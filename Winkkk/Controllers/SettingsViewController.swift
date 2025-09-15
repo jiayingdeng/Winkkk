@@ -103,7 +103,7 @@ class SettingsViewController: UIViewController {
                         action: { [weak self] in self?.showEnhanceSettings() }
                     ),
                     SettingsItem(
-                        type: .switch,
+                        type: .toggle,
                         title: "自动画质修复",
                         subtitle: "截图后自动应用修复",
                         icon: "autostartstop",
@@ -120,7 +120,7 @@ class SettingsViewController: UIViewController {
                 title: "分享设置",
                 items: [
                     SettingsItem(
-                        type: .switch,
+                        type: .toggle,
                         title: "默认添加水印",
                         subtitle: "分享时自动添加应用水印",
                         icon: "drop.fill",
@@ -468,7 +468,7 @@ extension SettingsViewController: UITableViewDataSource, UITableViewDelegate {
         let item = sections[indexPath.section].items[indexPath.row]
         
         switch item.type {
-        case .switch:
+        case .toggle:
             let cell = tableView.dequeueReusableCell(withIdentifier: SettingsSwitchCell.identifier, for: indexPath) as! SettingsSwitchCell
             cell.configure(with: item)
             return cell
@@ -543,7 +543,7 @@ class SettingsItem {
 
 enum SettingsItemType {
     case selection
-    case switch
+    case toggle
     case detail
     case action
 }

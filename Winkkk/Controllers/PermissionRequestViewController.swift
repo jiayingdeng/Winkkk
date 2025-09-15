@@ -34,7 +34,7 @@ class PermissionRequestViewController: UIViewController {
     private let stackView = UIStackView()
     
     // Button
-    private let continueButton = ThemedButton()
+    private let continueButton = CapsuleButton(style: .primary, size: .medium)
     private let laterButton = UIButton()
     
     // MARK: - Permission Data

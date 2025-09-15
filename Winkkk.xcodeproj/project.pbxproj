@@ -29,9 +29,22 @@
 		5E0550182E77FAEA0062CBE7 /* WinkkkUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WinkkkUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		5E0550692E7814CA0062CBE7 /* Exceptions for "Winkkk" folder in "Winkkk" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 5E0550002E77FAE90062CBE7 /* Winkkk */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		5E0550032E77FAE90062CBE7 /* Winkkk */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5E0550692E7814CA0062CBE7 /* Exceptions for "Winkkk" folder in "Winkkk" target */,
+			);
 			path = Winkkk;
 			sourceTree = "<group>";
 		};

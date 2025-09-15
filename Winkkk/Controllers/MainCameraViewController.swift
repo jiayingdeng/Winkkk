@@ -541,9 +541,3 @@ extension MainCameraViewController: CameraManagerDelegate {
     }
 }
 
-// MARK: - CameraManagerDelegate协议定义
-protocol CameraManagerDelegate: AnyObject {
-    func cameraManagerDidStartSession()
-    func cameraManagerDidStopSession()
-    func cameraManager(_ manager: CameraManager, didFailWithError error: Error)
-}

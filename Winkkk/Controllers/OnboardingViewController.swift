@@ -30,7 +30,7 @@ class OnboardingViewController: UIViewController {
     private var currentPageView: OnboardingPageView?
     
     // 按钮
-    private let continueButton = ThemedButton()
+    private let continueButton = CapsuleButton(style: .primary, size: .medium)
     private let skipButton = UIButton()
     
     // MARK: - Data

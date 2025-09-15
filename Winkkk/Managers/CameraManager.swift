@@ -9,6 +9,13 @@
 import AVFoundation
 import UIKit
 
+// MARK: - CameraManagerDelegate Protocol
+protocol CameraManagerDelegate: AnyObject {
+    func cameraManagerDidStartSession()
+    func cameraManagerDidStopSession()
+    func cameraManager(_ manager: CameraManager, didFailWithError error: Error)
+}
+
 class CameraManager: NSObject {
     
     // MARK: - Properties
@@ -29,8 +36,8 @@ class CameraManager: NSObject {
     // 设备性能配置
     private let devicePerformance = DeviceInfo.performanceLevel
     
-    // MARK: - Public Properties
-    var captureSession: AVCaptureSession {
+    // MARK: - Public Properties  
+    var sessionPreview: AVCaptureSession {
         return captureSession
     }
     

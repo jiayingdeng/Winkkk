@@ -15,12 +15,12 @@ class ImageEnhancer {
     private let context: CIContext
     
     // 滤镜实例缓存
-    private lazy var unsharpMaskFilter = CIFilter.unsharpMask()
-    private lazy var colorControlsFilter = CIFilter.colorControls()
-    private lazy var exposureAdjustFilter = CIFilter.exposureAdjust()
-    private lazy var vibrance = CIFilter.vibrance()
-    private lazy var gaussianBlur = CIFilter.gaussianBlur()
-    private lazy var lanczosScaleTransform = CIFilter.lanczosScaleTransform()
+    private lazy var unsharpMaskFilter = CIFilter(name: "CIUnsharpMask")
+    private lazy var colorControlsFilter = CIFilter(name: "CIColorControls")
+    private lazy var exposureAdjustFilter = CIFilter(name: "CIExposureAdjust")
+    private lazy var vibranceFilter = CIFilter(name: "CIVibrance")
+    private lazy var gaussianBlurFilter = CIFilter(name: "CIGaussianBlur")
+    private lazy var lanczosScaleFilter = CIFilter(name: "CILanczosScaleTransform")
     
     // MARK: - Initialization
     init() {
@@ -160,10 +160,10 @@ class ImageEnhancer {
     /// - Returns: 颜色增强后的图像
     /// - Throws: 处理错误
     private func enhanceColors(_ image: CIImage, level: EnhanceLevel) throws -> CIImage {
-        vibrance.inputImage = image
-        vibrance.amount = level.vibranceBoost
+        vibranceFilter?.inputImage = image
+        vibranceFilter?.setValue(level.vibranceBoost, forKey: "inputAmount")
         
-        guard let vibranceImage = vibrance.outputImage else {
+        guard let vibranceImage = vibranceFilter?.outputImage else {
             throw ImageEnhancementError.processingFailed("Vibrance enhancement failed")
         }
         
@@ -188,10 +188,10 @@ class ImageEnhancer {
     /// - Throws: 处理错误
     private func applyNoiseReduction(to image: CIImage, intensity: Float) throws -> CIImage {
         // 使用轻微的高斯模糊作为简单的降噪
-        gaussianBlur.inputImage = image
-        gaussianBlur.radius = intensity
+        gaussianBlurFilter?.inputImage = image
+        gaussianBlurFilter?.setValue(intensity, forKey: "inputRadius")
         
-        guard let blurredImage = gaussianBlur.outputImage else {
+        guard let blurredImage = gaussianBlurFilter?.outputImage else {
             throw ImageEnhancementError.processingFailed("Noise reduction failed")
         }
         

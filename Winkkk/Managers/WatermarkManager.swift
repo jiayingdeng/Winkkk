@@ -13,7 +13,9 @@ class WatermarkManager {
     
     // MARK: - Singleton
     static let shared = WatermarkManager()
-    private init() {}
+    
+    // MARK: - Initialization
+    init() {}
     
     // MARK: - Properties
     private let context = CIContext()
@@ -364,7 +366,7 @@ class WatermarkManager {
     ///   - rect: 文字矩形
     ///   - context: 图形上下文
     ///   - style: 水印样式
-    private func drawTextBackground(in rect: CGRect, context: CGGraphicsContext, style: WatermarkStyle) {
+    private func drawTextBackground(in rect: CGRect, context: CGContext, style: WatermarkStyle) {
         let backgroundRect = rect.insetBy(dx: -style.backgroundPadding, dy: -style.backgroundPadding)
         
         context.setFillColor(style.backgroundColor.withAlphaComponent(style.backgroundOpacity).cgColor)

@@ -387,41 +387,7 @@ struct VideoInfo {
     let duration: Double
 }
 
-struct CacheCleanupResult {
-    let deletedVideoCount: Int
-    let deletedVideoSize: Int64
-    let deletedThumbnailCount: Int
-    let deletedThumbnailSize: Int64
-    
-    var totalDeletedSize: Int64 {
-        return deletedVideoSize + deletedThumbnailSize
-    }
-    
-    var totalDeletedCount: Int {
-        return deletedVideoCount + deletedThumbnailCount
-    }
-}
 
-struct CacheSizeInfo {
-    let videoCount: Int
-    let videosSize: Int64
-    let thumbnailsSize: Int64
-    let screenshotCount: Int
-    let screenshotsSize: Int64
-    let totalSize: Int64
-    
-    var formattedTotalSize: String {
-        return String.formatFileSize(totalSize)
-    }
-    
-    var formattedVideosSize: String {
-        return String.formatFileSize(videosSize)
-    }
-    
-    var formattedScreenshotsSize: String {
-        return String.formatFileSize(screenshotsSize)
-    }
-}
 
 // MARK: - Error Types
 enum VideoManagerError: LocalizedError {
