@@ -54,11 +54,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
         print("🔗 AppDelegate: configurationForConnecting called")
         print("   Session role: \(connectingSceneSession.role)")
-        print("   Connection options: \(connectionOptions)")
+        print("   Connection options: \(options)")
         
         let config = UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
         print("   Created config: \(config)")
-        print("   Delegate class: \(config.delegateClass?.description ?? "nil")")
+        print("   Delegate class: \(String(describing: config.delegateClass))")
         
         return config
     }
