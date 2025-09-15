@@ -24,8 +24,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             print("❌ AppDelegate: Theme configuration failed: \(error)")
         }
         
-        // 如果不支持Scene (iOS 12及以下)，创建窗口
+        // 只在不支持Scene的设备上 (iOS 12及以下) 创建窗口
         if #unavailable(iOS 13.0) {
+            print("📱 AppDelegate: iOS 12 or below, setting up window manually")
             window = UIWindow(frame: UIScreen.main.bounds)
             
             // 检查是否完成引导
@@ -41,18 +42,35 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             }
             
             window?.makeKeyAndVisible()
+        } else {
+            print("📱 AppDelegate: iOS 13+, Scene system should handle window creation")
         }
         
+        print("✅ AppDelegate: application(_:didFinishLaunchingWithOptions:) - COMPLETED")
         return true
     }
     
     // MARK: - UISceneSession Lifecycle (iOS 13+)
     func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
-        return UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+        print("🔗 AppDelegate: configurationForConnecting called")
+        print("   Session role: \(connectingSceneSession.role)")
+        print("   Connection options: \(connectionOptions)")
+        
+        let config = UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+        print("   Created config: \(config)")
+        print("   Delegate class: \(config.delegateClass?.description ?? "nil")")
+        
+        return config
+    }
+    
+    func application(_ application: UIApplication, didDiscardSceneSessions sceneSessions: Set<UISceneSession>) {
+        print("🗑️ AppDelegate: didDiscardSceneSessions called")
     }
 }
 
 // MARK: - Scene Delegate (iOS 13+)
+@available(iOS 13.0, *)
+@objc(SceneDelegate)
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     
     var window: UIWindow?
