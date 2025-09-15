@@ -44,6 +44,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             window?.makeKeyAndVisible()
         } else {
             print("📱 AppDelegate: iOS 13+, Scene system should handle window creation")
+            print("📝 AppDelegate: Available scene configurations:")
+            if let manifest = Bundle.main.infoDictionary?["UIApplicationSceneManifest"] as? [String: Any],
+               let configurations = manifest["UISceneConfigurations"] as? [String: Any],
+               let windowSceneConfigs = configurations["UIWindowSceneSessionRoleApplication"] as? [[String: Any]] {
+                for config in windowSceneConfigs {
+                    print("   - Name: \(config["UISceneConfigurationName"] ?? "nil")")
+                    print("   - Delegate: \(config["UISceneDelegateClassName"] ?? "nil")")
+                }
+            } else {
+                print("❌ AppDelegate: No scene configurations found in Info.plist!")
+            }
         }
         
         print("✅ AppDelegate: application(_:didFinishLaunchingWithOptions:) - COMPLETED")
@@ -51,20 +62,27 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
     
     // MARK: - UISceneSession Lifecycle (iOS 13+)
+    @available(iOS 13.0, *)
     func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
         print("🔗 AppDelegate: configurationForConnecting called")
         print("   Session role: \(connectingSceneSession.role)")
         print("   Connection options: \(options)")
         
+        // 明确设置Scene配置
         let config = UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
+        config.delegateClass = SceneDelegate.self
+        
         print("   Created config: \(config)")
         print("   Delegate class: \(String(describing: config.delegateClass))")
+        print("   Scene class: \(String(describing: config.sceneClass))")
         
         return config
     }
     
+    @available(iOS 13.0, *)
     func application(_ application: UIApplication, didDiscardSceneSessions sceneSessions: Set<UISceneSession>) {
         print("🗑️ AppDelegate: didDiscardSceneSessions called")
+        print("   Discarded sessions count: \(sceneSessions.count)")
     }
 }
 
