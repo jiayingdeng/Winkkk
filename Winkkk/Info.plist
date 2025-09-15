@@ -4,7 +4,7 @@
 <dict>
 	<!-- App基础信息 -->
 	<key>CFBundleIdentifier</key>
-	<string>com.winkkk.app</string>
+	<string>com.UI.Winkkk</string>
 	
 	<key>CFBundleName</key>
 	<string>Winkkk</string>

@@ -265,43 +265,74 @@ extension ThemeManager {
     
     /// 配置主题
     func configureTheme() {
-        Self.configureShadows()
+        print("🎨 ThemeManager: configureTheme() - START")
         
-        // 配置全局外观
-        configureGlobalAppearance()
+        do {
+            Self.configureShadows()
+            print("✅ ThemeManager: Shadows configured")
+            
+            // 配置全局外观
+            configureGlobalAppearance()
+            print("✅ ThemeManager: Global appearance configured")
+            
+        } catch {
+            print("❌ ThemeManager: Configuration failed: \(error)")
+            // 即使配置失败，也不要抛出错误，让应用继续运行
+        }
+        
+        print("✅ ThemeManager: configureTheme() - COMPLETED")
     }
     
     /// 配置全局外观
     private func configureGlobalAppearance() {
-        // 配置导航栏外观
-        let navigationBarAppearance = UINavigationBarAppearance()
-        navigationBarAppearance.configureWithTransparentBackground()
-        navigationBarAppearance.titleTextAttributes = [
-            .foregroundColor: Self.primaryText,
-            .font: Self.headlineFont
-        ]
-        navigationBarAppearance.largeTitleTextAttributes = [
-            .foregroundColor: Self.primaryText,
-            .font: Self.titleFont
-        ]
+        print("🎨 ThemeManager: Configuring global appearance...")
         
-        UINavigationBar.appearance().standardAppearance = navigationBarAppearance
-        UINavigationBar.appearance().compactAppearance = navigationBarAppearance
-        UINavigationBar.appearance().scrollEdgeAppearance = navigationBarAppearance
+        // 配置导航栏外观
+        do {
+            let navigationBarAppearance = UINavigationBarAppearance()
+            navigationBarAppearance.configureWithTransparentBackground()
+            navigationBarAppearance.titleTextAttributes = [
+                .foregroundColor: Self.primaryText,
+                .font: Self.headlineFont
+            ]
+            navigationBarAppearance.largeTitleTextAttributes = [
+                .foregroundColor: Self.primaryText,
+                .font: Self.titleFont
+            ]
+            
+            UINavigationBar.appearance().standardAppearance = navigationBarAppearance
+            UINavigationBar.appearance().compactAppearance = navigationBarAppearance
+            UINavigationBar.appearance().scrollEdgeAppearance = navigationBarAppearance
+            print("✅ ThemeManager: Navigation bar configured")
+        } catch {
+            print("❌ ThemeManager: Navigation bar configuration failed: \(error)")
+        }
         
         // 配置标签栏外观
-        let tabBarAppearance = UITabBarAppearance()
-        tabBarAppearance.configureWithTransparentBackground()
-        tabBarAppearance.backgroundColor = Self.cardBackground.withAlphaComponent(0.9)
-        
-        UITabBar.appearance().standardAppearance = tabBarAppearance
-        UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
+        do {
+            let tabBarAppearance = UITabBarAppearance()
+            tabBarAppearance.configureWithTransparentBackground()
+            tabBarAppearance.backgroundColor = Self.cardBackground.withAlphaComponent(0.9)
+            
+            UITabBar.appearance().standardAppearance = tabBarAppearance
+            UITabBar.appearance().scrollEdgeAppearance = tabBarAppearance
+            print("✅ ThemeManager: Tab bar configured")
+        } catch {
+            print("❌ ThemeManager: Tab bar configuration failed: \(error)")
+        }
         
         // 配置工具栏外观
-        let toolbarAppearance = UIToolbarAppearance()
-        toolbarAppearance.configureWithTransparentBackground()
+        do {
+            let toolbarAppearance = UIToolbarAppearance()
+            toolbarAppearance.configureWithTransparentBackground()
+            
+            UIToolbar.appearance().standardAppearance = toolbarAppearance
+            UIToolbar.appearance().compactAppearance = toolbarAppearance
+            print("✅ ThemeManager: Toolbar configured")
+        } catch {
+            print("❌ ThemeManager: Toolbar configuration failed: \(error)")
+        }
         
-        UIToolbar.appearance().standardAppearance = toolbarAppearance
-        UIToolbar.appearance().compactAppearance = toolbarAppearance
+        print("✅ ThemeManager: Global appearance configuration completed")
     }
 }
