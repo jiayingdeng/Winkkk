@@ -75,15 +75,26 @@ class OnboardingViewController: UIViewController {
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
+        print("🎬 OnboardingViewController: viewDidLoad")
         setupUI()
-        setupPages()
         setupConstraints()
         setupGestures()
         updateUI()
+        print("✅ OnboardingViewController: viewDidLoad completed")
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        
+        // 在布局完成后设置页面，确保view.bounds是正确的
+        if onboardingPages.isEmpty {
+            setupPages()
+        }
     }
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        print("🎭 OnboardingViewController: viewDidAppear")
         
         // 添加进入动画
         animatePageEntrance()
@@ -126,6 +137,12 @@ class OnboardingViewController: UIViewController {
     }
     
     private func setupPages() {
+        // 确保view有正确的bounds
+        guard view.bounds.width > 0 && view.bounds.height > 0 else {
+            print("⚠️ OnboardingViewController: View bounds not ready, skipping page setup")
+            return
+        }
+        
         onboardingPages.removeAll()
         
         for (index, data) in onboardingData.enumerated() {
@@ -150,6 +167,8 @@ class OnboardingViewController: UIViewController {
         )
         
         scrollView.contentSize = contentView.frame.size
+        
+        print("✅ OnboardingViewController: Pages setup completed with \(onboardingPages.count) pages")
     }
     
     private func setupConstraints() {
