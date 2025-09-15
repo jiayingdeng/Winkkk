@@ -278,7 +278,7 @@ extension MainCameraViewController {
         
         // 设置预览层
         if previewLayer == nil {
-            previewLayer = AVCaptureVideoPreviewLayer(session: cameraManager.captureSession)
+            previewLayer = AVCaptureVideoPreviewLayer(session: cameraManager.previewSession)
             previewLayer?.frame = cameraPreviewView.bounds
             previewLayer?.videoGravity = .resizeAspectFill
             cameraPreviewView.layer.addSublayer(previewLayer!)

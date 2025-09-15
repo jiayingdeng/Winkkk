@@ -22,6 +22,11 @@ class CameraManager: NSObject {
     weak var delegate: CameraManagerDelegate?
     
     private let captureSession = AVCaptureSession()
+    
+    /// 获取捕获会话（用于预览层）
+    var previewSession: AVCaptureSession {
+        return captureSession
+    }
     private var videoDeviceInput: AVCaptureDeviceInput?
     private var audioDeviceInput: AVCaptureDeviceInput?
     private var movieFileOutput: AVCaptureMovieFileOutput?
@@ -67,15 +72,6 @@ class CameraManager: NSObject {
             
         case (.authorized, .notDetermined):
             requestMicrophonePermission(completion: completion)
-            
-        case (.notDetermined, .notDetermined):
-            AVCaptureDevice.requestAccess(for: .video) { [weak self] cameraGranted in
-                if cameraGranted {
-                    self?.requestMicrophonePermission(completion: completion)
-                } else {
-                    completion(false)
-                }
-            }
             
         default:
             completion(false)
@@ -266,9 +262,15 @@ class CameraManager: NSObject {
             
             // 配置视频连接
             if let connection = movieOutput.connection(with: .video) {
-                // 设置视频方向
-                if connection.isVideoOrientationSupported {
-                    connection.videoOrientation = .portrait
+                // 设置视频方向 (使用iOS 17+的新API)
+                if #available(iOS 17.0, *) {
+                    if connection.isVideoRotationAngleSupported(90) {
+                        connection.videoRotationAngle = 90 // Portrait方向
+                    }
+                } else {
+                    if connection.isVideoOrientationSupported {
+                        connection.videoOrientation = .portrait
+                    }
                 }
                 
                 // 启用视频防抖
@@ -470,7 +472,7 @@ extension CameraManager {
     
     private func convertPointToDeviceCoordinates(_ point: CGPoint, in view: UIView) -> CGPoint {
         // 将视图坐标转换为设备坐标 (0,0) - (1,1)
-        return CGPoint(x: point.y / view.bounds.height, x: 1.0 - point.x / view.bounds.width)
+        return CGPoint(x: point.y / view.bounds.height, y: 1.0 - point.x / view.bounds.width)
     }
 }
 

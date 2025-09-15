@@ -213,17 +213,6 @@ extension PersistenceController {
         container.viewContext.automaticallyMergesChangesFromParent = true
         container.viewContext.mergePolicy = NSMergeByPropertyStoreTrumpMergePolicy
         
-        var controller = PersistenceController.__allocating_init()
-        controller.setValue(container, forKey: "container")
-        return controller
-    }
-}
-
-private extension PersistenceController {
-    static func __allocating_init() -> PersistenceController {
-        return unsafeBitCast(
-            class_createInstance(PersistenceController.self, 0),
-            to: PersistenceController.self
-        )
+        return PersistenceController(container: container)
     }
 }

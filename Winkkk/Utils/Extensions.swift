@@ -415,3 +415,4 @@ struct FileManagerHelper {
         return size
     }
 }
+

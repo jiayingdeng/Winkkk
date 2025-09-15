@@ -494,92 +494,23 @@ enum VideoQuality: CaseIterable {
     }
 }
 
-// MARK: - Cache Management
+// MARK: - Cache Management Helper Methods
 extension VideoManager {
-    
-    func getCacheSize(completion: @escaping (Result<CacheSizeInfo, Error>) -> Void) {
-        DispatchQueue.global(qos: .background).async {
-            do {
-                let tempDir = FileManagerHelper.getTempDirectory()
-                let documentsDir = FileManagerHelper.getDocumentsDirectory()
-                let videosDir = documentsDir.appendingPathComponent("Videos")
-                let screenshotsDir = documentsDir.appendingPathComponent("Screenshots")
-                let thumbnailsDir = documentsDir.appendingPathComponent("Thumbnails")
-                
-                // Calculate sizes
-                let tempSize = try self.calculateDirectorySize(tempDir)
-                let videoSize = try self.calculateDirectorySize(videosDir)
-                let screenshotSize = try self.calculateDirectorySize(screenshotsDir)
-                let thumbnailSize = try self.calculateDirectorySize(thumbnailsDir)
-                
-                let info = CacheSizeInfo(
-                    tempFileSize: tempSize,
-                    videoFileSize: videoSize,
-                    screenshotFileSize: screenshotSize,
-                    thumbnailCacheSize: thumbnailSize
-                )
-                
-                DispatchQueue.main.async {
-                    completion(.success(info))
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    completion(.failure(error))
-                }
-            }
-        }
-    }
-    
-    func cleanupCache(completion: @escaping (Result<CacheCleanupResult, Error>) -> Void) {
-        DispatchQueue.global(qos: .background).async {
-            do {
-                var totalDeletedSize: Int64 = 0
-                var totalDeletedCount = 0
-                
-                // Clean temp files
-                let tempDir = FileManagerHelper.getTempDirectory()
-                let tempResult = try self.cleanupDirectory(tempDir, keepDirectory: true)
-                totalDeletedSize += tempResult.size
-                totalDeletedCount += tempResult.count
-                
-                // Clean thumbnail cache
-                let documentsDir = FileManagerHelper.getDocumentsDirectory()
-                let thumbnailsDir = documentsDir.appendingPathComponent("Thumbnails")
-                let thumbnailResult = try self.cleanupDirectory(thumbnailsDir, keepDirectory: true)
-                totalDeletedSize += thumbnailResult.size
-                totalDeletedCount += thumbnailResult.count
-                
-                // Clear memory cache
-                self.thumbnailCache.removeAllObjects()
-                
-                let result = CacheCleanupResult(
-                    totalDeletedSize: totalDeletedSize,
-                    totalDeletedCount: totalDeletedCount
-                )
-                
-                DispatchQueue.main.async {
-                    completion(.success(result))
-                }
-            } catch {
-                DispatchQueue.main.async {
-                    completion(.failure(error))
-                }
-            }
-        }
-    }
     
     private func calculateDirectorySize(_ directory: URL) throws -> Int64 {
         let resourceKeys: [URLResourceKey] = [.isRegularFileKey, .fileAllocatedSizeKey]
-        let enumerator = FileManager.default.enumerator(
+        guard let enumerator = FileManager.default.enumerator(
             at: directory,
             includingPropertiesForKeys: resourceKeys,
             options: [.skipsHiddenFiles],
             errorHandler: nil
-        )
+        ) else {
+            return 0
+        }
         
         var totalSize: Int64 = 0
         
-        for case let fileURL as URL in enumerator ?? [] {
+        while let fileURL = enumerator.nextObject() as? URL {
             let resourceValues = try fileURL.resourceValues(forKeys: Set(resourceKeys))
             
             if resourceValues.isRegularFile == true {
@@ -619,14 +550,12 @@ extension VideoManager {
 
 // MARK: - Cache Data Structures
 struct CacheSizeInfo {
-    let tempFileSize: Int64
-    let videoFileSize: Int64
-    let screenshotFileSize: Int64
-    let thumbnailCacheSize: Int64
-    
-    var totalSize: Int64 {
-        return tempFileSize + thumbnailCacheSize
-    }
+    let videoCount: Int
+    let videosSize: Int64
+    let thumbnailsSize: Int64
+    let screenshotCount: Int
+    let screenshotsSize: Int64
+    let totalSize: Int64
     
     var formattedTotalSize: String {
         return String.formatFileSize(totalSize)
@@ -634,6 +563,16 @@ struct CacheSizeInfo {
 }
 
 struct CacheCleanupResult {
-    let totalDeletedSize: Int64
-    let totalDeletedCount: Int
+    let deletedVideoCount: Int
+    let deletedVideoSize: Int64
+    let deletedThumbnailCount: Int
+    let deletedThumbnailSize: Int64
+    
+    var totalDeletedSize: Int64 {
+        return deletedVideoSize + deletedThumbnailSize
+    }
+    
+    var totalDeletedCount: Int {
+        return deletedVideoCount + deletedThumbnailCount
+    }
 }

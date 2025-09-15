@@ -56,7 +56,7 @@ struct PersistenceController {
     /// Core Data 容器
     let container: NSPersistentContainer
     
-    /// 初始化方法
+    /// 默认初始化方法
     init(inMemory: Bool = false) {
         container = NSPersistentContainer(name: "WinkkkDataModel")
         
@@ -76,6 +76,15 @@ struct PersistenceController {
                 fatalError("Core Data 加载失败: \(error), \(error.userInfo)")
             }
         }
+        
+        // 配置视图上下文
+        container.viewContext.automaticallyMergesChangesFromParent = true
+        container.viewContext.mergePolicy = NSMergeByPropertyStoreTrumpMergePolicy
+    }
+    
+    /// 使用自定义container初始化
+    init(container: NSPersistentContainer) {
+        self.container = container
         
         // 配置视图上下文
         container.viewContext.automaticallyMergesChangesFromParent = true

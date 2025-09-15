@@ -15,12 +15,12 @@ class ImageEnhancer {
     private let context: CIContext
     
     // 滤镜实例缓存
-    private lazy var unsharpMaskFilter = CIFilter(name: "CIUnsharpMask")
-    private lazy var colorControlsFilter = CIFilter(name: "CIColorControls")
-    private lazy var exposureAdjustFilter = CIFilter(name: "CIExposureAdjust")
-    private lazy var vibranceFilter = CIFilter(name: "CIVibrance")
-    private lazy var gaussianBlurFilter = CIFilter(name: "CIGaussianBlur")
-    private lazy var lanczosScaleFilter = CIFilter(name: "CILanczosScaleTransform")
+    private lazy var unsharpMaskFilter = CIFilter(name: "CIUnsharpMask")!
+    private lazy var colorControlsFilter = CIFilter(name: "CIColorControls")!
+    private lazy var exposureAdjustFilter = CIFilter(name: "CIExposureAdjust")!
+    private lazy var vibranceFilter = CIFilter(name: "CIVibrance")!
+    private lazy var gaussianBlurFilter = CIFilter(name: "CIGaussianBlur")!
+    private lazy var lanczosScaleFilter = CIFilter(name: "CILanczosScaleTransform")!
     
     // MARK: - Initialization
     init() {
@@ -113,10 +113,10 @@ class ImageEnhancer {
     /// - Returns: 锐化后的图像
     /// - Throws: 处理错误
     private func applyUnsharpMask(to image: CIImage, intensity: Float) throws -> CIImage {
-        unsharpMaskFilter.inputImage = image
-        unsharpMaskFilter.intensity = intensity
-        unsharpMaskFilter.radius = 2.5  // 锐化半径
-        unsharpMaskFilter.threshold = 0.1 // 锐化阈值
+        unsharpMaskFilter.setValue(image, forKey: kCIInputImageKey)
+        unsharpMaskFilter.setValue(intensity, forKey: kCIInputIntensityKey)
+        unsharpMaskFilter.setValue(2.5, forKey: kCIInputRadiusKey) // 锐化半径
+        unsharpMaskFilter.setValue(0.1, forKey: "inputThreshold") // 锐化阈值
         
         guard let outputImage = unsharpMaskFilter.outputImage else {
             throw ImageEnhancementError.processingFailed("Unsharp mask failed")
@@ -133,18 +133,18 @@ class ImageEnhancer {
     /// - Throws: 处理错误
     private func adjustExposureAndContrast(_ image: CIImage, level: EnhanceLevel) throws -> CIImage {
         // 曝光调整
-        exposureAdjustFilter.inputImage = image
-        exposureAdjustFilter.ev = level.exposureAdjustment
+        exposureAdjustFilter.setValue(image, forKey: kCIInputImageKey)
+        exposureAdjustFilter.setValue(level.exposureAdjustment, forKey: kCIInputEVKey)
         
         guard let exposureAdjustedImage = exposureAdjustFilter.outputImage else {
             throw ImageEnhancementError.processingFailed("Exposure adjustment failed")
         }
         
         // 对比度调整
-        colorControlsFilter.inputImage = exposureAdjustedImage
-        colorControlsFilter.contrast = 1.0 + level.contrastBoost
-        colorControlsFilter.brightness = level.brightnessAdjustment
-        colorControlsFilter.saturation = 1.0 // 在颜色增强中单独处理
+        colorControlsFilter.setValue(exposureAdjustedImage, forKey: kCIInputImageKey)
+        colorControlsFilter.setValue(1.0 + level.contrastBoost, forKey: kCIInputContrastKey)
+        colorControlsFilter.setValue(level.brightnessAdjustment, forKey: kCIInputBrightnessKey)
+        colorControlsFilter.setValue(1.0, forKey: kCIInputSaturationKey) // 在颜色增强中单独处理
         
         guard let outputImage = colorControlsFilter.outputImage else {
             throw ImageEnhancementError.processingFailed("Color controls failed")
@@ -160,18 +160,18 @@ class ImageEnhancer {
     /// - Returns: 颜色增强后的图像
     /// - Throws: 处理错误
     private func enhanceColors(_ image: CIImage, level: EnhanceLevel) throws -> CIImage {
-        vibranceFilter?.inputImage = image
-        vibranceFilter?.setValue(level.vibranceBoost, forKey: "inputAmount")
+        vibranceFilter.setValue(image, forKey: kCIInputImageKey)
+        vibranceFilter.setValue(level.vibranceBoost, forKey: kCIInputAmountKey)
         
-        guard let vibranceImage = vibranceFilter?.outputImage else {
+        guard let vibranceImage = vibranceFilter.outputImage else {
             throw ImageEnhancementError.processingFailed("Vibrance enhancement failed")
         }
         
         // 饱和度微调
-        colorControlsFilter.inputImage = vibranceImage
-        colorControlsFilter.saturation = 1.0 + level.saturationBoost
-        colorControlsFilter.contrast = 1.0 // 重置对比度，避免累积
-        colorControlsFilter.brightness = 0.0 // 重置亮度
+        colorControlsFilter.setValue(vibranceImage, forKey: kCIInputImageKey)
+        colorControlsFilter.setValue(1.0 + level.saturationBoost, forKey: kCIInputSaturationKey)
+        colorControlsFilter.setValue(1.0, forKey: kCIInputContrastKey) // 重置对比度，避免累积
+        colorControlsFilter.setValue(0.0, forKey: kCIInputBrightnessKey) // 重置亮度
         
         guard let outputImage = colorControlsFilter.outputImage else {
             throw ImageEnhancementError.processingFailed("Saturation adjustment failed")
@@ -188,17 +188,19 @@ class ImageEnhancer {
     /// - Throws: 处理错误
     private func applyNoiseReduction(to image: CIImage, intensity: Float) throws -> CIImage {
         // 使用轻微的高斯模糊作为简单的降噪
-        gaussianBlurFilter?.inputImage = image
-        gaussianBlurFilter?.setValue(intensity, forKey: "inputRadius")
+        gaussianBlurFilter.setValue(image, forKey: kCIInputImageKey)
+        gaussianBlurFilter.setValue(intensity, forKey: kCIInputRadiusKey)
         
-        guard let blurredImage = gaussianBlurFilter?.outputImage else {
+        guard let blurredImage = gaussianBlurFilter.outputImage else {
             throw ImageEnhancementError.processingFailed("Noise reduction failed")
         }
         
         // 将原图和模糊图混合，保持细节
-        let blendFilter = CIFilter.sourceOverCompositing()
-        blendFilter.inputImage = image
-        blendFilter.backgroundImage = blurredImage
+        guard let blendFilter = CIFilter(name: "CISourceOverCompositing") else {
+            throw ImageEnhancementError.processingFailed("Cannot create blend filter")
+        }
+        blendFilter.setValue(image, forKey: kCIInputImageKey)
+        blendFilter.setValue(blurredImage, forKey: kCIInputBackgroundImageKey)
         
         guard let outputImage = blendFilter.outputImage else {
             throw ImageEnhancementError.processingFailed("Noise reduction blend failed")

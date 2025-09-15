@@ -221,8 +221,8 @@ class WatermarkManager {
         let logoWatermarked = try addLogoWatermark(to: image, style: style)
         
         // 然后添加文字（调整位置避免重叠）
-        var textStyle = style
-        textStyle.position = getAlternativePosition(for: style.position)
+        let alternativePosition = getAlternativePosition(for: style.position)
+        let textStyle = style.withPosition(alternativePosition)
         
         return try addTextWatermark(to: logoWatermarked, style: textStyle)
     }
@@ -433,6 +433,37 @@ struct WatermarkStyle {
     
     // Logo相关
     let logoImage: UIImage?
+    
+    // MARK: - 便捷方法
+    
+    /// 创建一个具有不同位置的副本
+    /// - Parameter newPosition: 新的位置
+    /// - Returns: 具有新位置的WatermarkStyle副本
+    func withPosition(_ newPosition: WatermarkPosition) -> WatermarkStyle {
+        return WatermarkStyle(
+            type: type,
+            text: text,
+            position: newPosition,
+            size: size,
+            opacity: opacity,
+            margin: margin,
+            textColor: textColor,
+            fontWeight: fontWeight,
+            hasStroke: hasStroke,
+            strokeColor: strokeColor,
+            strokeWidth: strokeWidth,
+            hasShadow: hasShadow,
+            shadowColor: shadowColor,
+            shadowOffset: shadowOffset,
+            shadowBlurRadius: shadowBlurRadius,
+            hasBackground: hasBackground,
+            backgroundColor: backgroundColor,
+            backgroundOpacity: backgroundOpacity,
+            backgroundPadding: backgroundPadding,
+            backgroundCornerRadius: backgroundCornerRadius,
+            logoImage: logoImage
+        )
+    }
     
     // MARK: - 预设样式
     static let `default` = WatermarkStyle(
