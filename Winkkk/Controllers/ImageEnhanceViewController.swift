@@ -1,0 +1,515 @@
+//
+//  ImageEnhanceViewController.swift
+//  Winkkk
+//
+//  Created by Winkkk on 2024/12/20.
+//  图像画质修复视图控制器 - 修复前后对比和参数调节
+//
+
+import UIKit
+
+class ImageEnhanceViewController: UIViewController {
+    
+    // MARK: - Properties
+    private let originalImage: UIImage
+    private let timestamp: Double
+    private var enhancedImage: UIImage?
+    private var currentLevel: EnhanceLevel = .medium
+    
+    // MARK: - UI Components
+    private let gradientBackgroundView = GradientBackgroundView()
+    private let scrollView = UIScrollView()
+    private let contentView = UIView()
+    
+    // 图像对比视图
+    private let comparisonView = ImageComparisonView()
+    
+    // 控制面板
+    private let controlPanelBlurView = BlurEffectView(style: .regular, intensity: 0.9)
+    private let levelSegmentedControl = UISegmentedControl(items: ["轻度", "中度", "重度"])
+    private let enhanceButton = UIButton()
+    private let progressView = UIProgressView()
+    private let statusLabel = UILabel()
+    
+    // 底部按钮
+    private let resetButton = UIButton()
+    private let saveButton = UIButton()
+    private let shareButton = UIButton()
+    
+    // MARK: - Dependencies
+    private let imageEnhancer = ImageEnhancer()
+    
+    // MARK: - State
+    private var isProcessing = false {
+        didSet {
+            updateProcessingState()
+        }
+    }
+    
+    // MARK: - Initialization
+    init(image: UIImage, timestamp: Double) {
+        self.originalImage = image
+        self.timestamp = timestamp
+        super.init(nibName: nil, bundle: nil)
+    }
+    
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    // MARK: - Lifecycle
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        setupUI()
+        setupConstraints()
+        configureInitialState()
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        // 首次显示时自动应用中度修复
+        enhanceImageWithCurrentLevel()
+    }
+    
+    // MARK: - UI Setup
+    private func setupUI() {
+        view.backgroundColor = .black
+        
+        // 渐变背景
+        view.addSubview(gradientBackgroundView)
+        
+        // 滚动视图
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.showsHorizontalScrollIndicator = false
+        view.addSubview(scrollView)
+        
+        scrollView.addSubview(contentView)
+        
+        // 图像对比视图
+        comparisonView.setOriginalImage(originalImage)
+        contentView.addSubview(comparisonView)
+        
+        // 控制面板
+        setupControlPanel()
+        
+        // 导航栏
+        setupNavigationBar()
+    }
+    
+    private func setupNavigationBar() {
+        title = "画质修复"
+        navigationController?.navigationBar.tintColor = .white
+        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: UIColor.white]
+        
+        navigationItem.leftBarButtonItem = UIBarButtonItem(
+            title: "取消",
+            style: .plain,
+            target: self,
+            action: #selector(cancelButtonTapped)
+        )
+    }
+    
+    private func setupControlPanel() {
+        controlPanelBlurView.layer.cornerRadius = ThemeManager.largeCornerRadius
+        controlPanelBlurView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        view.addSubview(controlPanelBlurView)
+        
+        // 强度选择控件
+        setupLevelControl()
+        
+        // 修复按钮
+        setupEnhanceButton()
+        
+        // 进度视图
+        setupProgressView()
+        
+        // 底部按钮
+        setupBottomButtons()
+        
+        // 添加到控制面板
+        controlPanelBlurView.contentView.addSubview(levelSegmentedControl)
+        controlPanelBlurView.contentView.addSubview(enhanceButton)
+        controlPanelBlurView.contentView.addSubview(progressView)
+        controlPanelBlurView.contentView.addSubview(statusLabel)
+        controlPanelBlurView.contentView.addSubview(resetButton)
+        controlPanelBlurView.contentView.addSubview(saveButton)
+        controlPanelBlurView.contentView.addSubview(shareButton)
+    }
+    
+    private func setupLevelControl() {
+        levelSegmentedControl.selectedSegmentIndex = 1 // 默认中度
+        levelSegmentedControl.backgroundColor = ThemeManager.cardBackground
+        levelSegmentedControl.selectedSegmentTintColor = ThemeManager.buttonPrimary
+        levelSegmentedControl.setTitleTextAttributes([.foregroundColor: ThemeManager.primaryText], for: .normal)
+        levelSegmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
+        
+        levelSegmentedControl.addTarget(self, action: #selector(levelChanged(_:)), for: .valueChanged)
+    }
+    
+    private func setupEnhanceButton() {
+        enhanceButton.setTitle("应用修复", for: .normal)
+        enhanceButton.setTitleColor(.white, for: .normal)
+        enhanceButton.backgroundColor = ThemeManager.success
+        enhanceButton.layer.cornerRadius = ThemeManager.standardCornerRadius
+        enhanceButton.titleLabel?.font = ThemeManager.buttonFont
+        
+        enhanceButton.addTarget(self, action: #selector(enhanceButtonTapped), for: .touchUpInside)
+    }
+    
+    private func setupProgressView() {
+        progressView.progressTintColor = ThemeManager.buttonPrimary
+        progressView.trackTintColor = UIColor.white.withAlphaComponent(0.3)
+        progressView.isHidden = true
+        
+        statusLabel.textColor = .white
+        statusLabel.font = ThemeManager.captionFont
+        statusLabel.textAlignment = .center
+        statusLabel.text = "选择修复强度并点击应用修复"
+    }
+    
+    private func setupBottomButtons() {
+        // 重置按钮
+        resetButton.setTitle("重置", for: .normal)
+        resetButton.setTitleColor(ThemeManager.secondaryText, for: .normal)
+        resetButton.backgroundColor = UIColor.clear
+        resetButton.layer.borderWidth = 1
+        resetButton.layer.borderColor = ThemeManager.secondaryText.cgColor
+        resetButton.layer.cornerRadius = ThemeManager.smallCornerRadius
+        resetButton.addTarget(self, action: #selector(resetButtonTapped), for: .touchUpInside)
+        
+        // 保存按钮
+        saveButton.setTitle("保存", for: .normal)
+        saveButton.setTitleColor(.white, for: .normal)
+        saveButton.backgroundColor = ThemeManager.buttonPrimary
+        saveButton.layer.cornerRadius = ThemeManager.smallCornerRadius
+        saveButton.addTarget(self, action: #selector(saveButtonTapped), for: .touchUpInside)
+        
+        // 分享按钮
+        shareButton.setTitle("分享", for: .normal)
+        shareButton.setTitleColor(.white, for: .normal)
+        shareButton.backgroundColor = ThemeManager.success
+        shareButton.layer.cornerRadius = ThemeManager.smallCornerRadius
+        shareButton.addTarget(self, action: #selector(shareButtonTapped), for: .touchUpInside)
+        
+        // 初始状态设置
+        saveButton.isEnabled = false
+        saveButton.alpha = 0.6
+        shareButton.isEnabled = false
+        shareButton.alpha = 0.6
+    }
+    
+    private func setupConstraints() {
+        gradientBackgroundView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        comparisonView.translatesAutoresizingMaskIntoConstraints = false
+        controlPanelBlurView.translatesAutoresizingMaskIntoConstraints = false
+        
+        // 控制面板内的控件
+        levelSegmentedControl.translatesAutoresizingMaskIntoConstraints = false
+        enhanceButton.translatesAutoresizingMaskIntoConstraints = false
+        progressView.translatesAutoresizingMaskIntoConstraints = false
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
+        resetButton.translatesAutoresizingMaskIntoConstraints = false
+        saveButton.translatesAutoresizingMaskIntoConstraints = false
+        shareButton.translatesAutoresizingMaskIntoConstraints = false
+        
+        NSLayoutConstraint.activate([
+            // 渐变背景
+            gradientBackgroundView.topAnchor.constraint(equalTo: view.topAnchor),
+            gradientBackgroundView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            gradientBackgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            gradientBackgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
+            // 滚动视图
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: controlPanelBlurView.topAnchor),
+            
+            // 内容视图
+            contentView.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
+            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            
+            // 对比视图
+            comparisonView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
+            comparisonView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            comparisonView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            comparisonView.heightAnchor.constraint(equalTo: comparisonView.widthAnchor, multiplier: 1.2),
+            comparisonView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
+            
+            // 控制面板
+            controlPanelBlurView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            controlPanelBlurView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            controlPanelBlurView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            controlPanelBlurView.heightAnchor.constraint(equalToConstant: 200 + view.safeAreaInsets.bottom),
+            
+            // 强度选择
+            levelSegmentedControl.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 20),
+            levelSegmentedControl.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 20),
+            levelSegmentedControl.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -20),
+            levelSegmentedControl.heightAnchor.constraint(equalToConstant: 32),
+            
+            // 修复按钮
+            enhanceButton.topAnchor.constraint(equalTo: levelSegmentedControl.bottomAnchor, constant: 16),
+            enhanceButton.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
+            enhanceButton.widthAnchor.constraint(equalToConstant: 120),
+            enhanceButton.heightAnchor.constraint(equalToConstant: 40),
+            
+            // 进度视图
+            progressView.topAnchor.constraint(equalTo: enhanceButton.bottomAnchor, constant: 12),
+            progressView.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 40),
+            progressView.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -40),
+            
+            // 状态标签
+            statusLabel.topAnchor.constraint(equalTo: progressView.bottomAnchor, constant: 8),
+            statusLabel.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 20),
+            statusLabel.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -20),
+            
+            // 底部按钮
+            resetButton.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 16),
+            resetButton.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 20),
+            resetButton.widthAnchor.constraint(equalTo: controlPanelBlurView.widthAnchor, multiplier: 0.25),
+            resetButton.heightAnchor.constraint(equalToConstant: 36),
+            
+            saveButton.centerYAnchor.constraint(equalTo: resetButton.centerYAnchor),
+            saveButton.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
+            saveButton.widthAnchor.constraint(equalTo: resetButton.widthAnchor),
+            saveButton.heightAnchor.constraint(equalTo: resetButton.heightAnchor),
+            
+            shareButton.centerYAnchor.constraint(equalTo: resetButton.centerYAnchor),
+            shareButton.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -20),
+            shareButton.widthAnchor.constraint(equalTo: resetButton.widthAnchor),
+            shareButton.heightAnchor.constraint(equalTo: resetButton.heightAnchor)
+        ])
+    }
+    
+    private func configureInitialState() {
+        currentLevel = .medium
+        levelSegmentedControl.selectedSegmentIndex = 1
+        updateStatusLabel()
+    }
+    
+    // MARK: - Image Enhancement
+    @objc private func enhanceButtonTapped() {
+        enhanceImageWithCurrentLevel()
+    }
+    
+    @objc private func levelChanged(_ sender: UISegmentedControl) {
+        currentLevel = EnhanceLevel(rawValue: sender.selectedSegmentIndex + 1) ?? .medium
+        updateStatusLabel()
+        
+        // 如果已有增强图像，自动重新处理
+        if enhancedImage != nil {
+            enhanceImageWithCurrentLevel()
+        }
+    }
+    
+    private func enhanceImageWithCurrentLevel() {
+        guard !isProcessing else { return }
+        
+        isProcessing = true
+        progressView.progress = 0
+        
+        statusLabel.text = "正在处理图像..."
+        
+        // 触觉反馈
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        
+        imageEnhancer.enhanceImage(originalImage, level: currentLevel) { [weak self] result in
+            DispatchQueue.main.async {
+                self?.isProcessing = false
+                
+                switch result {
+                case .success(let enhanced):
+                    self?.handleEnhancementSuccess(enhanced)
+                    
+                case .failure(let error):
+                    self?.handleEnhancementError(error)
+                }
+            }
+        }
+        
+        // 模拟进度更新
+        animateProgress()
+    }
+    
+    private func animateProgress() {
+        UIView.animate(withDuration: 2.0, delay: 0, options: .curveEaseInOut) {
+            self.progressView.progress = 1.0
+        }
+    }
+    
+    private func handleEnhancementSuccess(_ enhanced: UIImage) {
+        enhancedImage = enhanced
+        comparisonView.setEnhancedImage(enhanced)
+        
+        statusLabel.text = "修复完成！可以保存或分享"
+        
+        // 启用保存和分享按钮
+        saveButton.isEnabled = true
+        saveButton.alpha = 1.0
+        shareButton.isEnabled = true
+        shareButton.alpha = 1.0
+        
+        // 成功触觉反馈
+        let successFeedback = UINotificationFeedbackGenerator()
+        successFeedback.notificationOccurred(.success)
+        
+        // 显示完成动画
+        showCompletionAnimation()
+    }
+    
+    private func handleEnhancementError(_ error: ImageEnhancementError) {
+        statusLabel.text = "修复失败：\(error.localizedDescription)"
+        
+        // 错误触觉反馈
+        let errorFeedback = UINotificationFeedbackGenerator()
+        errorFeedback.notificationOccurred(.error)
+        
+        // 显示错误提示
+        showErrorAlert(error)
+    }
+    
+    private func showCompletionAnimation() {
+        let checkmarkView = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
+        checkmarkView.tintColor = ThemeManager.success
+        checkmarkView.frame = CGRect(x: 0, y: 0, width: 50, height: 50)
+        checkmarkView.center = comparisonView.center
+        view.addSubview(checkmarkView)
+        
+        checkmarkView.alpha = 0
+        checkmarkView.transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
+        
+        UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.5) {
+            checkmarkView.alpha = 1
+            checkmarkView.transform = .identity
+        } completion: { _ in
+            UIView.animate(withDuration: 0.3, delay: 1.0, options: .curveEaseInOut) {
+                checkmarkView.alpha = 0
+            } completion: { _ in
+                checkmarkView.removeFromSuperview()
+            }
+        }
+    }
+    
+    private func updateProcessingState() {
+        enhanceButton.isEnabled = !isProcessing
+        enhanceButton.alpha = isProcessing ? 0.6 : 1.0
+        levelSegmentedControl.isEnabled = !isProcessing
+        
+        progressView.isHidden = !isProcessing
+        
+        if isProcessing {
+            enhanceButton.setTitle("处理中...", for: .normal)
+        } else {
+            enhanceButton.setTitle("应用修复", for: .normal)
+        }
+    }
+    
+    private func updateStatusLabel() {
+        if !isProcessing {
+            statusLabel.text = "\(currentLevel.displayName) - \(currentLevel.description)"
+        }
+    }
+    
+    // MARK: - Actions
+    @objc private func cancelButtonTapped() {
+        dismiss(animated: true)
+    }
+    
+    @objc private func resetButtonTapped() {
+        enhancedImage = nil
+        comparisonView.setEnhancedImage(nil)
+        
+        saveButton.isEnabled = false
+        saveButton.alpha = 0.6
+        shareButton.isEnabled = false
+        shareButton.alpha = 0.6
+        
+        statusLabel.text = "选择修复强度并点击应用修复"
+        
+        // 触觉反馈
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
+    }
+    
+    @objc private func saveButtonTapped() {
+        guard let enhanced = enhancedImage else { return }
+        
+        // 保存到相册并创建截图记录
+        saveEnhancedImage(enhanced)
+    }
+    
+    @objc private func shareButtonTapped() {
+        guard let enhanced = enhancedImage else { return }
+        
+        let shareVC = ShareViewController(image: enhanced, originalImage: originalImage)
+        let navController = UINavigationController(rootViewController: shareVC)
+        present(navController, animated: true)
+    }
+    
+    // MARK: - Save & Share
+    private func saveEnhancedImage(_ image: UIImage) {
+        // 显示保存进度
+        let alertController = UIAlertController(title: "保存中", message: "正在保存图片...", preferredStyle: .alert)
+        present(alertController, animated: true)
+        
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            
+            do {
+                // 保存到文件系统
+                let fileName = "enhanced_\(Date().timeIntervalSince1970).jpg"
+                let imageURL = FileManagerHelper.screenshotsDirectory.appendingPathComponent(fileName)
+                
+                guard let imageData = image.jpegData(compressionQuality: 0.95) else {
+                    throw ImageEnhancementError.processingFailed("Failed to create image data")
+                }
+                
+                try imageData.write(to: imageURL)
+                
+                // 创建截图记录
+                let imageSize = image.size
+                let fileSize = imageURL.fileSize
+                
+                // TODO: 关联到对应的VideoItem
+                
+                DispatchQueue.main.async {
+                    alertController.dismiss(animated: true) {
+                        self.showSaveSuccessAlert()
+                    }
+                }
+                
+            } catch {
+                DispatchQueue.main.async {
+                    alertController.dismiss(animated: true) {
+                        self.showSaveErrorAlert(error)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func showSaveSuccessAlert() {
+        let alert = UIAlertController(title: "保存成功", message: "图片已保存到相册", preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
+    }
+    
+    private func showSaveErrorAlert(_ error: Error) {
+        let alert = UIAlertController(title: "保存失败", message: error.localizedDescription, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
+    }
+    
+    private func showErrorAlert(_ error: ImageEnhancementError) {
+        let alert = UIAlertController(title: "处理失败", message: error.localizedDescription, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
+    }
+}

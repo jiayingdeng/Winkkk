@@ -350,6 +350,52 @@ struct DeviceInfo {
     }
 }
 
+// MARK: - VideoItem扩展
+extension VideoItem {
+    
+    /// 格式化时长
+    var formattedDuration: String {
+        return String.formatTime(duration)
+    }
+    
+    /// 格式化文件大小
+    var formattedFileSize: String {
+        return String.formatFileSize(fileSize)
+    }
+    
+    /// 格式化创建日期
+    var formattedCreationDate: String {
+        guard let date = createdDate else { return "未知日期" }
+        
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
+}
+
+// MARK: - ScreenshotItem扩展
+extension ScreenshotItem {
+    
+    /// 格式化时间戳
+    var formattedTimestamp: String {
+        return String.formatTime(timestamp)
+    }
+    
+    /// 格式化创建日期
+    var formattedCreationDate: String {
+        guard let date = createdDate else { return "未知日期" }
+        return date.shortString
+    }
+}
+
+// MARK: - 相机管理代理
+protocol CameraManagerDelegate: AnyObject {
+    func cameraManagerDidStartSession()
+    func cameraManagerDidStopSession()
+    func cameraManager(_ manager: CameraManager, didFailWithError error: Error)
+}
+
 // MARK: - 文件管理辅助
 struct FileManagerHelper {
     
