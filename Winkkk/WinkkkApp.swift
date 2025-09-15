@@ -50,11 +50,20 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         // 创建窗口
         window = UIWindow(windowScene: windowScene)
         
-        // 设置根视图控制器
-        let mainCameraVC = MainCameraViewController()
-        let navigationController = UINavigationController(rootViewController: mainCameraVC)
+        // 检查是否完成引导
+        let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "HasCompletedOnboarding")
         
-        window?.rootViewController = navigationController
+        if hasCompletedOnboarding {
+            // 已完成引导，直接进入主界面
+            let mainCameraVC = MainCameraViewController()
+            let navigationController = UINavigationController(rootViewController: mainCameraVC)
+            window?.rootViewController = navigationController
+        } else {
+            // 未完成引导，显示引导页面
+            let onboardingVC = OnboardingViewController()
+            window?.rootViewController = onboardingVC
+        }
+        
         window?.makeKeyAndVisible()
     }
     

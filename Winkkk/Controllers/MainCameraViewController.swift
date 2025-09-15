@@ -450,8 +450,14 @@ extension MainCameraViewController {
             blinkAnimation.fromValue = 1.0
             blinkAnimation.toValue = 0.3
             recordingIndicatorView.layer.add(blinkAnimation, forKey: "blink")
+            
+            // 启动录制按钮呼吸光效动画
+            AnimationManager.shared.startRecordingBreathingAnimation(on: recordButton)
         } else {
             recordingIndicatorView.layer.removeAnimation(forKey: "blink")
+            
+            // 停止录制按钮呼吸光效动画
+            AnimationManager.shared.stopRecordingBreathingAnimation(on: recordButton)
         }
     }
     

@@ -527,3 +527,147 @@ enum VideoQuality: CaseIterable {
         }
     }
 }
+
+// MARK: - Cache Management
+extension VideoManager {
+    
+    func getCacheSize(completion: @escaping (Result<CacheSizeInfo, Error>) -> Void) {
+        DispatchQueue.global(qos: .background).async {
+            do {
+                let tempDir = FileManagerHelper.getTempDirectory()
+                let documentsDir = FileManagerHelper.getDocumentsDirectory()
+                let videosDir = documentsDir.appendingPathComponent("Videos")
+                let screenshotsDir = documentsDir.appendingPathComponent("Screenshots")
+                let thumbnailsDir = documentsDir.appendingPathComponent("Thumbnails")
+                
+                // Calculate sizes
+                let tempSize = try self.calculateDirectorySize(tempDir)
+                let videoSize = try self.calculateDirectorySize(videosDir)
+                let screenshotSize = try self.calculateDirectorySize(screenshotsDir)
+                let thumbnailSize = try self.calculateDirectorySize(thumbnailsDir)
+                
+                let info = CacheSizeInfo(
+                    tempFileSize: tempSize,
+                    videoFileSize: videoSize,
+                    screenshotFileSize: screenshotSize,
+                    thumbnailCacheSize: thumbnailSize
+                )
+                
+                DispatchQueue.main.async {
+                    completion(.success(info))
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+            }
+        }
+    }
+    
+    func cleanupCache(completion: @escaping (Result<CacheCleanupResult, Error>) -> Void) {
+        DispatchQueue.global(qos: .background).async {
+            do {
+                var totalDeletedSize: Int64 = 0
+                var totalDeletedCount = 0
+                
+                // Clean temp files
+                let tempDir = FileManagerHelper.getTempDirectory()
+                let tempResult = try self.cleanupDirectory(tempDir, keepDirectory: true)
+                totalDeletedSize += tempResult.size
+                totalDeletedCount += tempResult.count
+                
+                // Clean thumbnail cache
+                let documentsDir = FileManagerHelper.getDocumentsDirectory()
+                let thumbnailsDir = documentsDir.appendingPathComponent("Thumbnails")
+                let thumbnailResult = try self.cleanupDirectory(thumbnailsDir, keepDirectory: true)
+                totalDeletedSize += thumbnailResult.size
+                totalDeletedCount += thumbnailResult.count
+                
+                // Clear memory cache
+                self.thumbnailCache.removeAllObjects()
+                
+                let result = CacheCleanupResult(
+                    totalDeletedSize: totalDeletedSize,
+                    totalDeletedCount: totalDeletedCount
+                )
+                
+                DispatchQueue.main.async {
+                    completion(.success(result))
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+            }
+        }
+    }
+    
+    private func calculateDirectorySize(_ directory: URL) throws -> Int64 {
+        let resourceKeys: [URLResourceKey] = [.isRegularFileKey, .fileAllocatedSizeKey]
+        let enumerator = FileManager.default.enumerator(
+            at: directory,
+            includingPropertiesForKeys: resourceKeys,
+            options: [.skipsHiddenFiles],
+            errorHandler: nil
+        )
+        
+        var totalSize: Int64 = 0
+        
+        for case let fileURL as URL in enumerator ?? [] {
+            let resourceValues = try fileURL.resourceValues(forKeys: Set(resourceKeys))
+            
+            if resourceValues.isRegularFile == true {
+                totalSize += Int64(resourceValues.fileAllocatedSize ?? 0)
+            }
+        }
+        
+        return totalSize
+    }
+    
+    private func cleanupDirectory(_ directory: URL, keepDirectory: Bool) throws -> (size: Int64, count: Int) {
+        guard FileManager.default.fileExists(atPath: directory.path) else {
+            return (0, 0)
+        }
+        
+        let contents = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.fileAllocatedSizeKey], options: [])
+        
+        var totalSize: Int64 = 0
+        var totalCount = 0
+        
+        for fileURL in contents {
+            let resourceValues = try fileURL.resourceValues(forKeys: [.fileAllocatedSizeKey])
+            let fileSize = Int64(resourceValues.fileAllocatedSize ?? 0)
+            
+            try FileManager.default.removeItem(at: fileURL)
+            totalSize += fileSize
+            totalCount += 1
+        }
+        
+        if keepDirectory {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: nil)
+        }
+        
+        return (totalSize, totalCount)
+    }
+}
+
+// MARK: - Cache Data Structures
+struct CacheSizeInfo {
+    let tempFileSize: Int64
+    let videoFileSize: Int64
+    let screenshotFileSize: Int64
+    let thumbnailCacheSize: Int64
+    
+    var totalSize: Int64 {
+        return tempFileSize + thumbnailCacheSize
+    }
+    
+    var formattedTotalSize: String {
+        return String.formatFileSize(totalSize)
+    }
+}
+
+struct CacheCleanupResult {
+    let totalDeletedSize: Int64
+    let totalDeletedCount: Int
+}

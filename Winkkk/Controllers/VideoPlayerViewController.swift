@@ -365,7 +365,7 @@ class VideoPlayerViewController: UIViewController {
     
     private func handleScreenshotSuccess(_ image: UIImage) {
         // 显示心形动画
-        showHeartAnimation()
+        AnimationManager.shared.showHeartSuccessAnimation(in: view, at: view.center)
         
         // 触觉反馈
         let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
@@ -376,49 +376,6 @@ class VideoPlayerViewController: UIViewController {
         let navController = UINavigationController(rootViewController: enhanceVC)
         navController.modalPresentationStyle = .fullScreen
         present(navController, animated: true)
-    }
-    
-    private func showHeartAnimation() {
-        let heartView = createHeartView()
-        view.addSubview(heartView)
-        
-        heartView.center = view.center
-        heartView.transform = CGAffineTransform(scaleX: 0.1, y: 0.1)
-        heartView.alpha = 0
-        
-        UIView.animateKeyframes(withDuration: 1.5, delay: 0, animations: {
-            UIView.addKeyframe(withRelativeStartTime: 0, relativeDuration: 0.3) {
-                heartView.transform = CGAffineTransform(scaleX: 1.2, y: 1.2)
-                heartView.alpha = 1
-            }
-            
-            UIView.addKeyframe(withRelativeStartTime: 0.3, relativeDuration: 0.4) {
-                heartView.transform = .identity
-            }
-            
-            UIView.addKeyframe(withRelativeStartTime: 0.7, relativeDuration: 0.3) {
-                heartView.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
-                heartView.alpha = 0
-                heartView.center.y -= 50
-            }
-        }) { _ in
-            heartView.removeFromSuperview()
-        }
-    }
-    
-    private func createHeartView() -> UIView {
-        let heartImageView = UIImageView(image: UIImage(systemName: "heart.fill"))
-        heartImageView.tintColor = ThemeManager.buttonPrimary
-        heartImageView.frame = CGRect(x: 0, y: 0, width: 60, height: 60)
-        heartImageView.contentMode = .scaleAspectFit
-        
-        // 添加发光效果
-        heartImageView.layer.shadowColor = ThemeManager.buttonPrimary.cgColor
-        heartImageView.layer.shadowRadius = 10
-        heartImageView.layer.shadowOpacity = 0.8
-        heartImageView.layer.shadowOffset = .zero
-        
-        return heartImageView
     }
     
     // MARK: - Actions
