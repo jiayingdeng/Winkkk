@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- 相机使用权限 -->
+	<key>NSCameraUsageDescription</key>
+	<string>此App需要访问您的相机来录制视频，让您能够捕捉精彩瞬间并创建完美截图。</string>
+	
+	<!-- 麦克风使用权限 -->
+	<key>NSMicrophoneUsageDescription</key>
+	<string>此App需要访问您的麦克风来录制包含音频的视频，为您提供完整的视听体验。</string>
+	
+	<!-- 相册访问权限 -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>此App需要访问您的相册来导入视频文件，让您能够从已有视频中截取精美图片。</string>
+	
+	<!-- 相册写入权限 -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>此App需要保存处理后的图片到您的相册，让您可以轻松保存和分享您的作品。</string>
+	
+	<!-- 支持的设备方向（仅竖屏） -->
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	
+	<!-- iPad支持的设备方向 -->
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
+	</array>
+	
+	<!-- 状态栏样式 -->
+	<key>UIStatusBarStyle</key>
+	<string>UIStatusBarStyleLightContent</string>
+	
+	<!-- 隐藏状态栏 -->
+	<key>UIStatusBarHidden</key>
+	<false/>
+	
+	<!-- 支持的最低iOS版本 -->
+	<key>MinimumOSVersion</key>
+	<string>15.0</string>
+	
+	<!-- App传输安全设置（允许相机访问） -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<false/>
+	</dict>
+</dict>
+</plist>
