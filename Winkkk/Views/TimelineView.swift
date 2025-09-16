@@ -508,10 +508,107 @@ class TimelineView: UIView {
         }
     }
     
-    // MARK: - Time Scale Generation (Placeholder for Task 7)
+    // MARK: - Time Scale Generation
     private func generateTimeScale() {
-        // TODO: 将在任务7中实现完整的时间刻度系统
-        print("TimeScale: \(currentTimeResolution.displayName) @ \(zoomScale)x")
+        // 🎯 第1步：清空旧的刻度图层
+        timeScaleView.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
+        
+        guard duration > 0, bounds.width > 0 else { return }
+        
+        // 🎯 第2步：确定需要绘制的可见时间范围
+        let visibleStartOffset = scrollView.contentOffset.x
+        let visibleEndOffset = visibleStartOffset + scrollView.bounds.width
+        
+        let startTime = coordinateToTime(visibleStartOffset)
+        let endTime = coordinateToTime(visibleEndOffset)
+        
+        // 🎯 第3步：获取刻度间隔并计算起始时间
+        let interval = getCurrentTimeInterval()
+        var currentTime = ceil(startTime / interval) * interval
+        
+        // 🎯 第4步：循环绘制每个刻度
+        while currentTime <= endTime {
+            // 将时间转换为contentView中的绝对X坐标
+            let absoluteX = timeToCoordinate(currentTime)
+            
+            // 转换为相对于timeScaleView的本地X坐标
+            let relativeX = absoluteX - scrollView.contentOffset.x
+            
+            // 只绘制在timeScaleView范围内的刻度
+            if relativeX >= 0 && relativeX <= timeScaleView.bounds.width {
+                drawTickMark(at: relativeX, for: currentTime, interval: interval)
+            }
+            
+            currentTime += interval
+        }
+        
+        print("🎯 时间刻度更新: \(currentTimeResolution.displayName) @ \(zoomScale)x, 范围: \(startTime.formattedTimeString())-\(endTime.formattedTimeString())")
+    }
+    
+    /// 绘制单个刻度线和文字
+    private func drawTickMark(at x: CGFloat, for time: Double, interval: Double) {
+        let isMainTick = shouldDrawTimeLabel(for: time, interval: interval)
+        
+        // 绘制刻度线
+        let tickLayer = CALayer()
+        tickLayer.backgroundColor = UIColor.white.withAlphaComponent(0.6).cgColor
+        tickLayer.frame = CGRect(
+            x: x - 0.5,
+            y: timeScaleView.bounds.height - (isMainTick ? 12 : 8),
+            width: 1,
+            height: isMainTick ? 12 : 8
+        )
+        timeScaleView.layer.addSublayer(tickLayer)
+        
+        // 只在主刻度位置绘制时间文字
+        if isMainTick {
+            let textLayer = CATextLayer()
+            textLayer.string = formatTimeForDisplay(time)
+            textLayer.font = UIFont.systemFont(ofSize: 11, weight: .medium)
+            textLayer.fontSize = 11
+            textLayer.foregroundColor = UIColor.white.withAlphaComponent(0.8).cgColor
+            textLayer.alignmentMode = .center
+            textLayer.contentsScale = UIScreen.main.scale
+            
+            // 计算文字尺寸并居中对齐
+            let textSize = (textLayer.string as? String)?.size(withAttributes: [
+                .font: UIFont.systemFont(ofSize: 11, weight: .medium)
+            ]) ?? CGSize(width: 40, height: 12)
+            
+            textLayer.frame = CGRect(
+                x: x - textSize.width / 2,
+                y: 2,
+                width: textSize.width,
+                height: textSize.height
+            )
+            
+            timeScaleView.layer.addSublayer(textLayer)
+        }
+    }
+    
+    /// 判断是否应该绘制时间文字（避免文字过于密集）
+    private func shouldDrawTimeLabel(for time: Double, interval: Double) -> Bool {
+        switch currentTimeResolution {
+        case .seconds:
+            return abs(time.truncatingRemainder(dividingBy: 1.0)) < 0.01
+        case .halfSeconds:
+            return abs(time.truncatingRemainder(dividingBy: 1.0)) < 0.01
+        case .frames:
+            let frameInterval = 1.0 / frameRate
+            let framesPerSecond = Int(1.0 / frameInterval)
+            let frameNumber = Int(time / frameInterval)
+            return frameNumber % max(1, framesPerSecond / 4) == 0  // 每秒显示4个主刻度
+        }
+    }
+    
+    /// 格式化时间显示
+    private func formatTimeForDisplay(_ time: Double) -> String {
+        switch currentTimeResolution {
+        case .seconds, .halfSeconds:
+            return time.formattedTimeString()
+        case .frames:
+            return time.formattedFrameString(at: frameRate)
+        }
     }
     
     private func centerCurrentProgressIfNeeded() {
@@ -985,6 +1082,9 @@ extension TimelineView: UIScrollViewDelegate {
             let progress = duration > 0 ? captureTime / duration : 0
             delegate?.timelineView(self, didSeekToProgress: progress)
         }
+        
+        // 🎯 新增：滚动时刷新时间刻度
+        generateTimeScale()
     }
     
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
