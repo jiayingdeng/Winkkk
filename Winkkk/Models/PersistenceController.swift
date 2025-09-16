@@ -11,8 +11,8 @@ import Foundation
 
 struct PersistenceController {
     
-    /// 共享实例
-    static let shared = PersistenceController()
+    /// 共享实例 - 使用自定义Code Data模型
+    static let shared = PersistenceController.createWithCustomModel()
     
     /// 预览用实例（用于SwiftUI预览）
     static var preview: PersistenceController = {

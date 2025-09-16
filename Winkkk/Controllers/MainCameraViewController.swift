@@ -462,6 +462,8 @@ extension MainCameraViewController {
     }
     
     private func handleRecordingComplete(url: URL) {
+        print("📹 录制完成，视频保存到: \(url)")
+        
         // 显示录制完成选项
         let alert = UIAlertController(title: "录制完成", message: "选择下一步操作", preferredStyle: .actionSheet)
         
@@ -492,8 +494,43 @@ extension MainCameraViewController {
     }
     
     private func saveVideoToGallery(url: URL) {
-        // TODO: 实现VideoManager保存视频逻辑
         print("保存视频到相册: \(url)")
+        
+        // 显示保存进度指示器
+        let alert = UIAlertController(title: "保存中", message: "正在保存视频到相册...", preferredStyle: .alert)
+        present(alert, animated: true)
+        
+        // 保存视频到相册
+        UISaveVideoAtPathToSavedPhotosAlbum(url.path, self, #selector(video(_:didFinishSavingWithError:contextInfo:)), nil)
+    }
+    
+    @objc private func video(_ videoPath: String, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        // 关闭进度指示器
+        dismiss(animated: true) { [weak self] in
+            if let error = error {
+                // 保存失败
+                let alert = UIAlertController(
+                    title: "保存失败", 
+                    message: "无法保存视频到相册: \(error.localizedDescription)",
+                    preferredStyle: .alert
+                )
+                alert.addAction(UIAlertAction(title: "确定", style: .default))
+                self?.present(alert, animated: true)
+            } else {
+                // 保存成功
+                let alert = UIAlertController(
+                    title: "保存成功", 
+                    message: "视频已成功保存到相册",
+                    preferredStyle: .alert
+                )
+                alert.addAction(UIAlertAction(title: "确定", style: .default))
+                self?.present(alert, animated: true)
+                
+                // 播放成功音效和触觉反馈
+                let successFeedback = UINotificationFeedbackGenerator()
+                successFeedback.notificationOccurred(.success)
+            }
+        }
     }
     
     private func showError(_ error: Error) {
