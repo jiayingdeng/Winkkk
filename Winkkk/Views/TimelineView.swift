@@ -176,12 +176,11 @@ class TimelineView: UIView {
         contentView.addSubview(thumbnailContainerView)
         
         // 轨道
-        trackView.backgroundColor = UIColor.white.withAlphaComponent(0.3)
+        trackView.backgroundColor = .clear  // 🎯 透明但保留点击功能
         trackView.layer.cornerRadius = 2
         contentView.addSubview(trackView)
         
-        // 🎯 隐藏轨道条 - 编辑器模式不需要显示
-        trackView.isHidden = true
+        // 🎯 轨道设为透明 - 视觉上不可见但保留点击跳转功能
         
         // 🎯 Wink编辑器模式：移除传统播放器组件
         // ❌ 不再添加进度条和滑块
