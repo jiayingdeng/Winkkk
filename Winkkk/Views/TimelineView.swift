@@ -176,18 +176,25 @@ class TimelineView: UIView {
         trackView.layer.cornerRadius = 2
         contentView.addSubview(trackView)
         
-        // 进度条
-        progressView.backgroundColor = ThemeManager.buttonPrimary
-        progressView.layer.cornerRadius = 2
-        contentView.addSubview(progressView)
+        // 🎯 Wink编辑器模式：移除传统播放器组件
+        // ❌ 不再添加进度条和滑块
+        // progressView - 传统播放进度显示
+        // thumbView - 传统滑块控制
         
-        // 🎯 白色竖直指示器 - Wink风格的播放头指示器
+        // 🎯 白色竖直指示器 - Wink风格的唯一定位器
         setupPlayheadIndicator()
         contentView.addSubview(playheadIndicator)
         
-        // 拖拽滑块
+        // 🎯 设置传统组件但隐藏（保持代码兼容性）
         setupThumbView()
+        progressView.backgroundColor = ThemeManager.buttonPrimary
+        progressView.layer.cornerRadius = 2
+        contentView.addSubview(progressView)
         contentView.addSubview(thumbView)
+        
+        // 🎯 隐藏传统播放器组件
+        thumbView.isHidden = true
+        progressView.isHidden = true
     }
     
     // 🎯 设置播放头指示器（白色竖线）- 增强截图瞄准器地位
@@ -424,10 +431,13 @@ class TimelineView: UIView {
     }
     
     func setProgress(_ progress: Double) {
-        guard !isDragging && !isZooming else { return }
-        currentProgress = max(0, min(1, progress))
-        updateProgressUI()
-        centerCurrentProgressIfNeeded()
+        // 🎯 Wink编辑器模式：不再跟踪播放进度
+        // ❌ 移除currentProgress更新
+        // ❌ 移除传统播放器的进度跟踪逻辑
+        // ✅ 在编辑器模式下，播放进度与截图位置解耦
+        
+        // 保留方法签名用于兼容性，但不执行任何操作
+        // 所有位置控制现在通过滚动时间轴实现
     }
     
     // MARK: - Time Resolution Management
@@ -469,40 +479,19 @@ class TimelineView: UIView {
     }
     
     private func centerCurrentProgressIfNeeded() {
-        // 只在播放时自动跟踪，手动操作时不干扰
-        guard !isDragging && !isZooming else { return }
+        // 🎯 Wink编辑器模式：不再自动跟踪播放位置
+        // ❌ 移除播放位置自动跟踪逻辑
+        // ✅ 白色竖线固定在中心，用户通过滚动选择截图位置
         
-        let currentTimeX = timeToCoordinate(duration * currentProgress)
-        let visibleWidth = scrollView.bounds.width
-        let currentOffsetX = scrollView.contentOffset.x
-        
-        // 检查播放位置是否需要跟踪
-        let shouldTrack = shouldAutoTrackPlayhead(currentTimeX: currentTimeX, 
-                                                  visibleWidth: visibleWidth, 
-                                                  currentOffsetX: currentOffsetX)
-        
-        if shouldTrack {
-            let targetOffsetX = currentTimeX - visibleWidth / 2
-            let maxOffsetX = max(0, currentContentWidth - visibleWidth)
-            let clampedOffsetX = max(0, min(maxOffsetX, targetOffsetX))
-            
-            // 平滑跟踪动画
-            UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseInOut) {
-                self.scrollView.setContentOffset(CGPoint(x: clampedOffsetX, y: 0), animated: false)
-            }
-            
-            print("🎯 自动跟踪播放位置: \(currentProgress * duration)s")
-        }
+        // 保留方法用于兼容性，但不执行任何跟踪操作
+        // 在编辑器模式下，位置控制完全由用户主导
     }
     
-    /// 判断是否应该自动跟踪播放头
+    /// 🎯 Wink编辑器模式：移除播放头跟踪逻辑
     private func shouldAutoTrackPlayhead(currentTimeX: CGFloat, visibleWidth: CGFloat, currentOffsetX: CGFloat) -> Bool {
-        let leftEdge = currentOffsetX
-        let rightEdge = currentOffsetX + visibleWidth
-        let bufferZone = visibleWidth * 0.1 // 10% 缓冲区
-        
-        // 如果播放头快要离开可见区域，就开始跟踪
-        return currentTimeX <= leftEdge + bufferZone || currentTimeX >= rightEdge - bufferZone
+        // ❌ 不再需要播放头跟踪判断
+        // ✅ 白色竖线固定在中心，无需跟踪
+        return false
     }
     
     // MARK: - Thumbnail Generation (Density-Based)
@@ -665,82 +654,69 @@ class TimelineView: UIView {
         }
     }
     
-    // MARK: - Progress Update
+    // MARK: - Wink Editor Mode (移除传统进度更新)
     private func updateProgressUI() {
-        updateProgressConstraints()
+        // 🎯 Wink编辑器模式：不再更新传统播放进度
+        // ❌ 移除滑块位置更新
+        // ❌ 移除进度条宽度更新  
+        // ✅ 白色竖线固定在中心，无需更新位置
         
-        // 使用新的坐标转换系统更新滑块位置
-        let currentTime = duration * currentProgress
-        let thumbCenterX = timeToCoordinate(currentTime)
-        thumbView.center.x = thumbCenterX
-        
-        // 添加微妙的缩放动画（仅在非交互状态）
-        if !isDragging && !isZooming {
-            UIView.animate(withDuration: 0.1, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5) {
-                self.thumbView.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
-            } completion: { _ in
-                UIView.animate(withDuration: 0.1) {
-                    self.thumbView.transform = .identity
-                }
-            }
-        }
+        // 保留方法用于兼容性，但内部逻辑已清空
+        // 所有定位逻辑现在基于固定的白色竖线
     }
     
     
     private func updateProgressConstraints() {
-        // 移除旧的宽度约束
-        progressView.constraints.forEach { constraint in
-            if constraint.firstAttribute == .width {
-                progressView.removeConstraint(constraint)
-            }
-        }
-        
-        // 使用新的坐标系统计算进度条宽度
-        let currentTime = duration * currentProgress
-        let progressWidth = timeToCoordinate(currentTime)
-        progressView.widthAnchor.constraint(equalToConstant: progressWidth).isActive = true
-        
-        layoutIfNeeded()
+        // 🎯 Wink编辑器模式：不再需要进度条约束更新
+        // ❌ 进度条已隐藏，无需更新约束
+        // 保留方法用于兼容性
     }
     
-    // MARK: - Gesture Handling
+    // MARK: - Gesture Handling (Wink编辑器模式)
     @objc private func handlePanGesture(_ gesture: UIPanGestureRecognizer) {
-        // 将手势位置转换为内容视图坐标
-        let locationInScrollView = gesture.location(in: scrollView)
-        let locationInContent = CGPoint(
-            x: locationInScrollView.x + scrollView.contentOffset.x,
-            y: locationInScrollView.y
-        )
-        
-        // 使用新的坐标转换系统
-        let currentTime = coordinateToTime(locationInContent.x)
-        let progress = duration > 0 ? max(0, min(1, currentTime / duration)) : 0
+        // 🎯 Wink逻辑：拖拽滚动时间轴内容，白色竖线保持固定
+        let translation = gesture.translation(in: scrollView)
         
         switch gesture.state {
         case .began:
             isDragging = true
             delegate?.timelineViewDidBeginSeeking(self)
             
-            // 放大滑块
+            // 🎯 白色竖线脉冲效果，强调截图瞄准器
             UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.5) {
-                self.thumbView.transform = CGAffineTransform(scaleX: 1.3, y: 1.3)
+                self.playheadIndicator.transform = CGAffineTransform(scaleX: 1.2, y: 1.0)
             }
             
             // 触觉反馈
             HapticFeedbackManager.shared.sliderValueChanged()
             
         case .changed:
-            currentProgress = progress
-            updateProgressUI()
+            // 🎯 计算新的滚动偏移 (拖拽移动时间轴内容)
+            let currentOffsetX = scrollView.contentOffset.x
+            let newOffsetX = currentOffsetX - translation.x  // 反向滚动，符合直觉
+            
+            // 限制滚动范围
+            let maxOffsetX = max(0, scrollView.contentSize.width - scrollView.bounds.width)
+            let clampedOffsetX = max(0, min(maxOffsetX, newOffsetX))
+            
+            // 更新滚动位置
+            scrollView.setContentOffset(CGPoint(x: clampedOffsetX, y: 0), animated: false)
+            
+            // 重置translation避免累加
+            gesture.setTranslation(.zero, in: scrollView)
+            
+            // 🎯 实时通知截取时间变化（基于固定白色竖线）
+            let captureTime = getCurrentCaptureTime()
+            let progress = duration > 0 ? captureTime / duration : 0
             delegate?.timelineView(self, didSeekToProgress: progress)
             
         case .ended, .cancelled:
             isDragging = false
             delegate?.timelineViewDidEndSeeking(self)
             
-            // 恢复滑块大小
+            // 🎯 恢复白色竖线大小
             UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.5) {
-                self.thumbView.transform = .identity
+                self.playheadIndicator.transform = .identity
             }
             
             // 轻微触觉反馈
@@ -957,10 +933,10 @@ class TimelineView: UIView {
 extension TimelineView: UIScrollViewDelegate {
     
     func scrollViewDidScroll(_ scrollView: UIScrollView) {
-        // 滚动时更新进度条和滑块位置
-        updateProgressUI()
+        // 🎯 Wink编辑器模式：只处理截图时间变化通知
+        // ❌ 不再更新传统播放器的进度条和滑块
         
-        // 🎯 Wink风格：滚动时实时通知截取时间变化（性能优化：减少频繁回调）
+        // 🎯 滚动时实时通知截取时间变化（基于固定白色竖线）
         if !isDragging && !isZooming {  // 仅在非交互状态时回调
             let captureTime = getCurrentCaptureTime()
             let progress = duration > 0 ? captureTime / duration : 0
@@ -1028,15 +1004,10 @@ extension TimelineView: UIGestureRecognizerDelegate {
     
     override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         if gestureRecognizer == panGesture {
-            let location = gestureRecognizer.location(in: self)
-            // 🎯 Wink风格：拖拽优先于滚动，可以在整个时间轴区域进行
-            // 但滑块区域优先级更高（精确控制播放进度）
-            let thumbFrame = thumbView.frame.insetBy(dx: -20, dy: -20)
-            if thumbFrame.contains(location) {
-                return true  // 滑块区域：播放进度控制
-            }
-            // 其他区域：内容滚动（Wink风格截取定位）
-            return false  // 让scrollView处理滚动
+            // 🎯 Wink编辑器模式：拖拽在整个时间轴区域都可以进行
+            // ❌ 不再检查滑块区域（滑块已隐藏）
+            // ✅ 拖拽手势控制时间轴内容滚动
+            return true  // 整个时间轴区域：内容滚动控制
         } else if gestureRecognizer == pinchGesture {
             // 🎯 缩放手势在整个时间轴区域都可以进行
             return true
