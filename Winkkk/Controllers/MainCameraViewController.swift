@@ -39,6 +39,10 @@ class MainCameraViewController: UIViewController {
     // MARK: - Dependencies
     private lazy var cameraManager = CameraManager()
     
+    // 触感反馈生成器
+    private let impactFeedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
+    private let lightFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
+    
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -46,6 +50,10 @@ class MainCameraViewController: UIViewController {
         setupConstraints()
         setupCameraPreview()
         configureTheme()
+        
+        // 准备触感反馈生成器
+        impactFeedbackGenerator.prepare()
+        lightFeedbackGenerator.prepare()
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -313,9 +321,18 @@ extension MainCameraViewController {
 extension MainCameraViewController {
     
     @objc private func recordButtonTapped() {
+        print("🎯 录制按钮被点击，当前状态：\(isRecording ? "录制中" : "未录制")")
+        
+        // 立即触感反馈确认按钮点击
+        let selectionFeedback = UISelectionFeedbackGenerator()
+        selectionFeedback.selectionChanged()
+        print("📳 触感反馈：按钮点击")
+        
         if isRecording {
+            print("🛑 尝试停止录制...")
             stopRecording()
         } else {
+            print("▶️ 尝试开始录制...")
             startRecording()
         }
     }
@@ -360,8 +377,8 @@ extension MainCameraViewController {
                     self?.startRecordingTimer()
                     
                     // 触觉反馈
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-                    impactFeedback.impactOccurred()
+                    self?.impactFeedbackGenerator.impactOccurred()
+                    print("📳 触感反馈：开始录制")
                     
                 case .failure(let error):
                     self?.showError(error)
@@ -383,8 +400,8 @@ extension MainCameraViewController {
                     self?.handleRecordingComplete(url: url)
                     
                     // 触觉反馈
-                    let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-                    impactFeedback.impactOccurred()
+                    self?.lightFeedbackGenerator.impactOccurred()
+                    print("📳 触感反馈：停止录制")
                     
                 case .failure(let error):
                     self?.showError(error)
