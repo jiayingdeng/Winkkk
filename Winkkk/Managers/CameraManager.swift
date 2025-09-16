@@ -200,10 +200,12 @@ class CameraManager: NSObject {
         do {
             try device.lockForConfiguration()
             
-            // 设置帧率
-            let frameRate: Double = devicePerformance == .low ? 30 : 60
-            let frameDuration = CMTime(value: 1, timescale: CMTimeScale(frameRate))
+            // 设置帧率 - 先检查设备支持的帧率范围
+            let preferredFrameRate: Double = devicePerformance == .low ? 30 : 60
+            let actualFrameRate = getSupportedFrameRate(device: device, preferredRate: preferredFrameRate)
+            let frameDuration = CMTime(value: 1, timescale: CMTimeScale(actualFrameRate))
             
+            print("🎥 CameraManager: Setting frame rate to \(actualFrameRate) fps (preferred: \(preferredFrameRate))")
             device.activeVideoMinFrameDuration = frameDuration
             device.activeVideoMaxFrameDuration = frameDuration
             
@@ -232,6 +234,30 @@ class CameraManager: NSObject {
         } catch {
             print("视频设备配置失败: \(error)")
         }
+    }
+    
+    /// 获取设备支持的帧率，如果不支持首选帧率则降级到安全值
+    private func getSupportedFrameRate(device: AVCaptureDevice, preferredRate: Double) -> Double {
+        // 获取当前格式支持的帧率范围
+        let frameRateRanges = device.activeFormat.videoSupportedFrameRateRanges
+        
+        // 打印支持的帧率范围用于调试
+        print("🎥 CameraManager: Supported frame rate ranges:")
+        for range in frameRateRanges {
+            print("   - \(range.minFrameRate) to \(range.maxFrameRate) fps")
+        }
+        
+        // 检查首选帧率是否被支持
+        for range in frameRateRanges {
+            if preferredRate >= range.minFrameRate && preferredRate <= range.maxFrameRate {
+                return preferredRate
+            }
+        }
+        
+        // 如果首选帧率不被支持，选择最高的支持帧率
+        let maxSupportedRate = frameRateRanges.map { $0.maxFrameRate }.max() ?? 30.0
+        print("⚠️ CameraManager: Preferred rate \(preferredRate) not supported, using \(maxSupportedRate)")
+        return maxSupportedRate
     }
     
     private func configureAudioInput() -> Bool {

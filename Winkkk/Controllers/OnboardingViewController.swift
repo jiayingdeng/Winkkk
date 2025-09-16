@@ -199,7 +199,7 @@ class OnboardingViewController: UIViewController {
             continueButton.topAnchor.constraint(equalTo: pageControl.bottomAnchor, constant: 30),
             continueButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 40),
             continueButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -40),
-            continueButton.heightAnchor.constraint(equalToConstant: 50),
+            // continueButton高度由CapsuleButton内部管理，无需重复设置约束
             
             // 跳过按钮
             skipButton.topAnchor.constraint(equalTo: continueButton.bottomAnchor, constant: 15),

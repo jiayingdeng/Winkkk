@@ -170,7 +170,7 @@ class PermissionRequestViewController: UIViewController {
             continueButton.topAnchor.constraint(equalTo: stackView.bottomAnchor, constant: 40),
             continueButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 40),
             continueButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -40),
-            continueButton.heightAnchor.constraint(equalToConstant: 50),
+            // continueButton高度由CapsuleButton内部管理，无需重复设置约束
             
             // 稍后按钮
             laterButton.topAnchor.constraint(equalTo: continueButton.bottomAnchor, constant: 15),
