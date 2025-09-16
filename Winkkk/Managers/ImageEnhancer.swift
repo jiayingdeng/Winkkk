@@ -116,7 +116,7 @@ class ImageEnhancer {
         unsharpMaskFilter.setValue(image, forKey: kCIInputImageKey)
         unsharpMaskFilter.setValue(intensity, forKey: kCIInputIntensityKey)
         unsharpMaskFilter.setValue(2.5, forKey: kCIInputRadiusKey) // 锐化半径
-        unsharpMaskFilter.setValue(0.1, forKey: "inputThreshold") // 锐化阈值
+        // 注意：CIUnsharpMask不支持inputThreshold参数，已移除避免崩溃
         
         guard let outputImage = unsharpMaskFilter.outputImage else {
             throw ImageEnhancementError.processingFailed("Unsharp mask failed")

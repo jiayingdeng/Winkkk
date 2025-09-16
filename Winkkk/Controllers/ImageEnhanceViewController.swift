@@ -39,6 +39,9 @@ class ImageEnhanceViewController: UIViewController {
     // MARK: - Dependencies
     private let imageEnhancer = ImageEnhancer()
     
+    // MARK: - Layout Constraints
+    private var controlPanelHeightConstraint: NSLayoutConstraint?
+    
     // MARK: - State
     private var isProcessing = false {
         didSet {
@@ -69,6 +72,25 @@ class ImageEnhanceViewController: UIViewController {
         super.viewDidAppear(animated)
         // 首次显示时自动应用中度修复
         enhanceImageWithCurrentLevel()
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        
+        // 动态调整控制面板高度，确保适配不同设备
+        let safeAreaBottom = view.safeAreaInsets.bottom
+        let panelHeight = 200 + safeAreaBottom
+        
+        // 确保控制面板不会占用太多屏幕空间（最多不超过屏幕高度的40%）
+        let maxHeight = view.bounds.height * 0.4
+        let finalHeight = min(panelHeight, maxHeight)
+        
+        controlPanelHeightConstraint?.constant = finalHeight
+        
+        print("📱 ImageEnhanceViewController 布局更新:")
+        print("   安全区域底部: \(safeAreaBottom)")
+        print("   控制面板高度: \(finalHeight)")
+        print("   屏幕高度: \(view.bounds.height)")
     }
     
     // MARK: - UI Setup
@@ -245,7 +267,6 @@ class ImageEnhanceViewController: UIViewController {
             controlPanelBlurView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             controlPanelBlurView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             controlPanelBlurView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            controlPanelBlurView.heightAnchor.constraint(equalToConstant: 200 + view.safeAreaInsets.bottom),
             
             // 强度选择
             levelSegmentedControl.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 20),
@@ -285,6 +306,10 @@ class ImageEnhanceViewController: UIViewController {
             shareButton.widthAnchor.constraint(equalTo: resetButton.widthAnchor),
             shareButton.heightAnchor.constraint(equalTo: resetButton.heightAnchor)
         ])
+        
+        // 创建控制面板高度约束（稍后在viewDidLayoutSubviews中设置）
+        controlPanelHeightConstraint = controlPanelBlurView.heightAnchor.constraint(equalToConstant: 220)
+        controlPanelHeightConstraint?.isActive = true
     }
     
     private func configureInitialState() {
@@ -317,8 +342,7 @@ class ImageEnhanceViewController: UIViewController {
         statusLabel.text = "正在处理图像..."
         
         // 触觉反馈
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
+        HapticFeedbackManager.shared.buttonTap()
         
         imageEnhancer.enhanceImage(originalImage, level: currentLevel) { [weak self] result in
             DispatchQueue.main.async {
@@ -357,8 +381,7 @@ class ImageEnhanceViewController: UIViewController {
         shareButton.alpha = 1.0
         
         // 成功触觉反馈
-        let successFeedback = UINotificationFeedbackGenerator()
-        successFeedback.notificationOccurred(.success)
+        HapticFeedbackManager.shared.notificationSuccess()
         
         // 显示完成动画
         showCompletionAnimation()
@@ -368,8 +391,7 @@ class ImageEnhanceViewController: UIViewController {
         statusLabel.text = "修复失败：\(error.localizedDescription)"
         
         // 错误触觉反馈
-        let errorFeedback = UINotificationFeedbackGenerator()
-        errorFeedback.notificationOccurred(.error)
+        HapticFeedbackManager.shared.notificationError()
         
         // 显示错误提示
         showErrorAlert(error)
@@ -434,8 +456,7 @@ class ImageEnhanceViewController: UIViewController {
         statusLabel.text = "选择修复强度并点击应用修复"
         
         // 触觉反馈
-        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-        impactFeedback.impactOccurred()
+        HapticFeedbackManager.shared.lightImpact()
     }
     
     @objc private func saveButtonTapped() {

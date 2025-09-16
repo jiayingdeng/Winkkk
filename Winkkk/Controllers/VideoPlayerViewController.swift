@@ -364,16 +364,9 @@ class VideoPlayerViewController: UIViewController {
     }
     
     private func handleScreenshotSuccess(_ image: UIImage) {
-        // 显示心形动画
-        AnimationManager.shared.showHeartSuccessAnimation(in: view, at: view.center)
-        
-        // 触觉反馈
-        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
-        impactFeedback.impactOccurred()
-        
-        // 进入画质修复界面
-        let enhanceVC = ImageEnhanceViewController(image: image, timestamp: currentTime.seconds)
-        let navController = UINavigationController(rootViewController: enhanceVC)
+        // 显示截图预览界面（用户可选择是否进行画质修复）
+        let previewVC = ScreenshotPreviewViewController(image: image, timestamp: currentTime.seconds)
+        let navController = UINavigationController(rootViewController: previewVC)
         navController.modalPresentationStyle = .fullScreen
         present(navController, animated: true)
     }

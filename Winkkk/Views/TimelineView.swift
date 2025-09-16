@@ -267,8 +267,7 @@ class TimelineView: UIView {
             }
             
             // 触觉反馈
-            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-            impactFeedback.impactOccurred()
+            HapticFeedbackManager.shared.sliderValueChanged()
             
         case .changed:
             currentProgress = progress
@@ -285,8 +284,7 @@ class TimelineView: UIView {
             }
             
             // 轻微触觉反馈
-            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-            impactFeedback.impactOccurred()
+            HapticFeedbackManager.shared.sliderValueChanged()
             
         default:
             break
@@ -333,8 +331,7 @@ class TimelineView: UIView {
             delegate?.timelineView(self, didSeekToProgress: progress)
             
             // 触觉反馈
-            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-            impactFeedback.impactOccurred()
+            HapticFeedbackManager.shared.sliderValueChanged()
         }
     }
 }

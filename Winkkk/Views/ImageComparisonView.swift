@@ -226,8 +226,7 @@ class ImageComparisonView: UIView {
             }
             
             // 触觉反馈
-            let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-            impactFeedback.impactOccurred()
+            HapticFeedbackManager.shared.sliderValueChanged()
             
         case .changed:
             dividerPosition = newPosition

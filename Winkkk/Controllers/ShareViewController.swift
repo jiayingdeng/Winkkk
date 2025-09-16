@@ -282,8 +282,7 @@ class ShareViewController: UIViewController {
         updateWatermarkPreview()
         
         // 触觉反馈
-        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
-        impactFeedback.impactOccurred()
+        HapticFeedbackManager.shared.buttonTap()
     }
     
     private func updateWatermarkPreview() {
@@ -365,8 +364,7 @@ class ShareViewController: UIViewController {
         showCopySuccessMessage()
         
         // 触觉反馈
-        let successFeedback = UINotificationFeedbackGenerator()
-        successFeedback.notificationOccurred(.success)
+        HapticFeedbackManager.shared.notificationSuccess()
         
         // 追踪复制事件
         trackShareEvent(type: "copy")
@@ -414,8 +412,7 @@ class ShareViewController: UIViewController {
         present(alert, animated: true)
         
         // 成功触觉反馈
-        let successFeedback = UINotificationFeedbackGenerator()
-        successFeedback.notificationOccurred(.success)
+        HapticFeedbackManager.shared.notificationSuccess()
     }
     
     private func showSaveErrorAlert(_ error: Error) {
@@ -428,8 +425,7 @@ class ShareViewController: UIViewController {
         present(alert, animated: true)
         
         // 错误触觉反馈
-        let errorFeedback = UINotificationFeedbackGenerator()
-        errorFeedback.notificationOccurred(.error)
+        HapticFeedbackManager.shared.notificationError()
     }
     
     private func trackShareEvent(type: String) {

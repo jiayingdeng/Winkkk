@@ -39,9 +39,8 @@ class MainCameraViewController: UIViewController {
     // MARK: - Dependencies
     private lazy var cameraManager = CameraManager()
     
-    // 触感反馈生成器
-    private let impactFeedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
-    private let lightFeedbackGenerator = UIImpactFeedbackGenerator(style: .light)
+    // 触感反馈管理器
+    private let hapticManager = HapticFeedbackManager.shared
     
     // MARK: - Lifecycle
     override func viewDidLoad() {
@@ -51,9 +50,7 @@ class MainCameraViewController: UIViewController {
         setupCameraPreview()
         configureTheme()
         
-        // 准备触感反馈生成器
-        impactFeedbackGenerator.prepare()
-        lightFeedbackGenerator.prepare()
+        // 触感反馈管理器已在单例初始化时准备好
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -338,10 +335,20 @@ extension MainCameraViewController {
         print("🎯 录制按钮被点击，当前状态：\(isRecording ? "录制中" : "未录制")")
         
         // 立即触感反馈确认按钮点击
-        let selectionFeedback = UISelectionFeedbackGenerator()
-        selectionFeedback.prepare()
-        selectionFeedback.selectionChanged()
-        print("📳 触感反馈：按钮点击已触发")
+        hapticManager.buttonTap()
+        
+        // 🧪 临时测试：同时尝试简化触感反馈
+        hapticManager.simpleFeedback()
+        
+        // 🔬 超级彻底测试（只在第一次点击时执行）
+        if !isRecording {
+            hapticManager.thoroughHapticTest()
+            
+            // 🚨 最后的手段：系统级强制振动
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+                self?.hapticManager.forceSystemVibration()
+            }
+        }
         
         if isRecording {
             print("🛑 尝试停止录制...")
@@ -394,9 +401,7 @@ extension MainCameraViewController {
                     self?.startRecordingTimer()
                     
                     // 触觉反馈
-                    self?.impactFeedbackGenerator.prepare()
-                    self?.impactFeedbackGenerator.impactOccurred()
-                    print("📳 触感反馈：开始录制已触发")
+                    self?.hapticManager.recordingStart()
                     
                 case .failure(let error):
                     self?.showError(error)
@@ -418,9 +423,7 @@ extension MainCameraViewController {
                     self?.handleRecordingComplete(url: url)
                     
                     // 触觉反馈
-                    self?.lightFeedbackGenerator.prepare()
-                    self?.lightFeedbackGenerator.impactOccurred()
-                    print("📳 触感反馈：停止录制已触发")
+                    self?.hapticManager.recordingStop()
                     
                 case .failure(let error):
                     self?.showError(error)
@@ -576,10 +579,7 @@ extension MainCameraViewController {
                 self?.present(alert, animated: true)
                 
                 // 错误触觉反馈
-                let errorFeedback = UINotificationFeedbackGenerator()
-                errorFeedback.prepare()
-                errorFeedback.notificationOccurred(.error)
-                print("📳 错误触感反馈已触发")
+                self?.hapticManager.notificationError()
             } else {
                 print("✅ 视频成功保存到相册")
                 // 保存成功
@@ -592,10 +592,7 @@ extension MainCameraViewController {
                 self?.present(alert, animated: true)
                 
                 // 播放成功音效和触觉反馈
-                let successFeedback = UINotificationFeedbackGenerator()
-                successFeedback.prepare()
-                successFeedback.notificationOccurred(.success)
-                print("📳 成功触感反馈已触发")
+                self?.hapticManager.notificationSuccess()
             }
         }
     }
