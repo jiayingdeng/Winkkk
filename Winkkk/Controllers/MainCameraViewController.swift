@@ -510,7 +510,7 @@ extension MainCameraViewController {
             self?.editVideo(url: url)
         })
         
-        alert.addAction(UIAlertAction(title: "保存相册", style: .default) { [weak self] _ in
+        alert.addAction(UIAlertAction(title: "保存到相册", style: .default) { [weak self] _ in
             self?.saveVideoToAppGallery(url: url)
         })
         
