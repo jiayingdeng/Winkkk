@@ -385,6 +385,13 @@ class VideoPlayerViewController: UIViewController {
         print("⏸️ 停止内容流动")
     }
     
+    // 🎯 编辑器模式：暂停播放 = 停止流动
+    private func pausePlayer() {
+        stopFlowing()
+        // 同时暂停视频播放
+        player?.pause()
+    }
+    
     // 🎯 更新流动位置
     private func updateFlowPosition(speed: CGFloat) {
         let currentOffset = timelineView.timelineScrollView.contentOffset.x
