@@ -283,22 +283,22 @@ class TimelineView: UIView {
             
             // 内容视图约束将在updateContentSize中动态设置
             
-            // 时间刻度视图 (在内容视图中) - 🎯 增加高度
+            // 时间刻度视图 (在内容视图中) - 🎯 与缩略图容器对齐
             timeScaleView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            timeScaleView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            timeScaleView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            timeScaleView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            timeScaleView.widthAnchor.constraint(equalTo: self.widthAnchor),  // 与TimelineView同宽
             timeScaleView.heightAnchor.constraint(equalToConstant: 30),  // 20 → 30px
             
-            // 缩略图容器 (在内容视图中) - 🎯 增加高度
+            // 缩略图容器 (在内容视图中) - 🎯 只占据视频内容区域，不包含padding
             thumbnailContainerView.topAnchor.constraint(equalTo: timeScaleView.bottomAnchor, constant: 6),  // 4 → 6px间距
-            thumbnailContainerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            thumbnailContainerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            thumbnailContainerView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            thumbnailContainerView.widthAnchor.constraint(equalTo: self.widthAnchor),  // 与TimelineView同宽
             thumbnailContainerView.heightAnchor.constraint(equalToConstant: 60),  // 40 → 60px
             
-            // 轨道 (在内容视图中)
+            // 轨道 (在内容视图中) - 🎯 与缩略图容器对齐
             trackView.topAnchor.constraint(equalTo: thumbnailContainerView.bottomAnchor, constant: 8),
-            trackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            trackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            trackView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            trackView.widthAnchor.constraint(equalTo: self.widthAnchor),  // 与TimelineView同宽
             trackView.heightAnchor.constraint(equalToConstant: 4),
             
             // 进度条 (在内容视图中)
@@ -612,9 +612,9 @@ class TimelineView: UIView {
         let asset = AVAsset(url: videoURL)
         let imageGenerator = AVAssetImageGenerator(asset: asset)
         
-        // 🎯 计算显示尺寸 - 缩略图只占据实际视频内容区域
-        let actualVideoWidth = getActualVideoWidth()
-        let thumbnailWidth = actualVideoWidth / CGFloat(count)
+        // 🎯 计算显示尺寸 - 缩略图容器现在与TimelineView同宽
+        let containerWidth = bounds.width
+        let thumbnailWidth = containerWidth / CGFloat(count)
         let thumbnailHeight: CGFloat = 60  // 40 → 60px，与约束保持一致
         
         // 🎯 关键修复：动态计算高质量缩略图分辨率
@@ -650,9 +650,9 @@ class TimelineView: UIView {
             thumbnailContainerView.addSubview(imageView)
             thumbnailImageViews.append(imageView)
             
-            // 🎯 使用 frame 布局 - 缩略图从leftPadding开始，只占据视频内容区域
+            // 🎯 使用 frame 布局 - 缩略图容器已居中，从0开始布局
             imageView.frame = CGRect(
-                x: leftPadding + CGFloat(i) * thumbnailWidth,
+                x: CGFloat(i) * thumbnailWidth,
                 y: 0,
                 width: thumbnailWidth,
                 height: 60  // 40 → 60px
@@ -665,7 +665,7 @@ class TimelineView: UIView {
             generateThumbnail(at: time, for: imageView, using: imageGenerator)
         }
         
-        print("🖼️ 生成 \(count) 个缩略图, 每个宽度: \(thumbnailWidth), 总宽度: \(currentContentWidth)")
+        print("🖼️ 生成 \(count) 个缩略图, 每个宽度: \(thumbnailWidth), 容器宽度: \(containerWidth)")
     }
     
     private func generateThumbnail(at time: CMTime, for imageView: UIImageView, using imageGenerator: AVAssetImageGenerator) {
@@ -917,22 +917,22 @@ class TimelineView: UIView {
     }
     
     private func updateThumbnailLayout() {
-        guard currentThumbnailCount > 0, currentContentWidth > 0 else { return }
+        guard currentThumbnailCount > 0, bounds.width > 0 else { return }
         
-        // 🎯 使用实际视频内容宽度，不包含padding
-        let actualVideoWidth = getActualVideoWidth()
-        let thumbnailWidth = actualVideoWidth / CGFloat(currentThumbnailCount)
+        // 🎯 缩略图容器现在与TimelineView同宽，使用TimelineView宽度
+        let containerWidth = bounds.width
+        let thumbnailWidth = containerWidth / CGFloat(currentThumbnailCount)
         
         for (index, imageView) in thumbnailImageViews.enumerated() {
             imageView.frame = CGRect(
-                x: leftPadding + CGFloat(index) * thumbnailWidth,
+                x: CGFloat(index) * thumbnailWidth,
                 y: 0,
                 width: thumbnailWidth,
                 height: 60  // 40 → 60px
             )
         }
         
-        print("🖼️ 更新缩略图布局: \(currentThumbnailCount)个, 每个宽度: \(thumbnailWidth), 视频内容宽度: \(actualVideoWidth)")
+        print("🖼️ 更新缩略图布局: \(currentThumbnailCount)个, 每个宽度: \(thumbnailWidth), 容器宽度: \(containerWidth)")
     }
     
     // MARK: - Touch Events
@@ -946,16 +946,20 @@ class TimelineView: UIView {
             y: locationInScrollView.y
         )
         
-        // 如果点击在轨道区域，直接跳转到该位置
+        // 🎯 如果点击在轨道区域，直接跳转到该位置（现在轨道与TimelineView同宽）
         let trackFrame = CGRect(
             x: 0,
             y: trackView.frame.minY,
-            width: currentContentWidth,
+            width: bounds.width,  // 轨道现在与TimelineView同宽
             height: trackView.frame.height
         )
         
         if trackFrame.contains(locationInContent) {
-            let currentTime = coordinateToTime(locationInContent.x)
+            // 🎯 调整坐标转换：点击位置相对于TimelineView，需要转换为contentView坐标系
+            let clickXInTimeline = locationInScrollView.x  // 相对于TimelineView的x坐标
+            let clickXInContent = clickXInTimeline + scrollView.contentOffset.x  // 转换为contentView坐标系
+            
+            let currentTime = coordinateToTime(clickXInContent)
             let progress = duration > 0 ? max(0, min(1, currentTime / duration)) : 0
             
             currentProgress = progress
