@@ -455,33 +455,92 @@ class TimelineView: UIView {
         return clampedCount
     }
     
+    /// 🎯 计算最优缩略图生成分辨率（解决清晰度问题）
+    private func calculateOptimalThumbnailSize(displayWidth: CGFloat, displayHeight: CGFloat) -> CGSize {
+        // 获取设备像素密度
+        let screenScale = UIScreen.main.scale
+        
+        // 计算基础目标分辨率（确保足够高清）
+        let baseTargetWidth = displayWidth * screenScale
+        let baseTargetHeight = displayHeight * screenScale
+        
+        // 根据缩放级别进一步调整分辨率
+        let qualityMultiplier: CGFloat = {
+            // 缩放级别越高，用户越可能关注细节，提供更高分辨率
+            if zoomScale >= 4.0 {
+                return 2.0  // 高精度模式，超高清晰度
+            } else if zoomScale >= 2.0 {
+                return 1.5  // 中等精度，高清晰度
+            } else {
+                return 1.2  // 基础模式，确保清晰
+            }
+        }()
+        
+        let finalWidth = baseTargetWidth * qualityMultiplier
+        let finalHeight = baseTargetHeight * qualityMultiplier
+        
+        // 限制最大分辨率，避免内存过度消耗
+        let maxWidth: CGFloat = 320
+        let maxHeight: CGFloat = 240
+        
+        let clampedWidth = min(finalWidth, maxWidth)
+        let clampedHeight = min(finalHeight, maxHeight)
+        
+        print("📱 缩略图分辨率计算: 设备倍率=\(screenScale)x, 质量倍率=\(qualityMultiplier)x, 最终=\(clampedWidth)x\(clampedHeight)")
+        
+        return CGSize(width: clampedWidth, height: clampedHeight)
+    }
+    
     private func generateThumbnailsWithCount(_ count: Int) {
         guard let videoURL = videoURL, duration > 0 else { return }
         
         // 更新当前缩略图数量
         currentThumbnailCount = count
         
-        // 清除现有缩略图
-        thumbnailImageViews.forEach { $0.removeFromSuperview() }
+        // 🎯 性能优化：清除现有缩略图
+        thumbnailImageViews.forEach { imageView in
+            // 取消进行中的异步图像加载，避免资源浪费
+            imageView.image = nil
+            imageView.removeFromSuperview()
+        }
         thumbnailImageViews.removeAll()
         
         let asset = AVAsset(url: videoURL)
         let imageGenerator = AVAssetImageGenerator(asset: asset)
-        imageGenerator.appliesPreferredTrackTransform = true
-        imageGenerator.requestedTimeToleranceAfter = .zero
-        imageGenerator.requestedTimeToleranceBefore = .zero
-        imageGenerator.maximumSize = CGSize(width: 60, height: 40)
         
+        // 计算显示尺寸
         let thumbnailWidth = currentContentWidth / CGFloat(count)
+        let thumbnailHeight: CGFloat = 40
+        
+        // 🎯 关键修复：动态计算高质量缩略图分辨率
+        let targetThumbnailSize = calculateOptimalThumbnailSize(
+            displayWidth: thumbnailWidth, 
+            displayHeight: thumbnailHeight
+        )
+        
+        // 配置高质量图像生成器
+        imageGenerator.appliesPreferredTrackTransform = true
+        imageGenerator.requestedTimeToleranceAfter = CMTime(seconds: 0.1, preferredTimescale: 600)
+        imageGenerator.requestedTimeToleranceBefore = CMTime(seconds: 0.1, preferredTimescale: 600)
+        imageGenerator.maximumSize = targetThumbnailSize
+        
+        print("🖼️ 缩略图生成配置: 显示尺寸=\(thumbnailWidth)x\(thumbnailHeight), 生成尺寸=\(targetThumbnailSize)")
         
         for i in 0..<count {
             let imageView = UIImageView()
+            
+            // 🎯 优化显示质量配置
             imageView.contentMode = .scaleAspectFill
             imageView.clipsToBounds = true
             imageView.backgroundColor = UIColor.black.withAlphaComponent(0.5)
             imageView.layer.cornerRadius = 2
             imageView.layer.borderWidth = 0.5
             imageView.layer.borderColor = UIColor.white.withAlphaComponent(0.2).cgColor
+            
+            // 确保高质量图像渲染
+            imageView.layer.contentsGravity = .resizeAspectFill
+            imageView.layer.magnificationFilter = .linear  // 高质量缩放
+            imageView.layer.minificationFilter = .trilinear  // 高质量缩小
             
             thumbnailContainerView.addSubview(imageView)
             thumbnailImageViews.append(imageView)
@@ -507,8 +566,22 @@ class TimelineView: UIView {
     private func generateThumbnail(at time: CMTime, for imageView: UIImageView, using imageGenerator: AVAssetImageGenerator) {
         imageGenerator.generateCGImagesAsynchronously(forTimes: [NSValue(time: time)]) { [weak imageView] _, cgImage, _, result, error in
             DispatchQueue.main.async {
-                guard let imageView = imageView, let cgImage = cgImage else { return }
-                imageView.image = UIImage(cgImage: cgImage)
+                guard let imageView = imageView, let cgImage = cgImage else { 
+                    if let error = error {
+                        print("⚠️ 缩略图生成失败: \(error.localizedDescription)")
+                    }
+                    return 
+                }
+                
+                // 🎯 使用高质量图像创建
+                let highQualityImage = UIImage(cgImage: cgImage)
+                imageView.image = highQualityImage
+                
+                // 确保图像视图以最佳质量显示
+                imageView.layer.shouldRasterize = false  // 避免栅格化降低质量
+                imageView.layer.allowsEdgeAntialiasing = true  // 边缘抗锯齿
+                
+                print("✅ 高质量缩略图加载完成: \(cgImage.width)x\(cgImage.height)")
             }
         }
     }
@@ -683,12 +756,11 @@ class TimelineView: UIView {
         // 使用新的密度计算方法
         let newThumbnailCount = calculateOptimalThumbnailCount()
         
-        // 如果缩略图数量发生变化，重新生成
-        if newThumbnailCount != thumbnailImageViews.count {
-            generateThumbnailsWithCount(newThumbnailCount)
-        }
+        // 🎯 关键优化：总是重新生成缩略图以确保最佳质量
+        // 因为缩放级别变化会影响最优分辨率
+        generateThumbnailsWithCount(newThumbnailCount)
         
-        print("🔍 缩放级别: \(zoomScale)x, 缩略图数量: \(newThumbnailCount)")
+        print("🔍 缩放级别: \(zoomScale)x, 缩略图数量: \(newThumbnailCount), 重新生成高质量缩略图")
     }
     
     private func showZoomLevelIndicator() {
