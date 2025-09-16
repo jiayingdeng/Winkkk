@@ -37,9 +37,12 @@ class VideoPlayerViewController: UIViewController {
             updatePlayPauseButton()
         }
     }
-    
+
     private var videoDuration: CMTime = .zero
     private var currentTime: CMTime = .zero
+    
+    // 🎯 响应式布局约束
+    private var controlPanelHeightConstraint: NSLayoutConstraint?
     
     // MARK: - Dependencies
     private let screenshotEngine = ScreenshotEngine()
@@ -206,7 +209,7 @@ class VideoPlayerViewController: UIViewController {
             controlPanelBlurView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             controlPanelBlurView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             controlPanelBlurView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            controlPanelBlurView.heightAnchor.constraint(equalToConstant: 210 + view.safeAreaInsets.bottom),  // 🎯 适配时间轴高度增长 (160→210px)
+            // 高度约束将动态设置
             
             // 时间轴
             timelineView.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 20),
@@ -235,6 +238,10 @@ class VideoPlayerViewController: UIViewController {
             screenshotButton.widthAnchor.constraint(equalToConstant: 80),
             screenshotButton.heightAnchor.constraint(equalToConstant: 40)
         ])
+        
+        // 🎯 初始化动态高度约束
+        controlPanelHeightConstraint = controlPanelBlurView.heightAnchor.constraint(equalToConstant: 210)
+        controlPanelHeightConstraint?.isActive = true
     }
     
     // MARK: - Player Setup
@@ -347,11 +354,24 @@ class VideoPlayerViewController: UIViewController {
         currentTimeLabel.text = currentTime.formattedString
     }
     
+    // 🎯 更新截取时间标签（Wink风格）
+    private func updateCaptureTimeLabel(_ captureTime: CMTime) {
+        // 显示截取时间，区别于播放时间
+        let captureTimeString = captureTime.formattedString
+        // 可以考虑添加视觉提示，比如颜色区分
+        totalTimeLabel.text = "截取: \(captureTimeString)"
+        totalTimeLabel.textColor = ThemeManager.success // 绿色表示截取时间
+    }
+    
     // MARK: - Screenshot
     @objc private func screenshotButtonTapped() {
         pausePlayer()
         
-        screenshotEngine.captureFrame(from: videoURL, at: currentTime) { [weak self] result in
+        // 🎯 Wink风格：使用竖线位置的截取时间，而非当前播放时间
+        let captureTime = timelineView.getCurrentCaptureTime()
+        let cmCaptureTime = CMTime(seconds: captureTime, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        
+        screenshotEngine.captureFrame(from: videoURL, at: cmCaptureTime) { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let image):
@@ -426,6 +446,33 @@ class VideoPlayerViewController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         playerLayer?.frame = playerContainerView.bounds
+        
+        // 🎯 动态调整控制面板高度，确保适配不同设备
+        updateControlPanelHeight()
+    }
+    
+    // 🎯 动态响应式高度适配
+    private func updateControlPanelHeight() {
+        let safeAreaBottom = view.safeAreaInsets.bottom
+        let baseHeight: CGFloat = 210  // 基础高度
+        let panelHeight = baseHeight + safeAreaBottom
+        
+        // 确保控制面板不会占用太多屏幕空间（最多不超过屏幕高度的40%）
+        let maxHeight = view.bounds.height * 0.4
+        let finalHeight = min(panelHeight, maxHeight)
+        
+        // 如果高度被限制，相应调整内部间距
+        let heightReduction = panelHeight - finalHeight
+        let adjustedSpacing = max(8, 20 - heightReduction * 0.3)  // 动态间距
+        
+        // 更新约束
+        controlPanelHeightConstraint?.constant = finalHeight
+        
+        print("📱 VideoPlayerViewController 响应式布局:")
+        print("   屏幕高度: \(view.bounds.height)")
+        print("   安全区域底部: \(safeAreaBottom)")
+        print("   最终面板高度: \(finalHeight) (限制前: \(panelHeight))")
+        print("   动态间距: \(adjustedSpacing)")
     }
     
     // MARK: - KVO
@@ -443,8 +490,14 @@ class VideoPlayerViewController: UIViewController {
 extension VideoPlayerViewController: TimelineViewDelegate {
     
     func timelineView(_ timelineView: TimelineView, didSeekToProgress progress: Double) {
-        let time = CMTime(seconds: progress * videoDuration.seconds, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
-        seekToTime(time)
+        // 🎯 Wink风格：接收的是截取时间，用于截图功能
+        let captureTime = CMTime(seconds: progress * videoDuration.seconds, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        
+        // 更新截取时间标签显示
+        updateCaptureTimeLabel(captureTime)
+        
+        // 可选：也可以同步更新播放位置
+        // seekToTime(captureTime)
     }
     
     func timelineViewDidBeginSeeking(_ timelineView: TimelineView) {
