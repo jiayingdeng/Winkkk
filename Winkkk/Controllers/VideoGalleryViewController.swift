@@ -52,7 +52,8 @@ class VideoGalleryViewController: UIViewController {
     
     // MARK: - Data Management
     private let videoManager = VideoManager.shared
-    private var fetchedResultsController: NSFetchedResultsController<VideoItem>!
+    // 临时禁用Core Data，使用简单数组存储
+    // private var fetchedResultsController: NSFetchedResultsController<VideoItem>!
     private var videos: [VideoItem] = []
     
     // MARK: - Lifecycle
@@ -61,7 +62,8 @@ class VideoGalleryViewController: UIViewController {
         setupUI()
         setupNavigationBar()
         setupConstraints()
-        setupFetchedResultsController()
+        // 临时禁用Core Data
+        // setupFetchedResultsController()
         loadVideos()
     }
     
@@ -153,6 +155,10 @@ class VideoGalleryViewController: UIViewController {
     
     // MARK: - Data Management
     private func setupFetchedResultsController() {
+        // 临时禁用Core Data - 避免崩溃
+        print("📱 VideoGallery: Core Data temporarily disabled")
+        videos = []
+        /*
         let request: NSFetchRequest<VideoItem> = VideoItem.fetchRequest()
         request.sortDescriptors = [NSSortDescriptor(key: "createdDate", ascending: false)]
         
@@ -171,9 +177,16 @@ class VideoGalleryViewController: UIViewController {
         } catch {
             print("获取视频数据失败: \(error)")
         }
+        */
     }
     
     private func loadVideos() {
+        // 临时简化加载逻辑
+        print("📱 VideoGallery: Loading videos (Core Data disabled)")
+        videos = []
+        updateUI()
+        
+        /* 原有的Core Data加载逻辑
         videoManager.loadVideos { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
@@ -186,9 +199,16 @@ class VideoGalleryViewController: UIViewController {
                 }
             }
         }
+        */
     }
     
     private func refreshData() {
+        // 临时禁用Core Data刷新
+        print("📱 VideoGallery: Refreshing data (Core Data disabled)")
+        videos = []
+        updateUI()
+        
+        /* 原有的Core Data刷新逻辑
         do {
             try fetchedResultsController.performFetch()
             videos = fetchedResultsController.fetchedObjects ?? []
@@ -196,6 +216,7 @@ class VideoGalleryViewController: UIViewController {
         } catch {
             print("刷新数据失败: \(error)")
         }
+        */
     }
     
     private func updateUI() {
@@ -450,6 +471,8 @@ extension VideoGalleryViewController: PHPickerViewControllerDelegate {
 }
 
 // MARK: - NSFetchedResultsControllerDelegate
+// 临时禁用Core Data delegate
+/*
 extension VideoGalleryViewController: NSFetchedResultsControllerDelegate {
     
     func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
@@ -457,3 +480,4 @@ extension VideoGalleryViewController: NSFetchedResultsControllerDelegate {
         updateUI()
     }
 }
+*/
