@@ -9,6 +9,29 @@
 import UIKit
 import AVFoundation
 
+// 🎯 流动速度控制枚举
+enum FlowSpeed {
+    case precise    // 0.5x - 精确模式
+    case standard   // 1.0x - 标准模式  
+    case browse     // 1.5x - 浏览模式
+    
+    var multiplier: Double {
+        switch self {
+        case .precise: return 0.5
+        case .standard: return 1.0
+        case .browse: return 1.5
+        }
+    }
+    
+    var displayName: String {
+        switch self {
+        case .precise: return "精确模式"
+        case .standard: return "标准模式"
+        case .browse: return "浏览模式"
+        }
+    }
+}
+
 class VideoPlayerViewController: UIViewController {
     
     // MARK: - Properties
@@ -31,8 +54,8 @@ class VideoPlayerViewController: UIViewController {
     // 截图按钮
     private let screenshotButton = UIButton()
     
-    // 状态变量
-    private var isPlaying = false {
+    // 状态变量 - 🎯 编辑器模式重构
+    private var isFlowing = false {  // 从isPlaying改为isFlowing
         didSet {
             updatePlayPauseButton()
         }
@@ -41,8 +64,18 @@ class VideoPlayerViewController: UIViewController {
     private var videoDuration: CMTime = .zero
     private var currentTime: CMTime = .zero
     
+    // 🎯 流动控制参数
+    private var flowTimer: Timer?
+    private var currentFlowSpeed: FlowSpeed = .standard
+    
+    // 🎯 实时预览控制参数
+    private var previewUpdateTimer: Timer?
+    private let previewUpdateInterval: TimeInterval = 1.0/30.0  // 30fps限制
+    private var lastPreviewUpdateTime: TimeInterval = 0
+    
     // 🎯 响应式布局约束
     private var controlPanelHeightConstraint: NSLayoutConstraint?
+    private var timelineWidthConstraint: NSLayoutConstraint?  // 动态宽度约束
     
     // MARK: - Dependencies
     private let screenshotEngine = ScreenshotEngine()
@@ -123,6 +156,8 @@ class VideoPlayerViewController: UIViewController {
     private func setupControlPanel() {
         controlPanelBlurView.layer.cornerRadius = ThemeManager.largeCornerRadius
         controlPanelBlurView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        // 🎯 允许时间轴溢出控制面板边界
+        controlPanelBlurView.clipsToBounds = false
         view.addSubview(controlPanelBlurView)
         
         // 播放/暂停按钮
@@ -211,11 +246,10 @@ class VideoPlayerViewController: UIViewController {
             controlPanelBlurView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             // 高度约束将动态设置
             
-            // 时间轴
+            // 🎯 时间轴 - 允许视觉溢出屏幕边界 (Wink风格)
             timelineView.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 20),
-            timelineView.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 60),
-            timelineView.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -60),
-            timelineView.heightAnchor.constraint(equalToConstant: 110),  // 🎯 适配新的时间轴高度 (60→110px)
+            timelineView.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
+            timelineView.heightAnchor.constraint(equalToConstant: 110),
             
             // 时间标签
             currentTimeLabel.topAnchor.constraint(equalTo: timelineView.bottomAnchor, constant: 8),
@@ -239,9 +273,15 @@ class VideoPlayerViewController: UIViewController {
             screenshotButton.heightAnchor.constraint(equalToConstant: 40)
         ])
         
-        // 🎯 初始化动态高度约束
+        // 🎯 初始化动态约束
         controlPanelHeightConstraint = controlPanelBlurView.heightAnchor.constraint(equalToConstant: 210)
         controlPanelHeightConstraint?.isActive = true
+        
+        // 🎯 初始化时间轴动态宽度约束 (实现15%溢出效果)
+        let screenWidth = UIScreen.main.bounds.width
+        let overflowWidth = screenWidth + (screenWidth * 0.15)  // 屏幕宽度 + 15%溢出
+        timelineWidthConstraint = timelineView.widthAnchor.constraint(equalToConstant: overflowWidth)
+        timelineWidthConstraint?.isActive = true
     }
     
     // MARK: - Player Setup
@@ -309,23 +349,55 @@ class VideoPlayerViewController: UIViewController {
         timelineView.setVideoURL(videoURL)
     }
     
-    // MARK: - Player Control
+    // MARK: - Flow Control (编辑器模式)
     @objc private func playPauseButtonTapped() {
-        if isPlaying {
-            pausePlayer()
+        if isFlowing {
+            stopFlowing()
         } else {
-            playPlayer()
+            startFlowing()
         }
     }
     
-    private func playPlayer() {
-        player?.play()
-        isPlaying = true
+    // 🎯 开始内容流动 (Wink编辑器模式)
+    private func startFlowing() {
+        guard videoDuration.seconds > 0 else { return }
+        
+        // 计算流动速度 (像素/秒)
+        let totalTimelineWidth = timelineView.timelineScrollView.contentSize.width
+        let basePixelsPerSecond = totalTimelineWidth / CGFloat(videoDuration.seconds)
+        let adjustedSpeed = basePixelsPerSecond * CGFloat(currentFlowSpeed.multiplier)
+        
+        // 启动定时器，让内容流动
+        flowTimer?.invalidate()
+        flowTimer = Timer.scheduledTimer(withTimeInterval: 1.0/30.0, repeats: true) { [weak self] _ in
+            self?.updateFlowPosition(speed: adjustedSpeed)
+        }
+        
+        isFlowing = true
+        print("🎯 开始内容流动 - 速度: \(currentFlowSpeed.displayName)")
     }
     
-    private func pausePlayer() {
-        player?.pause()
-        isPlaying = false
+    // 🎯 停止内容流动
+    private func stopFlowing() {
+        flowTimer?.invalidate()
+        flowTimer = nil
+        isFlowing = false
+        print("⏸️ 停止内容流动")
+    }
+    
+    // 🎯 更新流动位置
+    private func updateFlowPosition(speed: CGFloat) {
+        let currentOffset = timelineView.timelineScrollView.contentOffset.x
+        let newOffset = currentOffset + (speed / 30.0)  // 30fps
+        let maxOffset = timelineView.timelineScrollView.contentSize.width - timelineView.timelineScrollView.bounds.width
+        
+        if newOffset >= maxOffset {
+            // 流动到末尾，停止
+            timelineView.timelineScrollView.setContentOffset(CGPoint(x: maxOffset, y: 0), animated: false)
+            stopFlowing()
+        } else {
+            timelineView.timelineScrollView.setContentOffset(CGPoint(x: newOffset, y: 0), animated: false)
+        }
     }
     
     private func seekToTime(_ time: CMTime) {
@@ -335,19 +407,21 @@ class VideoPlayerViewController: UIViewController {
     }
     
     private func updatePlayPauseButton() {
-        let imageName = isPlaying ? "pause.fill" : "play.fill"
+        // 🎯 编辑器模式：流动控制而非播放控制
+        let imageName = isFlowing ? "pause.fill" : "play.fill"
         playPauseButton.setImage(UIImage(systemName: imageName), for: .normal)
+        
+        // 更新按钮标题以体现流动功能
+        let title = isFlowing ? "停止流动" : "开始流动"
+        playPauseButton.accessibilityLabel = title
     }
     
     private func updatePlaybackTime(_ time: CMTime) {
         currentTime = time
         updateTimeLabels()
         
-        // 更新时间轴
-        if videoDuration.seconds > 0 {
-            let progress = time.seconds / videoDuration.seconds
-            timelineView.setProgress(progress)
-        }
+        // 🎯 编辑器模式：不再同步播放进度到时间轴
+        // 时间轴现在只负责截取位置控制，不跟随播放进度
     }
     
     private func updateTimeLabels() {
@@ -363,9 +437,43 @@ class VideoPlayerViewController: UIViewController {
         totalTimeLabel.textColor = ThemeManager.success // 绿色表示截取时间
     }
     
+    // 🎯 实时视频预览更新（防抖优化）
+    private func updateVideoPreview(to time: CMTime) {
+        let currentTime = CACurrentMediaTime()
+        
+        // 防抖：避免过于频繁的更新
+        guard currentTime - lastPreviewUpdateTime >= previewUpdateInterval else {
+            return
+        }
+        
+        lastPreviewUpdateTime = currentTime
+        
+        // 取消之前的定时器
+        previewUpdateTimer?.invalidate()
+        
+        // 延迟更新，进一步防抖
+        previewUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: false) { [weak self] _ in
+            self?.performVideoSeek(to: time)
+        }
+    }
+    
+    // 🎯 执行视频帧跳转
+    private func performVideoSeek(to time: CMTime) {
+        player?.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] completed in
+            if completed {
+                DispatchQueue.main.async {
+                    self?.currentTime = time
+                    // 只更新当前播放时间，不更新截取时间标签
+                    self?.currentTimeLabel.text = time.formattedString
+                }
+            }
+        }
+    }
+    
     // MARK: - Screenshot
     @objc private func screenshotButtonTapped() {
-        pausePlayer()
+        // 🎯 编辑器模式：停止流动以便精确截图
+        stopFlowing()
         
         // 🎯 Wink风格：使用竖线位置的截取时间，而非当前播放时间
         let captureTime = timelineView.getCurrentCaptureTime()
@@ -384,8 +492,11 @@ class VideoPlayerViewController: UIViewController {
     }
     
     private func handleScreenshotSuccess(_ image: UIImage) {
+        // 🎯 使用截取时间作为时间戳，而非播放时间
+        let captureTime = timelineView.getCurrentCaptureTime()
+        
         // 显示截图预览界面（用户可选择是否进行画质修复）
-        let previewVC = ScreenshotPreviewViewController(image: image, timestamp: currentTime.seconds)
+        let previewVC = ScreenshotPreviewViewController(image: image, timestamp: captureTime)
         let navController = UINavigationController(rootViewController: previewVC)
         navController.modalPresentationStyle = .fullScreen
         present(navController, animated: true)
@@ -414,9 +525,9 @@ class VideoPlayerViewController: UIViewController {
     }
     
     @objc private func playerDidFinishPlaying() {
-        // 播放结束，重置到开始
-        seekToTime(.zero)
-        isPlaying = false
+        // 🎯 流动结束，重置到开始位置
+        timelineView.timelineScrollView.setContentOffset(.zero, animated: true)
+        isFlowing = false
     }
     
     // MARK: - Cleanup
@@ -424,6 +535,12 @@ class VideoPlayerViewController: UIViewController {
         if let timeObserverToken = timeObserverToken {
             player?.removeTimeObserver(timeObserverToken)
         }
+        
+        // 🎯 清理流动控制资源
+        flowTimer?.invalidate()
+        flowTimer = nil
+        previewUpdateTimer?.invalidate()
+        previewUpdateTimer = nil
         
         player?.removeObserver(self, forKeyPath: "timeControlStatus")
         NotificationCenter.default.removeObserver(self)
@@ -468,6 +585,9 @@ class VideoPlayerViewController: UIViewController {
         // 更新约束
         controlPanelHeightConstraint?.constant = finalHeight
         
+        // 🎯 更新时间轴动态宽度 (响应屏幕变化)
+        updateTimelineWidth()
+        
         print("📱 VideoPlayerViewController 响应式布局:")
         print("   屏幕高度: \(view.bounds.height)")
         print("   安全区域底部: \(safeAreaBottom)")
@@ -475,12 +595,24 @@ class VideoPlayerViewController: UIViewController {
         print("   动态间距: \(adjustedSpacing)")
     }
     
+    // 🎯 动态更新时间轴宽度 (实现15%溢出)
+    private func updateTimelineWidth() {
+        let screenWidth = view.bounds.width
+        let overflowWidth = screenWidth + (screenWidth * 0.15)  // 15%溢出
+        timelineWidthConstraint?.constant = overflowWidth
+        
+        print("🎯 时间轴溢出更新:")
+        print("   屏幕宽度: \(screenWidth)")
+        print("   溢出宽度: \(overflowWidth) (+\(screenWidth * 0.15)px)")
+    }
+    
     // MARK: - KVO
     override func observeValue(forKeyPath keyPath: String?, of object: Any?, change: [NSKeyValueChangeKey : Any]?, context: UnsafeMutableRawPointer?) {
         if keyPath == "timeControlStatus" {
             DispatchQueue.main.async { [weak self] in
-                guard let player = self?.player else { return }
-                self?.isPlaying = player.timeControlStatus == .playing
+                // 🎯 编辑器模式：不再同步AVPlayer的播放状态
+                // 流动状态由用户手动控制，不跟随AVPlayer状态
+                print("📱 AVPlayer状态变化，但编辑器模式独立控制流动状态")
             }
         }
     }
@@ -496,15 +628,17 @@ extension VideoPlayerViewController: TimelineViewDelegate {
         // 更新截取时间标签显示
         updateCaptureTimeLabel(captureTime)
         
-        // 可选：也可以同步更新播放位置
-        // seekToTime(captureTime)
+        // 🎯 实时预览：立即更新视频帧到对应时间
+        updateVideoPreview(to: captureTime)
     }
     
     func timelineViewDidBeginSeeking(_ timelineView: TimelineView) {
-        pausePlayer()
+        // 🎯 用户开始滚动时间轴，停止自动流动
+        stopFlowing()
     }
     
     func timelineViewDidEndSeeking(_ timelineView: TimelineView) {
-        // 可以选择恢复播放或保持暂停状态
+        // 🎯 用户结束滚动，可以选择恢复流动或保持停止状态
+        // 用户体验：让用户手动控制是否继续流动
     }
 }

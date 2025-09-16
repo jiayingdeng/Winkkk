@@ -80,6 +80,11 @@ class TimelineView: UIView {
     private let scrollView = UIScrollView()
     private let contentView = UIView()
     
+    // 🎯 提供scrollView访问接口 (供VideoPlayerViewController使用)
+    var timelineScrollView: UIScrollView {
+        return scrollView
+    }
+    
     // MARK: - UI Components (now in content view)
     private let trackView = UIView()
     private let progressView = UIView()
@@ -185,21 +190,37 @@ class TimelineView: UIView {
         contentView.addSubview(thumbView)
     }
     
-    // 🎯 设置播放头指示器（白色竖线）
+    // 🎯 设置播放头指示器（白色竖线）- 增强截图瞄准器地位
     private func setupPlayheadIndicator() {
         playheadIndicator.backgroundColor = UIColor.white
-        playheadIndicator.layer.cornerRadius = 1
+        playheadIndicator.layer.cornerRadius = 1.5  // 稍微增加圆角
         
-        // 添加阴影增强可见性
+        // 🎯 增强阴影效果，突出截图瞄准器地位
         playheadIndicator.layer.shadowColor = UIColor.black.cgColor
-        playheadIndicator.layer.shadowOffset = CGSize(width: 0, height: 1)
-        playheadIndicator.layer.shadowRadius = 2
-        playheadIndicator.layer.shadowOpacity = 0.5
+        playheadIndicator.layer.shadowOffset = CGSize(width: 0, height: 2)
+        playheadIndicator.layer.shadowRadius = 4  // 增大阴影半径
+        playheadIndicator.layer.shadowOpacity = 0.8  // 增强阴影透明度
         playheadIndicator.layer.masksToBounds = false
         
-        // 添加微妙的发光效果
-        playheadIndicator.layer.borderWidth = 0.5
-        playheadIndicator.layer.borderColor = UIColor.white.withAlphaComponent(0.8).cgColor
+        // 🎯 增强发光效果 - Wink级别视觉反馈
+        playheadIndicator.layer.borderWidth = 1.0  // 增加边框宽度
+        playheadIndicator.layer.borderColor = UIColor.white.withAlphaComponent(0.9).cgColor
+        
+        // 🎯 添加微妙的脉冲动画，增强用户注意力
+        addPulseAnimation()
+    }
+    
+    // 🎯 添加脉冲动画突出截图瞄准器
+    private func addPulseAnimation() {
+        let pulseAnimation = CABasicAnimation(keyPath: "transform.scale")
+        pulseAnimation.fromValue = 1.0
+        pulseAnimation.toValue = 1.05
+        pulseAnimation.duration = 1.5
+        pulseAnimation.repeatCount = .infinity
+        pulseAnimation.autoreverses = true
+        pulseAnimation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        
+        playheadIndicator.layer.add(pulseAnimation, forKey: "pulse")
     }
     
     private func setupThumbView() {
