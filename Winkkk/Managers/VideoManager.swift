@@ -64,16 +64,32 @@ class VideoManager {
     
     // MARK: - Video Import
     func importVideo(from sourceURL: URL, completion: @escaping (Result<VideoItem, Error>) -> Void) {
+        print("📥 VideoManager: 开始导入视频 from \(sourceURL)")
+        
         backgroundContext.perform { [weak self] in
             guard let self = self else { return }
             
             do {
+                // 检查源文件是否存在
+                guard self.fileManager.fileExists(atPath: sourceURL.path) else {
+                    print("❌ VideoManager: 源文件不存在: \(sourceURL.path)")
+                    DispatchQueue.main.async {
+                        completion(.failure(VideoManagerError.fileNotFound))
+                    }
+                    return
+                }
+                
+                print("✅ VideoManager: 源文件存在，开始处理")
+                
                 // 生成目标文件路径
                 let fileName = self.generateUniqueFileName(from: sourceURL)
                 let destinationURL = FileManagerHelper.videosDirectory.appendingPathComponent(fileName)
                 
+                print("📂 VideoManager: 目标路径: \(destinationURL)")
+                
                 // 复制文件
                 try self.fileManager.copyItem(at: sourceURL, to: destinationURL)
+                print("✅ VideoManager: 文件复制成功")
                 
                 // 获取视频信息
                 let videoInfo = try self.extractVideoInfo(from: destinationURL)

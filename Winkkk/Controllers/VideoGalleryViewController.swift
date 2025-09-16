@@ -430,14 +430,52 @@ extension VideoGalleryViewController: PHPickerViewControllerDelegate {
                     }
                 }
                 
-                if let url = url {
-                    self?.videoManager.importVideo(from: url) { importResult in
+                if let error = error {
+                    print("❌ 获取视频文件失败: \(error)")
+                    return
+                }
+                
+                guard let url = url else {
+                    print("❌ 视频URL为空")
+                    return
+                }
+                
+                print("📹 获取到临时视频文件: \(url)")
+                
+                // 检查临时文件是否存在
+                let fileManager = FileManager.default
+                guard fileManager.fileExists(atPath: url.path) else {
+                    print("❌ 临时文件不存在: \(url.path)")
+                    return
+                }
+                
+                // 立即复制到安全位置，避免临时文件被清理
+                do {
+                    let fileName = "imported_\(Date().timeIntervalSince1970)_\(UUID().uuidString.prefix(8)).mov"
+                    let tempDirectory = FileManager.default.temporaryDirectory
+                    let safeURL = tempDirectory.appendingPathComponent(fileName)
+                    
+                    try fileManager.copyItem(at: url, to: safeURL)
+                    print("✅ 视频已复制到安全位置: \(safeURL)")
+                    
+                    // 然后导入到应用
+                    self?.videoManager.importVideo(from: safeURL) { importResult in
                         DispatchQueue.main.async {
-                            if case .failure(let error) = importResult {
-                                print("导入视频失败: \(error)")
+                            switch importResult {
+                            case .success(let videoItem):
+                                print("✅ 视频导入成功: \(videoItem.fileName)")
+                                // 清理临时文件
+                                try? fileManager.removeItem(at: safeURL)
+                            case .failure(let error):
+                                print("❌ 导入视频失败: \(error)")
+                                // 清理临时文件
+                                try? fileManager.removeItem(at: safeURL)
                             }
                         }
                     }
+                    
+                } catch {
+                    print("❌ 复制临时文件失败: \(error)")
                 }
             }
         }
