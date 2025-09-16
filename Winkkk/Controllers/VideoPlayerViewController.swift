@@ -206,7 +206,7 @@ class VideoPlayerViewController: UIViewController {
             controlPanelBlurView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             controlPanelBlurView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             controlPanelBlurView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            controlPanelBlurView.heightAnchor.constraint(equalToConstant: 160 + view.safeAreaInsets.bottom),
+            controlPanelBlurView.heightAnchor.constraint(equalToConstant: 210 + view.safeAreaInsets.bottom),  // 🎯 适配时间轴高度增长 (160→210px)
             
             // 时间轴
             timelineView.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 20),
