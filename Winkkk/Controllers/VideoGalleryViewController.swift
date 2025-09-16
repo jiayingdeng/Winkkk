@@ -391,11 +391,15 @@ extension VideoGalleryViewController: UICollectionViewDelegate {
                 self?.openVideoEditor(with: video)
             }
             
+            let exportAction = UIAction(title: "导出到系统相册", image: UIImage(systemName: "square.and.arrow.up")) { [weak self] _ in
+                self?.exportVideoToSystemLibrary(video)
+            }
+            
             let deleteAction = UIAction(title: "删除", image: UIImage(systemName: "trash"), attributes: .destructive) { [weak self] _ in
                 self?.deleteVideo(at: indexPath)
             }
             
-            return UIMenu(title: "", children: [editAction, deleteAction])
+            return UIMenu(title: "", children: [editAction, exportAction, deleteAction])
         }
     }
     
@@ -404,6 +408,68 @@ extension VideoGalleryViewController: UICollectionViewDelegate {
         let navController = UINavigationController(rootViewController: playerVC)
         navController.modalPresentationStyle = .fullScreen
         present(navController, animated: true)
+    }
+    
+    private func exportVideoToSystemLibrary(_ video: VideoItem) {
+        print("导出视频到系统相册: \(video.fileName)")
+        
+        // 检查文件是否存在
+        let fileManager = FileManager.default
+        if !fileManager.fileExists(atPath: video.filePath.path) {
+            print("❌ 视频文件不存在: \(video.filePath.path)")
+            let alert = UIAlertController(
+                title: "导出失败",
+                message: "视频文件不存在，无法导出到系统相册",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "确定", style: .default))
+            present(alert, animated: true)
+            return
+        }
+        
+        print("✅ 视频文件存在，开始导出到系统相册")
+        
+        // 显示导出进度指示器
+        let loadingAlert = UIAlertController(title: "导出中", message: "正在导出视频到系统相册...", preferredStyle: .alert)
+        present(loadingAlert, animated: true)
+        
+        // 导出视频到系统相册
+        UISaveVideoAtPathToSavedPhotosAlbum(video.filePath.path, self, #selector(videoExportComplete(_:didFinishSavingWithError:contextInfo:)), nil)
+        print("🔄 UISaveVideoAtPathToSavedPhotosAlbum已调用")
+    }
+    
+    @objc private func videoExportComplete(_ videoPath: String, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        print("🎬 视频导出回调被调用")
+        print("   路径: \(videoPath)")
+        print("   错误: \(error?.localizedDescription ?? "无错误")")
+        
+        // 关闭进度指示器
+        dismiss(animated: true) { [weak self] in
+            if let error = error {
+                print("❌ 视频导出到系统相册失败: \(error.localizedDescription)")
+                
+                // 显示错误消息
+                let alert = UIAlertController(
+                    title: "导出失败", 
+                    message: "无法导出视频到系统相册: \(error.localizedDescription)",
+                    preferredStyle: .alert
+                )
+                alert.addAction(UIAlertAction(title: "确定", style: .default))
+                self?.present(alert, animated: true)
+                
+            } else {
+                print("✅ 视频成功导出到系统相册")
+                
+                // 显示成功消息
+                let alert = UIAlertController(
+                    title: "导出成功", 
+                    message: "视频已成功导出到系统相册",
+                    preferredStyle: .alert
+                )
+                alert.addAction(UIAlertAction(title: "确定", style: .default))
+                self?.present(alert, animated: true)
+            }
+        }
     }
 }
 

@@ -510,11 +510,13 @@ extension MainCameraViewController {
             self?.editVideo(url: url)
         })
         
-        alert.addAction(UIAlertAction(title: "保存到相册", style: .default) { [weak self] _ in
-            self?.saveVideoToGallery(url: url)
+        alert.addAction(UIAlertAction(title: "保存相册", style: .default) { [weak self] _ in
+            self?.saveVideoToAppGallery(url: url)
         })
         
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel) { [weak self] _ in
+            self?.cancelRecording(url: url)
+        })
         
         // iPad支持
         if let popover = alert.popoverPresentationController {
@@ -532,8 +534,8 @@ extension MainCameraViewController {
         present(navController, animated: true)
     }
     
-    private func saveVideoToGallery(url: URL) {
-        print("保存视频到相册: \(url)")
+    private func saveVideoToAppGallery(url: URL) {
+        print("保存视频到app内部相册: \(url)")
         
         // 检查文件是否存在
         let fileManager = FileManager.default
@@ -541,7 +543,7 @@ extension MainCameraViewController {
             print("❌ 视频文件不存在: \(url.path)")
             let alert = UIAlertController(
                 title: "保存失败",
-                message: "视频文件不存在，无法保存到相册",
+                message: "视频文件不存在，无法保存到app相册",
                 preferredStyle: .alert
             )
             alert.addAction(UIAlertAction(title: "确定", style: .default))
@@ -549,15 +551,81 @@ extension MainCameraViewController {
             return
         }
         
-        print("✅ 视频文件存在，开始保存到相册")
+        print("✅ 视频文件存在，开始保存到app内部相册")
         
         // 显示保存进度指示器
-        let alert = UIAlertController(title: "保存中", message: "正在保存视频到相册...", preferredStyle: .alert)
-        present(alert, animated: true)
+        let loadingAlert = UIAlertController(title: "保存中", message: "正在保存视频到app相册...", preferredStyle: .alert)
+        present(loadingAlert, animated: true)
         
-        // 保存视频到相册
-        UISaveVideoAtPathToSavedPhotosAlbum(url.path, self, #selector(video(_:didFinishSavingWithError:contextInfo:)), nil)
-        print("🔄 UISaveVideoAtPathToSavedPhotosAlbum已调用")
+        // 保存视频到app内部相册
+        VideoManager.shared.saveVideo(from: url) { [weak self] result in
+            DispatchQueue.main.async {
+                // 关闭进度指示器
+                loadingAlert.dismiss(animated: true) {
+                    switch result {
+                    case .success(let videoItem):
+                        print("✅ 视频成功保存到app内部相册")
+                        
+                        // 成功触觉反馈
+                        self?.hapticManager.notificationSuccess()
+                        
+                        // 显示成功消息
+                        let successAlert = UIAlertController(
+                            title: "保存成功",
+                            message: "视频已保存到app相册，可在相册中查看",
+                            preferredStyle: .alert
+                        )
+                        successAlert.addAction(UIAlertAction(title: "查看相册", style: .default) { [weak self] _ in
+                            self?.galleryButtonTapped()
+                        })
+                        successAlert.addAction(UIAlertAction(title: "确定", style: .cancel))
+                        self?.present(successAlert, animated: true)
+                        
+                    case .failure(let error):
+                        print("❌ 保存视频到app内部相册失败: \(error)")
+                        
+                        // 错误触觉反馈
+                        self?.hapticManager.notificationError()
+                        
+                        // 显示错误消息
+                        let errorAlert = UIAlertController(
+                            title: "保存失败",
+                            message: "无法保存到app相册: \(error.localizedDescription)",
+                            preferredStyle: .alert
+                        )
+                        errorAlert.addAction(UIAlertAction(title: "确定", style: .default))
+                        self?.present(errorAlert, animated: true)
+                    }
+                }
+            }
+        }
+    }
+    
+    private func cancelRecording(url: URL) {
+        print("取消录制，删除临时文件: \(url)")
+        
+        // 触觉反馈
+        hapticManager.buttonTap()
+        
+        // 删除临时文件
+        let fileManager = FileManager.default
+        do {
+            if fileManager.fileExists(atPath: url.path) {
+                try fileManager.removeItem(at: url)
+                print("✅ 临时文件已删除")
+            }
+        } catch {
+            print("❌ 删除临时文件失败: \(error)")
+        }
+        
+        // 可选：显示取消确认消息
+        let alert = UIAlertController(
+            title: "已取消",
+            message: "录制已取消，临时文件已删除",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
     }
     
     @objc private func video(_ videoPath: String, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
