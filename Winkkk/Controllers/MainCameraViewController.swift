@@ -339,8 +339,9 @@ extension MainCameraViewController {
         
         // 立即触感反馈确认按钮点击
         let selectionFeedback = UISelectionFeedbackGenerator()
+        selectionFeedback.prepare()
         selectionFeedback.selectionChanged()
-        print("📳 触感反馈：按钮点击")
+        print("📳 触感反馈：按钮点击已触发")
         
         if isRecording {
             print("🛑 尝试停止录制...")
@@ -393,8 +394,9 @@ extension MainCameraViewController {
                     self?.startRecordingTimer()
                     
                     // 触觉反馈
+                    self?.impactFeedbackGenerator.prepare()
                     self?.impactFeedbackGenerator.impactOccurred()
-                    print("📳 触感反馈：开始录制")
+                    print("📳 触感反馈：开始录制已触发")
                     
                 case .failure(let error):
                     self?.showError(error)
@@ -416,8 +418,9 @@ extension MainCameraViewController {
                     self?.handleRecordingComplete(url: url)
                     
                     // 触觉反馈
+                    self?.lightFeedbackGenerator.prepare()
                     self?.lightFeedbackGenerator.impactOccurred()
-                    print("📳 触感反馈：停止录制")
+                    print("📳 触感反馈：停止录制已触发")
                     
                 case .failure(let error):
                     self?.showError(error)
@@ -529,18 +532,40 @@ extension MainCameraViewController {
     private func saveVideoToGallery(url: URL) {
         print("保存视频到相册: \(url)")
         
+        // 检查文件是否存在
+        let fileManager = FileManager.default
+        if !fileManager.fileExists(atPath: url.path) {
+            print("❌ 视频文件不存在: \(url.path)")
+            let alert = UIAlertController(
+                title: "保存失败",
+                message: "视频文件不存在，无法保存到相册",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "确定", style: .default))
+            present(alert, animated: true)
+            return
+        }
+        
+        print("✅ 视频文件存在，开始保存到相册")
+        
         // 显示保存进度指示器
         let alert = UIAlertController(title: "保存中", message: "正在保存视频到相册...", preferredStyle: .alert)
         present(alert, animated: true)
         
         // 保存视频到相册
         UISaveVideoAtPathToSavedPhotosAlbum(url.path, self, #selector(video(_:didFinishSavingWithError:contextInfo:)), nil)
+        print("🔄 UISaveVideoAtPathToSavedPhotosAlbum已调用")
     }
     
     @objc private func video(_ videoPath: String, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        print("🎬 视频保存回调被调用")
+        print("   路径: \(videoPath)")
+        print("   错误: \(error?.localizedDescription ?? "无错误")")
+        
         // 关闭进度指示器
         dismiss(animated: true) { [weak self] in
             if let error = error {
+                print("❌ 视频保存到相册失败: \(error.localizedDescription)")
                 // 保存失败
                 let alert = UIAlertController(
                     title: "保存失败", 
@@ -549,7 +574,14 @@ extension MainCameraViewController {
                 )
                 alert.addAction(UIAlertAction(title: "确定", style: .default))
                 self?.present(alert, animated: true)
+                
+                // 错误触觉反馈
+                let errorFeedback = UINotificationFeedbackGenerator()
+                errorFeedback.prepare()
+                errorFeedback.notificationOccurred(.error)
+                print("📳 错误触感反馈已触发")
             } else {
+                print("✅ 视频成功保存到相册")
                 // 保存成功
                 let alert = UIAlertController(
                     title: "保存成功", 
@@ -561,7 +593,9 @@ extension MainCameraViewController {
                 
                 // 播放成功音效和触觉反馈
                 let successFeedback = UINotificationFeedbackGenerator()
+                successFeedback.prepare()
                 successFeedback.notificationOccurred(.success)
+                print("📳 成功触感反馈已触发")
             }
         }
     }
