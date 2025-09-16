@@ -409,6 +409,27 @@ class TimelineView: UIView {
         return frameNumber * frameDuration
     }
     
+    /// 🎯 计算基于视频时间范围的有效滚动边界
+    private func getValidScrollRange() -> (min: CGFloat, max: CGFloat) {
+        guard duration > 0, bounds.width > 0 else {
+            return (min: 0, max: 0)
+        }
+        
+        let centerX = bounds.width / 2
+        
+        // 让视频开头（时间0）能够到达中心竖线的滚动位置
+        let minScrollOffset = timeToCoordinate(0) - centerX
+        
+        // 让视频结尾（时间duration）能够到达中心竖线的滚动位置
+        let maxScrollOffset = timeToCoordinate(duration) - centerX
+        
+        // 确保边界值有效
+        let validMin = max(0, minScrollOffset)
+        let validMax = max(validMin, maxScrollOffset)
+        
+        return (min: validMin, max: validMax)
+    }
+    
     /// 🎯 同步滚动到指定截取时间
     func scrollToCaptureTime(_ time: Double) {
         // 🎯 使用更新后的坐标转换（已考虑padding）
@@ -417,8 +438,10 @@ class TimelineView: UIView {
         
         // 计算需要的滚动偏移，让目标时间点移动到中心竖线位置
         let scrollOffsetX = targetX - centerX
-        let maxOffset = max(0, scrollView.contentSize.width - scrollView.bounds.width)
-        let clampedOffset = max(0, min(maxOffset, scrollOffsetX))
+        
+        // 🎯 使用基于时间的滚动边界约束
+        let scrollRange = getValidScrollRange()
+        let clampedOffset = max(scrollRange.min, min(scrollRange.max, scrollOffsetX))
         
         scrollView.setContentOffset(CGPoint(x: clampedOffset, y: 0), animated: true)
     }
@@ -829,10 +852,9 @@ class TimelineView: UIView {
             let currentOffsetX = scrollView.contentOffset.x
             let newOffsetX = currentOffsetX - translation.x  // 反向滚动，符合直觉
             
-            // 🎯 新的滚动范围：允许完整滚动包括padding区域
-            // 这样视频开头和结尾都能移动到中心竖线位置
-            let maxOffsetX = max(0, scrollView.contentSize.width - scrollView.bounds.width)
-            let clampedOffsetX = max(0, min(maxOffsetX, newOffsetX))
+            // 🎯 使用基于视频时间范围的滚动边界约束
+            let scrollRange = getValidScrollRange()
+            let clampedOffsetX = max(scrollRange.min, min(scrollRange.max, newOffsetX))
             
             // 更新滚动位置
             scrollView.setContentOffset(CGPoint(x: clampedOffsetX, y: 0), animated: false)
@@ -893,8 +915,10 @@ class TimelineView: UIView {
                 // 缩放后保持相同的时间点在手势中心
                 let newCenterCoordinate = timeToCoordinate(centerTimeBeforeZoom)
                 let newScrollOffset = newCenterCoordinate - gestureLocationInScrollView.x
-                let maxOffset = max(0, scrollView.contentSize.width - scrollView.bounds.width)
-                let clampedOffset = max(0, min(maxOffset, newScrollOffset))
+                
+                // 🎯 使用基于视频时间范围的滚动边界约束
+                let scrollRange = getValidScrollRange()
+                let clampedOffset = max(scrollRange.min, min(scrollRange.max, newScrollOffset))
                 
                 scrollView.setContentOffset(CGPoint(x: clampedOffset, y: 0), animated: false)
                 
