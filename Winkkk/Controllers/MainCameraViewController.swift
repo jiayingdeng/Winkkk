@@ -83,23 +83,6 @@ class MainCameraViewController: UIViewController {
         return .fade
     }
     
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        
-        // 验证录制按钮的最终状态
-        print("🔍 视图布局完成 - 录制按钮状态:")
-        print("   Frame: \(recordButton.frame)")
-        print("   isUserInteractionEnabled: \(recordButton.isUserInteractionEnabled)")
-        print("   isHidden: \(recordButton.isHidden)")
-        print("   alpha: \(recordButton.alpha)")
-        print("   superview: \(recordButton.superview != nil ? "存在" : "nil")")
-        
-        if recordButton.frame != .zero {
-            print("✅ 录制按钮布局正常")
-        } else {
-            print("❌ 录制按钮frame为零！")
-        }
-    }
     
     // MARK: - UI Setup
     private func setupUI() {
@@ -606,6 +589,20 @@ extension MainCameraViewController {
         // 更新录制按钮渐变层
         if let gradientLayer = recordButton.layer.sublayers?.first as? CAGradientLayer {
             gradientLayer.frame = recordButton.bounds
+        }
+        
+        // 验证录制按钮的最终状态
+        print("🔍 视图布局完成 - 录制按钮状态:")
+        print("   Frame: \(recordButton.frame)")
+        print("   isUserInteractionEnabled: \(recordButton.isUserInteractionEnabled)")
+        print("   isHidden: \(recordButton.isHidden)")
+        print("   alpha: \(recordButton.alpha)")
+        print("   superview: \(recordButton.superview != nil ? "存在" : "nil")")
+        
+        if recordButton.frame != .zero {
+            print("✅ 录制按钮布局正常")
+        } else {
+            print("❌ 录制按钮frame为零！")
         }
     }
 }
