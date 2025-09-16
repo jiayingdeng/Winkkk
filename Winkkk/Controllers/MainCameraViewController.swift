@@ -83,6 +83,24 @@ class MainCameraViewController: UIViewController {
         return .fade
     }
     
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        
+        // 验证录制按钮的最终状态
+        print("🔍 视图布局完成 - 录制按钮状态:")
+        print("   Frame: \(recordButton.frame)")
+        print("   isUserInteractionEnabled: \(recordButton.isUserInteractionEnabled)")
+        print("   isHidden: \(recordButton.isHidden)")
+        print("   alpha: \(recordButton.alpha)")
+        print("   superview: \(recordButton.superview != nil ? "存在" : "nil")")
+        
+        if recordButton.frame != .zero {
+            print("✅ 录制按钮布局正常")
+        } else {
+            print("❌ 录制按钮frame为零！")
+        }
+    }
+    
     // MARK: - UI Setup
     private func setupUI() {
         view.backgroundColor = .black
@@ -129,10 +147,16 @@ class MainCameraViewController: UIViewController {
         // 设置按钮
         setupSettingsButton()
         
+        // 确保控制面板可以交互
+        controlPanelBlurView.isUserInteractionEnabled = true
+        controlPanelBlurView.contentView.isUserInteractionEnabled = true
+        
         // 添加按钮到控制面板
         controlPanelBlurView.contentView.addSubview(galleryButton)
         controlPanelBlurView.contentView.addSubview(recordButton)
         controlPanelBlurView.contentView.addSubview(settingsButton)
+        
+        print("🔧 控制面板配置完成，contentView交互: \(controlPanelBlurView.contentView.isUserInteractionEnabled)")
     }
     
     private func setupGalleryButton() {
@@ -163,6 +187,8 @@ class MainCameraViewController: UIViewController {
         innerCircle.backgroundColor = .white
         innerCircle.layer.cornerRadius = 25
         innerCircle.translatesAutoresizingMaskIntoConstraints = false
+        // 禁用内部视图的交互，确保点击事件传递到父按钮
+        innerCircle.isUserInteractionEnabled = false
         recordButton.addSubview(innerCircle)
         
         NSLayoutConstraint.activate([
@@ -172,9 +198,14 @@ class MainCameraViewController: UIViewController {
             innerCircle.heightAnchor.constraint(equalToConstant: 50)
         ])
         
+        // 确保按钮可以交互
+        recordButton.isUserInteractionEnabled = true
+        
         recordButton.addTarget(self, action: #selector(recordButtonTapped), for: .touchUpInside)
         recordButton.addTarget(self, action: #selector(buttonPressed(_:)), for: .touchDown)
         recordButton.addTarget(self, action: #selector(buttonReleased(_:)), for: [.touchUpInside, .touchUpOutside])
+        
+        print("🔧 录制按钮已配置，frame: \(recordButton.frame), isUserInteractionEnabled: \(recordButton.isUserInteractionEnabled)")
         
         // 添加阴影
         recordButton.layer.shadowColor = UIColor.black.withAlphaComponent(0.3).cgColor
@@ -351,12 +382,14 @@ extension MainCameraViewController {
     }
     
     @objc private func buttonPressed(_ button: UIButton) {
+        print("🔽 按钮按下: \(button == recordButton ? "录制按钮" : "其他按钮")")
         UIView.animate(withDuration: 0.1) {
             button.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
         }
     }
     
     @objc private func buttonReleased(_ button: UIButton) {
+        print("🔼 按钮释放: \(button == recordButton ? "录制按钮" : "其他按钮")")
         UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5) {
             button.transform = .identity
         }
