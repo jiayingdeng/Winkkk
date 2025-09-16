@@ -212,7 +212,7 @@ class VideoPlayerViewController: UIViewController {
             timelineView.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 20),
             timelineView.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 60),
             timelineView.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -60),
-            timelineView.heightAnchor.constraint(equalToConstant: 60),
+            timelineView.heightAnchor.constraint(equalToConstant: 110),  // 🎯 适配新的时间轴高度 (60→110px)
             
             // 时间标签
             currentTimeLabel.topAnchor.constraint(equalTo: timelineView.bottomAnchor, constant: 8),

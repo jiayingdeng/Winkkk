@@ -86,6 +86,7 @@ class TimelineView: UIView {
     private let thumbView = UIView()
     private let thumbnailContainerView = UIView()
     private let timeScaleView = UIView() // 新增：时间刻度显示
+    private let playheadIndicator = UIView() // 🎯 新增：白色竖直指示器
     
     // 缩略图相关
     private var thumbnailImageViews: [UIImageView] = []
@@ -109,6 +110,9 @@ class TimelineView: UIView {
     
     // MARK: - Coordinate System
     private var timeToPixelRatio: Double = 0  // 时间到像素的转换比例
+    
+    // MARK: - Layout Constraints
+    private var playheadIndicatorCenterXConstraint: NSLayoutConstraint?  // 🎯 播放头指示器位置约束
     
     // MARK: - Initialization
     override init(frame: CGRect) {
@@ -172,9 +176,30 @@ class TimelineView: UIView {
         progressView.layer.cornerRadius = 2
         contentView.addSubview(progressView)
         
+        // 🎯 白色竖直指示器 - Wink风格的播放头指示器
+        setupPlayheadIndicator()
+        contentView.addSubview(playheadIndicator)
+        
         // 拖拽滑块
         setupThumbView()
         contentView.addSubview(thumbView)
+    }
+    
+    // 🎯 设置播放头指示器（白色竖线）
+    private func setupPlayheadIndicator() {
+        playheadIndicator.backgroundColor = UIColor.white
+        playheadIndicator.layer.cornerRadius = 1
+        
+        // 添加阴影增强可见性
+        playheadIndicator.layer.shadowColor = UIColor.black.cgColor
+        playheadIndicator.layer.shadowOffset = CGSize(width: 0, height: 1)
+        playheadIndicator.layer.shadowRadius = 2
+        playheadIndicator.layer.shadowOpacity = 0.5
+        playheadIndicator.layer.masksToBounds = false
+        
+        // 添加微妙的发光效果
+        playheadIndicator.layer.borderWidth = 0.5
+        playheadIndicator.layer.borderColor = UIColor.white.withAlphaComponent(0.8).cgColor
     }
     
     private func setupThumbView() {
@@ -213,6 +238,7 @@ class TimelineView: UIView {
         trackView.translatesAutoresizingMaskIntoConstraints = false
         progressView.translatesAutoresizingMaskIntoConstraints = false
         thumbView.translatesAutoresizingMaskIntoConstraints = false
+        playheadIndicator.translatesAutoresizingMaskIntoConstraints = false  // 🎯 新增
         
         NSLayoutConstraint.activate([
             // 滚动视图 - 填满整个TimelineView
@@ -223,17 +249,17 @@ class TimelineView: UIView {
             
             // 内容视图约束将在updateContentSize中动态设置
             
-            // 时间刻度视图 (在内容视图中)
+            // 时间刻度视图 (在内容视图中) - 🎯 增加高度
             timeScaleView.topAnchor.constraint(equalTo: contentView.topAnchor),
             timeScaleView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             timeScaleView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            timeScaleView.heightAnchor.constraint(equalToConstant: 20),
+            timeScaleView.heightAnchor.constraint(equalToConstant: 30),  // 20 → 30px
             
-            // 缩略图容器 (在内容视图中)
-            thumbnailContainerView.topAnchor.constraint(equalTo: timeScaleView.bottomAnchor, constant: 4),
+            // 缩略图容器 (在内容视图中) - 🎯 增加高度
+            thumbnailContainerView.topAnchor.constraint(equalTo: timeScaleView.bottomAnchor, constant: 6),  // 4 → 6px间距
             thumbnailContainerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             thumbnailContainerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            thumbnailContainerView.heightAnchor.constraint(equalToConstant: 40),
+            thumbnailContainerView.heightAnchor.constraint(equalToConstant: 60),  // 40 → 60px
             
             // 轨道 (在内容视图中)
             trackView.topAnchor.constraint(equalTo: thumbnailContainerView.bottomAnchor, constant: 8),
@@ -250,9 +276,19 @@ class TimelineView: UIView {
             // 滑块 (在内容视图中)
             thumbView.centerYAnchor.constraint(equalTo: trackView.centerYAnchor),
             thumbView.widthAnchor.constraint(equalToConstant: 24),
-            thumbView.heightAnchor.constraint(equalToConstant: 24)
+            thumbView.heightAnchor.constraint(equalToConstant: 24),
             // 位置约束将动态更新
+            
+            // 🎯 播放头指示器 (白色竖线) - 穿过整个时间轴区域
+            playheadIndicator.topAnchor.constraint(equalTo: timeScaleView.topAnchor),
+            playheadIndicator.bottomAnchor.constraint(equalTo: trackView.bottomAnchor),
+            playheadIndicator.widthAnchor.constraint(equalToConstant: 2)
+            // centerX约束将动态更新，跟随播放进度
         ])
+        
+        // 🎯 初始化播放头指示器位置约束（初始位置在开始处）
+        playheadIndicatorCenterXConstraint = playheadIndicator.centerXAnchor.constraint(equalTo: contentView.leadingAnchor)
+        playheadIndicatorCenterXConstraint?.isActive = true
         
         updateProgressConstraints()
     }
@@ -508,9 +544,9 @@ class TimelineView: UIView {
         let asset = AVAsset(url: videoURL)
         let imageGenerator = AVAssetImageGenerator(asset: asset)
         
-        // 计算显示尺寸
+        // 计算显示尺寸 - 🎯 更新缩略图高度
         let thumbnailWidth = currentContentWidth / CGFloat(count)
-        let thumbnailHeight: CGFloat = 40
+        let thumbnailHeight: CGFloat = 60  // 40 → 60px，与约束保持一致
         
         // 🎯 关键修复：动态计算高质量缩略图分辨率
         let targetThumbnailSize = calculateOptimalThumbnailSize(
@@ -550,7 +586,7 @@ class TimelineView: UIView {
                 x: CGFloat(i) * thumbnailWidth,
                 y: 0,
                 width: thumbnailWidth,
-                height: 40
+                height: 60  // 40 → 60px
             )
             
             // 异步生成缩略图
@@ -595,6 +631,9 @@ class TimelineView: UIView {
         let thumbCenterX = timeToCoordinate(currentTime)
         thumbView.center.x = thumbCenterX
         
+        // 🎯 更新播放头指示器位置
+        updatePlayheadIndicatorPosition()
+        
         // 添加微妙的缩放动画（仅在非交互状态）
         if !isDragging && !isZooming {
             UIView.animate(withDuration: 0.1, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5) {
@@ -604,6 +643,28 @@ class TimelineView: UIView {
                     self.thumbView.transform = .identity
                 }
             }
+        }
+    }
+    
+    // 🎯 更新播放头指示器位置（白色竖线）
+    private func updatePlayheadIndicatorPosition() {
+        guard let constraint = playheadIndicatorCenterXConstraint else { return }
+        
+        // 计算指示器应该在的位置（与当前播放时间对应）
+        let currentTime = duration * currentProgress
+        let indicatorX = timeToCoordinate(currentTime)
+        
+        // 更新约束
+        constraint.constant = indicatorX
+        
+        // 平滑动画更新位置（仅在非交互状态）
+        if !isDragging && !isZooming {
+            UIView.animate(withDuration: 0.2, delay: 0, options: .curveEaseOut) {
+                self.layoutIfNeeded()
+            }
+        } else {
+            // 交互状态下立即更新
+            layoutIfNeeded()
         }
     }
     
@@ -833,7 +894,7 @@ class TimelineView: UIView {
                 x: CGFloat(index) * thumbnailWidth,
                 y: 0,
                 width: thumbnailWidth,
-                height: 40
+                height: 60  // 40 → 60px
             )
         }
         
