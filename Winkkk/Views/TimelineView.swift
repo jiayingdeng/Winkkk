@@ -109,6 +109,10 @@ class TimelineView: UIView {
     private var baseContentWidth: CGFloat = 0  // 基础内容宽度（1x时）
     private var currentContentWidth: CGFloat = 0  // 当前实际内容宽度
     
+    // MARK: - Content Padding (for complete scroll range)
+    private var leftPadding: CGFloat { bounds.width / 2 }  // 左侧填充，让视频开头能到达中心
+    private var rightPadding: CGFloat { bounds.width / 2 } // 右侧填充，让视频结尾能到达中心
+    
     // MARK: - Time Resolution
     private var currentTimeResolution: TimeResolution = .seconds
     private var frameRate: Double = 30.0  // 视频帧率
@@ -175,6 +179,9 @@ class TimelineView: UIView {
         trackView.backgroundColor = UIColor.white.withAlphaComponent(0.3)
         trackView.layer.cornerRadius = 2
         contentView.addSubview(trackView)
+        
+        // 🎯 隐藏轨道条 - 编辑器模式不需要显示
+        trackView.isHidden = true
         
         // 🎯 Wink编辑器模式：移除传统播放器组件
         // ❌ 不再添加进度条和滑块
@@ -332,12 +339,20 @@ class TimelineView: UIView {
     }
     
     // MARK: - Core Coordinate System Methods
-    /// 计算动态内容宽度
+    /// 计算动态内容宽度（包含左右padding）
     private func calculateContentWidth() -> CGFloat {
         guard baseContentWidth > 0 else {
             baseContentWidth = bounds.width
-            return baseContentWidth
+            return baseContentWidth + leftPadding + rightPadding
         }
+        // 🎯 总内容宽度 = 左padding + 实际视频内容 + 右padding
+        let actualVideoWidth = baseContentWidth * zoomScale
+        return leftPadding + actualVideoWidth + rightPadding
+    }
+    
+    /// 获取实际视频内容宽度（不包含padding）
+    private func getActualVideoWidth() -> CGFloat {
+        guard baseContentWidth > 0 else { return bounds.width }
         return baseContentWidth * zoomScale
     }
     
@@ -347,42 +362,64 @@ class TimelineView: UIView {
         contentView.frame = CGRect(x: 0, y: 0, width: currentContentWidth, height: bounds.height)
         scrollView.contentSize = CGSize(width: currentContentWidth, height: bounds.height)
         
-        // 更新时间到像素的转换比例
+        // 🎯 更新时间到像素的转换比例（基于实际视频内容宽度，不包含padding）
         if duration > 0 {
-            timeToPixelRatio = Double(currentContentWidth) / duration
+            let actualVideoWidth = getActualVideoWidth()
+            timeToPixelRatio = Double(actualVideoWidth) / duration
         }
     }
     
-    /// 时间坐标转换为像素坐标
+    /// 时间坐标转换为像素坐标（考虑leftPadding偏移）
     private func timeToCoordinate(_ time: Double) -> CGFloat {
-        guard duration > 0 else { return 0 }
-        return CGFloat(time * timeToPixelRatio)
+        guard duration > 0 else { return leftPadding }
+        // 时间 → 视频内容区域的像素位置 → 加上leftPadding得到最终位置
+        let videoContentX = CGFloat(time * timeToPixelRatio)
+        return leftPadding + videoContentX
     }
     
-    /// 像素坐标转换为时间
+    /// 像素坐标转换为时间（考虑leftPadding偏移）
     private func coordinateToTime(_ x: CGFloat) -> Double {
         guard timeToPixelRatio > 0 else { return 0 }
-        return Double(x) / timeToPixelRatio
+        // 总像素位置 → 减去leftPadding得到视频内容区域位置 → 转换为时间
+        let videoContentX = x - leftPadding
+        return max(0, Double(videoContentX) / timeToPixelRatio)
     }
     
     /// 🎯 Wink风格：获取当前竖线位置对应的截取时间
     func getCurrentCaptureTime() -> Double {
-        // 计算竖线在内容视图中的位置
+        // 🎯 计算竖线在内容视图中的绝对位置
         let centerX = bounds.width / 2  // 竖线固定在TimelineView中心
-        let relativeX = centerX + scrollView.contentOffset.x  // 相对于内容的位置
+        let absoluteX = centerX + scrollView.contentOffset.x  // 相对于内容视图的绝对位置
         
-        // 转换为时间
-        let captureTime = coordinateToTime(relativeX)
-        return max(0, min(duration, captureTime))  // 限制在有效范围内
+        // 🎯 使用更新后的坐标转换方法（已考虑padding）
+        let captureTime = coordinateToTime(absoluteX)
+        let clampedTime = max(0, min(duration, captureTime))  // 限制在有效范围内
+        
+        // 🎯 帧级别精度：在高缩放时对齐到帧边界
+        if currentTimeResolution == .frames && zoomScale >= 4.0 {
+            return alignToFrameBoundary(clampedTime)
+        }
+        
+        return clampedTime
+    }
+    
+    /// 🎯 将时间对齐到最近的帧边界
+    private func alignToFrameBoundary(_ time: Double) -> Double {
+        let frameDuration = 1.0 / frameRate
+        let frameNumber = round(time / frameDuration)
+        return frameNumber * frameDuration
     }
     
     /// 🎯 同步滚动到指定截取时间
     func scrollToCaptureTime(_ time: Double) {
+        // 🎯 使用更新后的坐标转换（已考虑padding）
         let targetX = timeToCoordinate(time)
         let centerX = bounds.width / 2
-        let scrollOffsetX = max(0, targetX - centerX)
+        
+        // 计算需要的滚动偏移，让目标时间点移动到中心竖线位置
+        let scrollOffsetX = targetX - centerX
         let maxOffset = max(0, scrollView.contentSize.width - scrollView.bounds.width)
-        let clampedOffset = min(scrollOffsetX, maxOffset)
+        let clampedOffset = max(0, min(maxOffset, scrollOffsetX))
         
         scrollView.setContentOffset(CGPoint(x: clampedOffset, y: 0), animated: true)
     }
@@ -576,8 +613,9 @@ class TimelineView: UIView {
         let asset = AVAsset(url: videoURL)
         let imageGenerator = AVAssetImageGenerator(asset: asset)
         
-        // 计算显示尺寸 - 🎯 更新缩略图高度
-        let thumbnailWidth = currentContentWidth / CGFloat(count)
+        // 🎯 计算显示尺寸 - 缩略图只占据实际视频内容区域
+        let actualVideoWidth = getActualVideoWidth()
+        let thumbnailWidth = actualVideoWidth / CGFloat(count)
         let thumbnailHeight: CGFloat = 60  // 40 → 60px，与约束保持一致
         
         // 🎯 关键修复：动态计算高质量缩略图分辨率
@@ -613,9 +651,9 @@ class TimelineView: UIView {
             thumbnailContainerView.addSubview(imageView)
             thumbnailImageViews.append(imageView)
             
-            // 使用 frame 布局而不是约束（性能更好）
+            // 🎯 使用 frame 布局 - 缩略图从leftPadding开始，只占据视频内容区域
             imageView.frame = CGRect(
-                x: CGFloat(i) * thumbnailWidth,
+                x: leftPadding + CGFloat(i) * thumbnailWidth,
                 y: 0,
                 width: thumbnailWidth,
                 height: 60  // 40 → 60px
@@ -695,7 +733,8 @@ class TimelineView: UIView {
             let currentOffsetX = scrollView.contentOffset.x
             let newOffsetX = currentOffsetX - translation.x  // 反向滚动，符合直觉
             
-            // 限制滚动范围
+            // 🎯 新的滚动范围：允许完整滚动包括padding区域
+            // 这样视频开头和结尾都能移动到中心竖线位置
             let maxOffsetX = max(0, scrollView.contentSize.width - scrollView.bounds.width)
             let clampedOffsetX = max(0, min(maxOffsetX, newOffsetX))
             
@@ -881,19 +920,20 @@ class TimelineView: UIView {
     private func updateThumbnailLayout() {
         guard currentThumbnailCount > 0, currentContentWidth > 0 else { return }
         
-        // 使用动态内容宽度而不是视图宽度
-        let thumbnailWidth = currentContentWidth / CGFloat(currentThumbnailCount)
+        // 🎯 使用实际视频内容宽度，不包含padding
+        let actualVideoWidth = getActualVideoWidth()
+        let thumbnailWidth = actualVideoWidth / CGFloat(currentThumbnailCount)
         
         for (index, imageView) in thumbnailImageViews.enumerated() {
             imageView.frame = CGRect(
-                x: CGFloat(index) * thumbnailWidth,
+                x: leftPadding + CGFloat(index) * thumbnailWidth,
                 y: 0,
                 width: thumbnailWidth,
                 height: 60  // 40 → 60px
             )
         }
         
-        print("🖼️ 更新缩略图布局: \(currentThumbnailCount)个, 每个宽度: \(thumbnailWidth), 总宽度: \(currentContentWidth)")
+        print("🖼️ 更新缩略图布局: \(currentThumbnailCount)个, 每个宽度: \(thumbnailWidth), 视频内容宽度: \(actualVideoWidth)")
     }
     
     // MARK: - Touch Events
