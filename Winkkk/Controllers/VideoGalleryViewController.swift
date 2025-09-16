@@ -21,7 +21,7 @@ class VideoGalleryViewController: UIViewController {
         cv.dataSource = self
         cv.backgroundColor = .clear
         cv.showsVerticalScrollIndicator = false
-        cv.contentInset = UIEdgeInsets(top: 20, left: 16, bottom: 20, right: 16)
+        cv.contentInset = UIEdgeInsets(top: 20, left: 8, bottom: 20, right: 8)
         
         // 注册cell
         cv.register(VideoThumbnailCell.self, forCellWithReuseIdentifier: VideoThumbnailCell.identifier)
@@ -137,7 +137,8 @@ class VideoGalleryViewController: UIViewController {
             heightDimension: .fractionalWidth(0.7)
         )
         let item = NSCollectionLayoutItem(layoutSize: itemSize)
-        item.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4)
+        // 移除item的contentInsets以避免宽度溢出导致的水平滚动
+        // item.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4)
         
         let groupSize = NSCollectionLayoutSize(
             widthDimension: .fractionalWidth(1.0),
@@ -145,9 +146,13 @@ class VideoGalleryViewController: UIViewController {
         )
         // 修复：每个group包含2个item，而不是只有1个
         let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitem: item, count: 2)
+        // 在group级别添加间距，避免宽度计算问题
+        group.interItemSpacing = .fixed(8)
         
         let section = NSCollectionLayoutSection(group: group)
         section.interGroupSpacing = 8
+        // 调整section的内边距来替代item的contentInsets
+        section.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4)
         
         return UICollectionViewCompositionalLayout(section: section)
     }
