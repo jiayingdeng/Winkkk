@@ -119,29 +119,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         let hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "HasCompletedOnboarding")
         print("🔍 SceneDelegate: HasCompletedOnboarding = \(hasCompletedOnboarding)")
         
-        // 临时测试：创建一个简单的红色视图来确认应用能启动
-        print("🧪 SceneDelegate: Creating test view controller")
-        let testVC = UIViewController()
-        testVC.view.backgroundColor = .systemRed
-        
-        let label = UILabel()
-        label.text = "应用启动测试成功！\nWinkkk is working!"
-        label.textColor = .white
-        label.font = UIFont.systemFont(ofSize: 24, weight: .bold)
-        label.textAlignment = .center
-        label.numberOfLines = 0
-        label.translatesAutoresizingMaskIntoConstraints = false
-        
-        testVC.view.addSubview(label)
-        NSLayoutConstraint.activate([
-            label.centerXAnchor.constraint(equalTo: testVC.view.centerXAnchor),
-            label.centerYAnchor.constraint(equalTo: testVC.view.centerYAnchor)
-        ])
-        
-        window?.rootViewController = testVC
-        
-        // 原来的代码（暂时注释掉）
-        /*
         if hasCompletedOnboarding {
             // 已完成引导，直接进入主界面
             print("📱 SceneDelegate: Loading MainCameraViewController")
@@ -154,7 +131,6 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             let onboardingVC = OnboardingViewController()
             window?.rootViewController = onboardingVC
         }
-        */
         
         window?.makeKeyAndVisible()
         print("✅ SceneDelegate: Window made key and visible")

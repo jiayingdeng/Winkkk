@@ -51,7 +51,7 @@
 					<key>UISceneConfigurationName</key>
 					<string>Default Configuration</string>
 					<key>UISceneDelegateClassName</key>
-					<string>Winkkk.SceneDelegate</string>
+					<string>SceneDelegate</string>
 				</dict>
 			</array>
 		</dict>
