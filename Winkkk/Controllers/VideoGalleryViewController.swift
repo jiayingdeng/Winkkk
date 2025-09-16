@@ -143,7 +143,8 @@ class VideoGalleryViewController: UIViewController {
             widthDimension: .fractionalWidth(1.0),
             heightDimension: .fractionalWidth(0.7)
         )
-        let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitems: [item])
+        // 修复：每个group包含2个item，而不是只有1个
+        let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitem: item, count: 2)
         
         let section = NSCollectionLayoutSection(group: group)
         section.interGroupSpacing = 8
