@@ -20,6 +20,27 @@ protocol TimelineViewDelegate: AnyObject {
     func timelineViewDidRequestPause(_ timelineView: TimelineView)
 }
 
+// MARK: - TimelineViewDelegate Default Implementation
+extension TimelineViewDelegate {
+    
+    /// 🎯 为新协议方法提供默认实现，确保向后兼容
+    func timelineView(_ timelineView: TimelineView, didUpdateProgressDuringPlayback progress: Double) {
+        // 默认行为：将播放进度更新转发给普通的跳转方法
+        // 子类可以重写此方法来实现播放时的特殊处理
+        timelineView(_ timelineView, didSeekToProgress: progress)
+    }
+    
+    func timelineViewDidRequestPlay(_ timelineView: TimelineView) {
+        // 默认实现：空操作
+        // 子类可以重写此方法来处理播放请求
+    }
+    
+    func timelineViewDidRequestPause(_ timelineView: TimelineView) {
+        // 默认实现：空操作  
+        // 子类可以重写此方法来处理暂停请求
+    }
+}
+
 // MARK: - Time Resolution Enum
 enum TimeResolution {
     case seconds      // 1x-2x: 显示秒
