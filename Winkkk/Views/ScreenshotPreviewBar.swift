@@ -15,6 +15,9 @@ protocol ScreenshotPreviewBarDelegate: AnyObject {
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestPreviewAll screenshots: [ScreenshotItem])
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestEnhanceAll screenshots: [ScreenshotItem])
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestClearAll mode: CaptureMode)
+    
+    // 🆕 添加长按手势支持（可选方法）
+    @objc optional func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didLongPressScreenshot screenshot: ScreenshotItem, at index: Int)
 }
 
 class ScreenshotPreviewBar: UIView {
@@ -480,6 +483,38 @@ class ScreenshotPreviewBar: UIView {
     @objc private func allScreenshotsCleared() {
         DispatchQueue.main.async {
             self.updateUI()
+        }
+    }
+    
+    // MARK: - 🆕 多选状态管理方法
+    private var isInSelectionMode = false
+    
+    func setSelectionMode(_ selectionMode: Bool) {
+        isInSelectionMode = selectionMode
+        // TODO: 更新UI以显示选择状态
+        updateSelectionModeUI()
+    }
+    
+    func selectAllItems() {
+        // TODO: 选择所有缩略图
+        print("🔄 选择所有截图")
+    }
+    
+    func deselectAllItems() {
+        // TODO: 取消选择所有缩略图
+        print("🔄 取消选择所有截图")
+    }
+    
+    func setScreenshotSelected(_ screenshot: ScreenshotItem, isSelected: Bool) {
+        // TODO: 设置特定截图的选择状态
+        print("🔄 设置截图选择状态: \(isSelected)")
+    }
+    
+    private func updateSelectionModeUI() {
+        // TODO: 更新UI以反映选择模式
+        UIView.animate(withDuration: 0.3) {
+            // 这里可以更新缩略图的显示样式
+            self.alpha = self.isInSelectionMode ? 0.9 : 1.0
         }
     }
 }

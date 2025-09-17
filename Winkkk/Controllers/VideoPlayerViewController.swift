@@ -59,6 +59,25 @@ class VideoPlayerViewController: UIViewController {
     private let captureModeSwitcher = CaptureModeSwitcher()
     private let screenshotPreviewBar = ScreenshotPreviewBar()
     
+    // 🆕 批量操作面板
+    private let batchOperationPanel = UIView()
+    private let batchSaveButton = UIButton()
+    private let batchDeleteButton = UIButton()
+    private let moreOptionsButton = UIButton()
+    private let selectionCountLabel = UILabel()
+    
+    // 🆕 多选状态管理
+    private var isInSelectionMode = false {
+        didSet {
+            updateSelectionModeUI()
+        }
+    }
+    private var selectedScreenshots: Set<ScreenshotItem> = [] {
+        didSet {
+            updateSelectionCountLabel()
+        }
+    }
+    
     // 状态变量 - 🎯 编辑器模式重构
     private var isFlowing = false {  // 从isPlaying改为isFlowing
         didSet {
@@ -142,6 +161,9 @@ class VideoPlayerViewController: UIViewController {
         // 🆕 多图截取系统组件
         setupCaptureModeSwitcher()
         setupScreenshotPreviewBar()
+        
+        // 🆕 批量操作面板
+        setupBatchOperationPanel()
         
         // 导航栏
         setupNavigationBar()
@@ -308,6 +330,11 @@ class VideoPlayerViewController: UIViewController {
     private func setupNewComponentsConstraints() {
         captureModeSwitcher.translatesAutoresizingMaskIntoConstraints = false
         screenshotPreviewBar.translatesAutoresizingMaskIntoConstraints = false
+        batchOperationPanel.translatesAutoresizingMaskIntoConstraints = false
+        selectionCountLabel.translatesAutoresizingMaskIntoConstraints = false
+        batchSaveButton.translatesAutoresizingMaskIntoConstraints = false
+        batchDeleteButton.translatesAutoresizingMaskIntoConstraints = false
+        moreOptionsButton.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
             // 模式切换器：位于时间轴上方
@@ -321,7 +348,35 @@ class VideoPlayerViewController: UIViewController {
             screenshotPreviewBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             screenshotPreviewBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             screenshotPreviewBar.heightAnchor.constraint(equalToConstant: 100),
-            screenshotPreviewBar.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor)
+            screenshotPreviewBar.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor),
+            
+            // 🆕 批量操作面板：位于截图预览栏上方
+            batchOperationPanel.bottomAnchor.constraint(equalTo: screenshotPreviewBar.topAnchor, constant: -8),
+            batchOperationPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
+            batchOperationPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            batchOperationPanel.heightAnchor.constraint(equalToConstant: 80),
+            
+            // 选择数量标签
+            selectionCountLabel.topAnchor.constraint(equalTo: batchOperationPanel.topAnchor, constant: 8),
+            selectionCountLabel.leadingAnchor.constraint(equalTo: batchOperationPanel.leadingAnchor, constant: 16),
+            selectionCountLabel.trailingAnchor.constraint(equalTo: batchOperationPanel.trailingAnchor, constant: -16),
+            selectionCountLabel.heightAnchor.constraint(equalToConstant: 20),
+            
+            // 批量操作按钮
+            batchSaveButton.topAnchor.constraint(equalTo: selectionCountLabel.bottomAnchor, constant: 8),
+            batchSaveButton.leadingAnchor.constraint(equalTo: batchOperationPanel.leadingAnchor, constant: 16),
+            batchSaveButton.heightAnchor.constraint(equalToConstant: 36),
+            batchSaveButton.widthAnchor.constraint(equalTo: batchOperationPanel.widthAnchor, multiplier: 0.25),
+            
+            batchDeleteButton.centerYAnchor.constraint(equalTo: batchSaveButton.centerYAnchor),
+            batchDeleteButton.centerXAnchor.constraint(equalTo: batchOperationPanel.centerXAnchor),
+            batchDeleteButton.heightAnchor.constraint(equalToConstant: 36),
+            batchDeleteButton.widthAnchor.constraint(equalTo: batchOperationPanel.widthAnchor, multiplier: 0.25),
+            
+            moreOptionsButton.centerYAnchor.constraint(equalTo: batchSaveButton.centerYAnchor),
+            moreOptionsButton.trailingAnchor.constraint(equalTo: batchOperationPanel.trailingAnchor, constant: -16),
+            moreOptionsButton.heightAnchor.constraint(equalToConstant: 36),
+            moreOptionsButton.widthAnchor.constraint(equalTo: batchOperationPanel.widthAnchor, multiplier: 0.25)
         ])
     }
     
@@ -400,6 +455,77 @@ class VideoPlayerViewController: UIViewController {
         screenshotPreviewBar.delegate = self
         screenshotPreviewBar.isHidden = true  // 初始隐藏，有截图时显示
         view.addSubview(screenshotPreviewBar)
+    }
+    
+    private func setupBatchOperationPanel() {
+        // 面板背景
+        batchOperationPanel.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+        batchOperationPanel.layer.cornerRadius = ThemeManager.standardCornerRadius
+        batchOperationPanel.isHidden = true  // 初始隐藏，多选模式时显示
+        view.addSubview(batchOperationPanel)
+        
+        // 选择数量标签
+        setupSelectionCountLabel()
+        
+        // 批量保存按钮
+        setupBatchSaveButton()
+        
+        // 批量删除按钮
+        setupBatchDeleteButton()
+        
+        // 更多选项按钮
+        setupMoreOptionsButton()
+        
+        // 添加到面板
+        batchOperationPanel.addSubview(selectionCountLabel)
+        batchOperationPanel.addSubview(batchSaveButton)
+        batchOperationPanel.addSubview(batchDeleteButton)
+        batchOperationPanel.addSubview(moreOptionsButton)
+    }
+    
+    private func setupSelectionCountLabel() {
+        selectionCountLabel.text = "已选择 0 张"
+        selectionCountLabel.textColor = .white
+        selectionCountLabel.font = ThemeManager.captionFont
+        selectionCountLabel.textAlignment = .center
+    }
+    
+    private func setupBatchSaveButton() {
+        batchSaveButton.setTitle("批量保存", for: .normal)
+        batchSaveButton.setTitleColor(.white, for: .normal)
+        batchSaveButton.backgroundColor = ThemeManager.buttonPrimary
+        batchSaveButton.layer.cornerRadius = ThemeManager.smallCornerRadius
+        batchSaveButton.titleLabel?.font = ThemeManager.buttonFont
+        
+        batchSaveButton.addTarget(self, action: #selector(batchSaveButtonTapped), for: .touchUpInside)
+        addButtonTouchEffects(to: batchSaveButton)
+    }
+    
+    private func setupBatchDeleteButton() {
+        batchDeleteButton.setTitle("批量删除", for: .normal)
+        batchDeleteButton.setTitleColor(.white, for: .normal)
+        batchDeleteButton.backgroundColor = ThemeManager.danger
+        batchDeleteButton.layer.cornerRadius = ThemeManager.smallCornerRadius
+        batchDeleteButton.titleLabel?.font = ThemeManager.buttonFont
+        
+        batchDeleteButton.addTarget(self, action: #selector(batchDeleteButtonTapped), for: .touchUpInside)
+        addButtonTouchEffects(to: batchDeleteButton)
+    }
+    
+    private func setupMoreOptionsButton() {
+        moreOptionsButton.setTitle("更多", for: .normal)
+        moreOptionsButton.setTitleColor(.white, for: .normal)
+        moreOptionsButton.backgroundColor = ThemeManager.cardBackground
+        moreOptionsButton.layer.cornerRadius = ThemeManager.smallCornerRadius
+        moreOptionsButton.titleLabel?.font = ThemeManager.buttonFont
+        
+        moreOptionsButton.addTarget(self, action: #selector(moreOptionsButtonTapped), for: .touchUpInside)
+        addButtonTouchEffects(to: moreOptionsButton)
+    }
+    
+    private func addButtonTouchEffects(to button: UIButton) {
+        button.addTarget(self, action: #selector(buttonPressed(_:)), for: .touchDown)
+        button.addTarget(self, action: #selector(buttonReleased(_:)), for: [.touchUpInside, .touchUpOutside])
     }
     
     private func setupMultiScreenshotSystem() {
@@ -702,7 +828,19 @@ class VideoPlayerViewController: UIViewController {
         )
         
         alert.addAction(UIAlertAction(title: "查看截图", style: .default) { _ in
-            self.showScreenshotPreview()
+            // 进入多选模式查看所有截图
+            self.enterSelectionMode()
+            self.selectedScreenshots = Set(self.screenshotManager.screenshots)
+            
+            // 跳转到处理中心
+            let screenshots = self.screenshotManager.screenshots
+            let processingVC = ScreenshotProcessingViewController(
+                screenshots: screenshots,
+                mode: self.screenshotManager.currentMode
+            )
+            let navController = UINavigationController(rootViewController: processingVC)
+            navController.modalPresentationStyle = .fullScreen
+            self.present(navController, animated: true)
         })
         
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
@@ -730,6 +868,163 @@ class VideoPlayerViewController: UIViewController {
     @objc private func doneButtonTapped() {
         // 保存当前编辑状态或其他操作
         dismiss(animated: true)
+    }
+    
+    // MARK: - 🆕 批量操作按钮动作
+    @objc private func batchSaveButtonTapped() {
+        HapticFeedbackManager.shared.buttonTap()
+        
+        guard !selectedScreenshots.isEmpty else { return }
+        
+        // 跳转到处理中心
+        let screenshots = Array(selectedScreenshots)
+        let currentMode = screenshotManager.currentMode
+        
+        let processingVC = ScreenshotProcessingViewController(screenshots: screenshots, mode: currentMode)
+        let navController = UINavigationController(rootViewController: processingVC)
+        navController.modalPresentationStyle = .fullScreen
+        
+        present(navController, animated: true)
+    }
+    
+    @objc private func batchDeleteButtonTapped() {
+        HapticFeedbackManager.shared.buttonTap()
+        
+        guard !selectedScreenshots.isEmpty else { return }
+        
+        let alert = UIAlertController(
+            title: "批量删除",
+            message: "确定要删除选中的 \(selectedScreenshots.count) 张截图吗？",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "删除", style: .destructive) { [weak self] _ in
+            self?.performBatchDelete()
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        present(alert, animated: true)
+    }
+    
+    @objc private func moreOptionsButtonTapped() {
+        HapticFeedbackManager.shared.buttonTap()
+        
+        let alert = UIAlertController(title: "更多操作", message: nil, preferredStyle: .actionSheet)
+        
+        alert.addAction(UIAlertAction(title: "全选", style: .default) { [weak self] _ in
+            self?.selectAll()
+        })
+        
+        alert.addAction(UIAlertAction(title: "全不选", style: .default) { [weak self] _ in
+            self?.deselectAll()
+        })
+        
+        alert.addAction(UIAlertAction(title: "退出多选", style: .default) { [weak self] _ in
+            self?.exitSelectionMode()
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        // iPad支持
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = moreOptionsButton
+            popover.sourceRect = moreOptionsButton.bounds
+        }
+        
+        present(alert, animated: true)
+    }
+    
+    // MARK: - 🆕 多选状态管理方法
+    private func updateSelectionModeUI() {
+        UIView.animate(withDuration: 0.3) {
+            self.batchOperationPanel.isHidden = !self.isInSelectionMode
+            
+            if self.isInSelectionMode {
+                self.batchOperationPanel.alpha = 1.0
+                self.batchOperationPanel.transform = .identity
+            } else {
+                self.batchOperationPanel.alpha = 0.0
+                self.batchOperationPanel.transform = CGAffineTransform(translationX: 0, y: 20)
+            }
+        }
+        
+        // 更新缩略图栏的选择模式
+        screenshotPreviewBar.setSelectionMode(isInSelectionMode)
+    }
+    
+    private func updateSelectionCountLabel() {
+        let count = selectedScreenshots.count
+        let modeText = screenshotManager.currentMode == .stillImage ? "张" : "个"
+        selectionCountLabel.text = "已选择 \(count) \(modeText)"
+        
+        // 更新按钮状态
+        batchSaveButton.isEnabled = count > 0
+        batchDeleteButton.isEnabled = count > 0
+        
+        batchSaveButton.alpha = count > 0 ? 1.0 : 0.5
+        batchDeleteButton.alpha = count > 0 ? 1.0 : 0.5
+    }
+    
+    private func enterSelectionMode() {
+        isInSelectionMode = true
+        HapticFeedbackManager.shared.lightImpact()
+    }
+    
+    private func exitSelectionMode() {
+        isInSelectionMode = false
+        selectedScreenshots.removeAll()
+        HapticFeedbackManager.shared.lightImpact()
+    }
+    
+    private func selectAll() {
+        selectedScreenshots = Set(screenshotManager.screenshots)
+        HapticFeedbackManager.shared.lightImpact()
+        
+        // 更新缩略图栏的选择状态
+        screenshotPreviewBar.selectAllItems()
+    }
+    
+    private func deselectAll() {
+        selectedScreenshots.removeAll()
+        HapticFeedbackManager.shared.lightImpact()
+        
+        // 更新缩略图栏的选择状态
+        screenshotPreviewBar.deselectAllItems()
+    }
+    
+    private func performBatchDelete() {
+        let screenshotsToDelete = Array(selectedScreenshots)
+        
+        for screenshot in screenshotsToDelete {
+            screenshotManager.removeScreenshot(screenshot)
+        }
+        
+        exitSelectionMode()
+        HapticFeedbackManager.shared.notificationSuccess()
+    }
+    
+    private func toggleScreenshotSelection(_ screenshot: ScreenshotItem) {
+        if selectedScreenshots.contains(screenshot) {
+            selectedScreenshots.remove(screenshot)
+        } else {
+            selectedScreenshots.insert(screenshot)
+        }
+        HapticFeedbackManager.shared.lightImpact()
+    }
+    
+    private func presentScreenshotViewSheet(_ screenshot: ScreenshotItem) {
+        let viewSheet = ScreenshotViewSheet(screenshot: screenshot)
+        viewSheet.modalPresentationStyle = .pageSheet
+        
+        // iOS 15+ 支持可调整高度
+        if #available(iOS 15.0, *) {
+            viewSheet.sheetPresentationController?.detents = [.medium(), .large()]
+            viewSheet.sheetPresentationController?.prefersGrabberVisible = true
+        }
+        
+        present(viewSheet, animated: true)
+        HapticFeedbackManager.shared.lightImpact()
     }
     
     @objc private func buttonPressed(_ button: UIButton) {
@@ -912,8 +1207,16 @@ extension VideoPlayerViewController: CaptureModeSwitcherDelegate {
 extension VideoPlayerViewController: ScreenshotPreviewBarDelegate {
     
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didTapScreenshot screenshot: ScreenshotItem, at index: Int) {
-        // 点击单个截图：进入统一预览系统
-        showScreenshotPreview(startingAt: index)
+        if isInSelectionMode {
+            // 多选模式：切换选中状态
+            toggleScreenshotSelection(screenshot)
+            
+            // 更新缩略图栏的选择显示
+            screenshotPreviewBar.setScreenshotSelected(screenshot, isSelected: selectedScreenshots.contains(screenshot))
+        } else {
+            // 单击查看模式：弹出Sheet查看大图
+            presentScreenshotViewSheet(screenshot)
+        }
     }
     
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didDeleteScreenshot screenshot: ScreenshotItem, at index: Int) {
@@ -931,13 +1234,34 @@ extension VideoPlayerViewController: ScreenshotPreviewBarDelegate {
     }
     
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestPreviewAll screenshots: [ScreenshotItem]) {
-        // 预览所有截图
-        showScreenshotPreview()
+        // 预览所有截图 - 使用新的批量保存逻辑
+        guard !screenshots.isEmpty else { return }
+        
+        // 进入多选模式并选择所有截图
+        enterSelectionMode()
+        selectedScreenshots = Set(screenshots)
+        
+        // 直接跳转到处理中心
+        let processingVC = ScreenshotProcessingViewController(
+            screenshots: screenshots,
+            mode: screenshotManager.currentMode
+        )
+        let navController = UINavigationController(rootViewController: processingVC)
+        navController.modalPresentationStyle = .fullScreen
+        present(navController, animated: true)
     }
     
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestEnhanceAll screenshots: [ScreenshotItem]) {
-        // 批量画质修复
-        showBatchEnhancement()
+        // 批量画质修复 - 跳转到处理中心
+        guard !screenshots.isEmpty else { return }
+        
+        let processingVC = ScreenshotProcessingViewController(
+            screenshots: screenshots,
+            mode: screenshotManager.currentMode
+        )
+        let navController = UINavigationController(rootViewController: processingVC)
+        navController.modalPresentationStyle = .fullScreen
+        present(navController, animated: true)
     }
     
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestClearAll mode: CaptureMode) {
@@ -958,48 +1282,19 @@ extension VideoPlayerViewController: ScreenshotPreviewBarDelegate {
         present(alert, animated: true)
     }
     
-    // MARK: - 🆕 功能集成方法
-    private func showScreenshotPreview(startingAt index: Int = 0) {
-        let screenshots = screenshotManager.screenshots
-        guard !screenshots.isEmpty else { return }
-        
-        let previewVC = UnifiedPreviewViewController(
-            screenshots: screenshots,
-            captureMode: screenshotManager.currentMode,
-            initialIndex: index
-        )
-        
-        let navController = UINavigationController(rootViewController: previewVC)
-        navController.modalPresentationStyle = .fullScreen
-        present(navController, animated: true)
-    }
-    
-    private func showBatchEnhancement() {
-        let screenshots = screenshotManager.screenshots
-        guard !screenshots.isEmpty else { return }
-        
-        // TODO: 实现批量画质修复功能
-        // 这里可以创建一个BatchImageEnhanceViewController
-        print("🚧 批量画质修复功能待实现")
-        
-        // 临时：显示单个修复
-        if let firstScreenshot = screenshots.first,
-           let image = firstScreenshot.image {
-            let enhanceVC = ImageEnhanceViewController(
-                image: image,
-                timestamp: firstScreenshot.timestamp
-            )
-            let navController = UINavigationController(rootViewController: enhanceVC)
-            present(navController, animated: true)
+    // 🆕 长按手势处理
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didLongPressScreenshot screenshot: ScreenshotItem, at index: Int) {
+        // 长按进入多选模式
+        if !isInSelectionMode {
+            enterSelectionMode()
+            
+            // 自动选择被长按的截图
+            selectedScreenshots.insert(screenshot)
+            screenshotPreviewBar.setScreenshotSelected(screenshot, isSelected: true)
+            
+            HapticFeedbackManager.shared.mediumImpact()
+            print("🔄 长按进入多选模式，已选择第 \(index + 1) 张截图")
         }
     }
-    
-    // MARK: - 🆕 辅助方法
-    private func showAlert(title: String, message: String, completion: (() -> Void)? = nil) {
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in
-            completion?()
-        })
-        present(alert, animated: true)
-    }
 }
+
