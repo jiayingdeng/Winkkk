@@ -391,10 +391,14 @@ class TimelineView: UIView {
         contentView.frame = CGRect(x: 0, y: 0, width: currentContentWidth, height: bounds.height)
         scrollView.contentSize = CGSize(width: currentContentWidth, height: bounds.height)
         
+        print("🔍 DEBUG-P4: updateContentSize - bounds.width=\(bounds.width), leftPadding=\(leftPadding), rightPadding=\(rightPadding)")
+        print("🔍 DEBUG-P4: updateContentSize - currentContentWidth=\(currentContentWidth), scrollView.contentSize=\(scrollView.contentSize)")
+        
         // 🎯 更新时间到像素的转换比例（基于实际视频内容宽度，不包含padding）
         if duration > 0 {
             let actualVideoWidth = getActualVideoWidth()
             timeToPixelRatio = Double(actualVideoWidth) / duration
+            print("🔍 DEBUG-P4: updateContentSize - duration=\(duration), actualVideoWidth=\(actualVideoWidth), timeToPixelRatio=\(timeToPixelRatio)")
         }
     }
     
@@ -424,6 +428,9 @@ class TimelineView: UIView {
         let captureTime = coordinateToTime(absoluteX)
         let clampedTime = max(0, min(duration, captureTime))  // 限制在有效范围内
         
+        print("🔍 DEBUG-P4: getCurrentCaptureTime - centerX=\(centerX), contentOffset.x=\(scrollView.contentOffset.x)")
+        print("🔍 DEBUG-P4: getCurrentCaptureTime - absoluteX=\(absoluteX), captureTime=\(captureTime), clampedTime=\(clampedTime)")
+        
         // 🎯 帧级别精度：在高缩放时对齐到帧边界
         if currentTimeResolution == .frames && zoomScale >= 4.0 {
             return alignToFrameBoundary(clampedTime)
@@ -442,20 +449,34 @@ class TimelineView: UIView {
     /// 🎯 计算基于视频时间范围的有效滚动边界
     private func getValidScrollRange() -> (min: CGFloat, max: CGFloat) {
         guard duration > 0, bounds.width > 0 else {
+            print("🔍 DEBUG-P4: getValidScrollRange early return - duration=\(duration), bounds.width=\(bounds.width)")
             return (min: 0, max: 0)
         }
         
         let centerX = bounds.width / 2
         
         // 让视频开头（时间0）能够到达中心竖线的滚动位置
-        let minScrollOffset = timeToCoordinate(0) - centerX
+        let timeZeroCoordinate = timeToCoordinate(0)
+        let minScrollOffset = timeZeroCoordinate - centerX
         
         // 让视频结尾（时间duration）能够到达中心竖线的滚动位置
-        let maxScrollOffset = timeToCoordinate(duration) - centerX
+        let timeDurationCoordinate = timeToCoordinate(duration)
+        let maxScrollOffset = timeDurationCoordinate - centerX
         
         // 确保边界值有效
         let validMin = max(0, minScrollOffset)
         let validMax = max(validMin, maxScrollOffset)
+        
+        print("🔍 DEBUG-P4: getValidScrollRange calculations:")
+        print("🔍 DEBUG-P4:   centerX=\(centerX)")
+        print("🔍 DEBUG-P4:   timeToCoordinate(0)=\(timeZeroCoordinate)")
+        print("🔍 DEBUG-P4:   timeToCoordinate(\(duration))=\(timeDurationCoordinate)")
+        print("🔍 DEBUG-P4:   minScrollOffset=\(minScrollOffset) (before max)")
+        print("🔍 DEBUG-P4:   maxScrollOffset=\(maxScrollOffset)")
+        print("🔍 DEBUG-P4:   validMin=\(validMin) (after max(0,...))")
+        print("🔍 DEBUG-P4:   validMax=\(validMax)")
+        print("🔍 DEBUG-P4:   UIScrollView.contentSize=\(scrollView.contentSize)")
+        print("🔍 DEBUG-P4:   UIScrollView theoretical max=\(max(0, scrollView.contentSize.width - scrollView.bounds.width))")
         
         return (min: validMin, max: validMax)
     }
@@ -478,10 +499,12 @@ class TimelineView: UIView {
     
     // MARK: - Public Methods
     func setDuration(_ duration: Double) {
+        print("🔍 DEBUG-P4: setDuration called with duration = \(duration)")
         self.duration = duration
         updateContentSize()
         generateThumbnails()
         updateTimeResolution()
+        print("🔍 DEBUG-P4: setDuration completed, self.duration = \(self.duration)")
     }
     
     func setVideoURL(_ url: URL) {
@@ -911,6 +934,11 @@ class TimelineView: UIView {
             // 🎯 使用基于视频时间范围的滚动边界约束
             let scrollRange = getValidScrollRange()
             let clampedOffsetX = max(scrollRange.min, min(scrollRange.max, newOffsetX))
+            
+            print("🔍 DEBUG-P4: Pan gesture - newOffsetX=\(newOffsetX), scrollRange=\(scrollRange), clampedOffsetX=\(clampedOffsetX)")
+            if clampedOffsetX != newOffsetX {
+                print("🔍 DEBUG-P4: Pan gesture - ⚠️ CLAMPED! Original=\(newOffsetX) → Clamped=\(clampedOffsetX)")
+            }
             
             // 更新滚动位置
             scrollView.setContentOffset(CGPoint(x: clampedOffsetX, y: 0), animated: false)
