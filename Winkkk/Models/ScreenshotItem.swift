@@ -57,6 +57,22 @@ extension ScreenshotItem {
     @NSManaged public var videoSource: VideoItem?
 }
 
+// MARK: - 新增属性（会话隔离支持）
+extension ScreenshotItem {
+    
+    /// 截图模式（存储为字符串）
+    @NSManaged public var captureMode: String
+    
+    /// 选择顺序（在当前会话中的顺序）
+    @NSManaged public var selectionOrder: Int16
+    
+    /// 是否被选中（用于批量操作）
+    @NSManaged public var isSelected: Bool
+    
+    /// 处理状态
+    @NSManaged public var processingStatus: String
+}
+
 // MARK: - Computed Properties
 extension ScreenshotItem {
     
@@ -109,6 +125,77 @@ extension ScreenshotItem {
         formatter.allowedUnits = [.useKB, .useMB]
         formatter.countStyle = .file
         return formatter.string(fromByteCount: enhancedFileSize)
+    }
+}
+
+// MARK: - 处理状态枚举
+enum ProcessingStatus: String, CaseIterable {
+    case original = "original"               // 原始图片
+    case enhancing = "enhancing"             // 修复中
+    case enhanced = "enhanced"               // 已修复
+    case failed = "failed"                   // 处理失败
+    
+    var displayName: String {
+        switch self {
+        case .original: return "原始"
+        case .enhancing: return "处理中"
+        case .enhanced: return "已修复"
+        case .failed: return "失败"
+        }
+    }
+    
+    var color: UIColor {
+        switch self {
+        case .original: return UIColor.systemGray
+        case .enhancing: return UIColor.systemBlue
+        case .enhanced: return UIColor.systemGreen
+        case .failed: return UIColor.systemRed
+        }
+    }
+}
+
+// MARK: - 会话隔离扩展方法
+extension ScreenshotItem {
+    
+    /// 获取截图模式
+    var mode: CaptureMode {
+        get {
+            return CaptureMode(rawValue: captureMode) ?? .stillImage
+        }
+        set {
+            captureMode = newValue.rawValue
+        }
+    }
+    
+    /// 获取处理状态
+    var status: ProcessingStatus {
+        get {
+            return ProcessingStatus(rawValue: processingStatus) ?? .original
+        }
+        set {
+            processingStatus = newValue.rawValue
+        }
+    }
+    
+    /// 设置选择状态
+    func setSelected(_ selected: Bool, order: Int? = nil) {
+        isSelected = selected
+        if let order = order {
+            selectionOrder = Int16(order)
+        }
+    }
+    
+    /// 重置会话状态
+    func resetSessionState() {
+        isSelected = false
+        selectionOrder = 0
+        status = .original
+    }
+    
+    /// 获取要显示的图片
+    var image: UIImage? {
+        let imagePath = displayImagePath
+        return UIImage(contentsOfFile: imagePath.path)
     }
 }
 

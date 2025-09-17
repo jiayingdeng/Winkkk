@@ -320,39 +320,39 @@ class TimelineView: UIView {
             
             // 内容视图约束将在updateContentSize中动态设置
             
-            // 时间刻度视图 (在内容视图中) - 🎯 与缩略图容器对齐
-            timeScaleView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            timeScaleView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            timeScaleView.widthAnchor.constraint(equalTo: self.widthAnchor),  // 🎯 与TimelineView同宽
-            timeScaleView.heightAnchor.constraint(equalToConstant: 30),  // 20 → 30px
-            
-            // 缩略图容器 (在内容视图中) - 🎯 只占据视频内容区域，不包含padding
-            thumbnailContainerView.topAnchor.constraint(equalTo: timeScaleView.bottomAnchor, constant: 6),  // 4 → 6px间距
+            // 🎯 优化布局：缩略图条置顶（占60%高度）
+            thumbnailContainerView.topAnchor.constraint(equalTo: contentView.topAnchor),
             thumbnailContainerView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             thumbnailContainerView.widthAnchor.constraint(equalTo: self.widthAnchor),  // 🎯 与TimelineView同宽
-            thumbnailContainerView.heightAnchor.constraint(equalToConstant: 60),  // 40 → 60px
+            thumbnailContainerView.heightAnchor.constraint(equalTo: self.heightAnchor, multiplier: 0.6),  // 60%高度
             
-            // 轨道 (在内容视图中) - 🎯 与缩略图容器对齐
-            trackView.topAnchor.constraint(equalTo: thumbnailContainerView.bottomAnchor, constant: 8),
+            // 🎯 优化布局：时间刻度在底部（占20%高度）
+            timeScaleView.topAnchor.constraint(equalTo: thumbnailContainerView.bottomAnchor),
+            timeScaleView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            timeScaleView.widthAnchor.constraint(equalTo: self.widthAnchor),  // 🎯 与TimelineView同宽
+            timeScaleView.heightAnchor.constraint(equalTo: self.heightAnchor, multiplier: 0.2),  // 20%高度
+            
+            // 🎯 优化布局：播放轨道紧贴时间刻度（占20%高度）
+            trackView.topAnchor.constraint(equalTo: timeScaleView.bottomAnchor),
             trackView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             trackView.widthAnchor.constraint(equalTo: self.widthAnchor),  // 🎯 与TimelineView同宽
-            trackView.heightAnchor.constraint(equalToConstant: 4),
+            trackView.heightAnchor.constraint(equalTo: self.heightAnchor, multiplier: 0.2),  // 20%高度
             
-            // 进度条 (在内容视图中)
+            // 进度条 (在内容视图中) - 🎯 隐藏但保持兼容性
             progressView.topAnchor.constraint(equalTo: trackView.topAnchor),
             progressView.leadingAnchor.constraint(equalTo: trackView.leadingAnchor),
             progressView.heightAnchor.constraint(equalTo: trackView.heightAnchor),
             // 宽度约束将动态更新
             
-            // 滑块 (在内容视图中)
+            // 滑块 (在内容视图中) - 🎯 隐藏但保持兼容性
             thumbView.centerYAnchor.constraint(equalTo: trackView.centerYAnchor),
             thumbView.widthAnchor.constraint(equalToConstant: 24),
             thumbView.heightAnchor.constraint(equalToConstant: 24),
             // 位置约束将动态更新
             
-            // 🎯 播放头指示器 (白色竖线) - 穿过整个时间轴区域
-            playheadIndicator.topAnchor.constraint(equalTo: timeScaleView.topAnchor),
-            playheadIndicator.bottomAnchor.constraint(equalTo: trackView.bottomAnchor),
+            // 🎯 播放头指示器 (白色竖线) - 贯穿整个TimelineView高度
+            playheadIndicator.topAnchor.constraint(equalTo: contentView.topAnchor),
+            playheadIndicator.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
             playheadIndicator.widthAnchor.constraint(equalToConstant: 2)
             // centerX约束将动态更新，跟随播放进度
         ])

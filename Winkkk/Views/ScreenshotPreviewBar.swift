@@ -1,0 +1,481 @@
+//
+//  ScreenshotPreviewBar.swift
+//  Winkkk
+//
+//  Created by Winkkk on 2024/12/20.
+//  截图预览栏 - 会话隔离设计
+//
+
+import UIKit
+import Combine
+
+protocol ScreenshotPreviewBarDelegate: AnyObject {
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didTapScreenshot screenshot: ScreenshotItem, at index: Int)
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestCapture mode: CaptureMode)
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestPreviewAll screenshots: [ScreenshotItem])
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestEnhanceAll screenshots: [ScreenshotItem])
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestClearAll mode: CaptureMode)
+}
+
+class ScreenshotPreviewBar: UIView {
+    
+    // MARK: - Properties
+    weak var delegate: ScreenshotPreviewBarDelegate?
+    private let screenshotManager = ScreenshotManager.shared
+    private var cancellables = Set<AnyCancellable>()
+    
+    // MARK: - UI Components
+    private let containerView = UIView()
+    private let blurEffectView = BlurEffectView(style: .regular, intensity: 0.95)
+    
+    // 头部信息区域
+    private let headerView = UIView()
+    private let hintLabel = UILabel()
+    private let clearButton = UIButton()
+    
+    // 截图滚动区域
+    private let scrollView = UIScrollView()
+    private let stackView = UIStackView()
+    
+    // 操作按钮区域
+    private let actionButtonsContainer = UIView()
+    private let captureButton = UIButton()
+    private let previewButton = UIButton()
+    private let enhanceButton = UIButton()
+    
+    // MARK: - Initialization
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setupUI()
+        setupConstraints()
+        setupObservers()
+        updateUI()
+    }
+    
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setupUI()
+        setupConstraints()
+        setupObservers()
+        updateUI()
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    // MARK: - UI Setup
+    private func setupUI() {
+        backgroundColor = .clear
+        
+        // 模糊背景
+        blurEffectView.layer.cornerRadius = ThemeManager.largeCornerRadius
+        blurEffectView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        blurEffectView.clipsToBounds = true
+        addSubview(blurEffectView)
+        
+        // 主容器
+        containerView.backgroundColor = .clear
+        blurEffectView.contentView.addSubview(containerView)
+        
+        // 设置子组件
+        setupHeaderView()
+        setupScrollView()
+        setupActionButtons()
+        
+        // 添加到容器
+        containerView.addSubview(headerView)
+        containerView.addSubview(scrollView)
+        containerView.addSubview(actionButtonsContainer)
+    }
+    
+    private func setupHeaderView() {
+        headerView.backgroundColor = .clear
+        
+        // 提示标签
+        hintLabel.font = ThemeManager.captionFont
+        hintLabel.textColor = UIColor.white.withAlphaComponent(0.8)
+        hintLabel.textAlignment = .left
+        hintLabel.numberOfLines = 1
+        headerView.addSubview(hintLabel)
+        
+        // 清空按钮
+        clearButton.setTitle("🗑 清空", for: .normal)
+        clearButton.setTitleColor(UIColor.systemRed, for: .normal)
+        clearButton.titleLabel?.font = ThemeManager.captionFont
+        clearButton.backgroundColor = UIColor.systemRed.withAlphaComponent(0.1)
+        clearButton.layer.cornerRadius = ThemeManager.smallCornerRadius
+        clearButton.addTarget(self, action: #selector(clearButtonTapped), for: .touchUpInside)
+        headerView.addSubview(clearButton)
+        
+        // 布局
+        hintLabel.translatesAutoresizingMaskIntoConstraints = false
+        clearButton.translatesAutoresizingMaskIntoConstraints = false
+        
+        NSLayoutConstraint.activate([
+            hintLabel.leadingAnchor.constraint(equalTo: headerView.leadingAnchor),
+            hintLabel.centerYAnchor.constraint(equalTo: headerView.centerYAnchor),
+            hintLabel.trailingAnchor.constraint(equalTo: clearButton.leadingAnchor, constant: -8),
+            
+            clearButton.trailingAnchor.constraint(equalTo: headerView.trailingAnchor),
+            clearButton.centerYAnchor.constraint(equalTo: headerView.centerYAnchor),
+            clearButton.widthAnchor.constraint(equalToConstant: 60),
+            clearButton.heightAnchor.constraint(equalToConstant: 28)
+        ])
+    }
+    
+    private func setupScrollView() {
+        scrollView.showsHorizontalScrollIndicator = false
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.alwaysBounceHorizontal = true
+        scrollView.decelerationRate = .fast
+        
+        // 配置堆叠视图
+        stackView.axis = .horizontal
+        stackView.spacing = 8
+        stackView.alignment = .center
+        stackView.distribution = .fillEqually
+        
+        scrollView.addSubview(stackView)
+        
+        // 堆叠视图约束
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            stackView.topAnchor.constraint(equalTo: scrollView.topAnchor),
+            stackView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor, constant: 12),
+            stackView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor, constant: -12),
+            stackView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
+            stackView.heightAnchor.constraint(equalTo: scrollView.heightAnchor)
+        ])
+    }
+    
+    private func setupActionButtons() {
+        actionButtonsContainer.backgroundColor = .clear
+        
+        // 截图按钮
+        setupCaptureButton()
+        
+        // 预览按钮
+        setupPreviewButton()
+        
+        // 修复按钮
+        setupEnhanceButton()
+        
+        // 添加到容器
+        actionButtonsContainer.addSubview(captureButton)
+        actionButtonsContainer.addSubview(previewButton)
+        actionButtonsContainer.addSubview(enhanceButton)
+        
+        // 布局
+        captureButton.translatesAutoresizingMaskIntoConstraints = false
+        previewButton.translatesAutoresizingMaskIntoConstraints = false
+        enhanceButton.translatesAutoresizingMaskIntoConstraints = false
+        
+        NSLayoutConstraint.activate([
+            // 截图按钮（左侧）
+            captureButton.leadingAnchor.constraint(equalTo: actionButtonsContainer.leadingAnchor),
+            captureButton.centerYAnchor.constraint(equalTo: actionButtonsContainer.centerYAnchor),
+            captureButton.widthAnchor.constraint(equalToConstant: 80),
+            captureButton.heightAnchor.constraint(equalToConstant: 40),
+            
+            // 预览按钮（中间）
+            previewButton.centerXAnchor.constraint(equalTo: actionButtonsContainer.centerXAnchor),
+            previewButton.centerYAnchor.constraint(equalTo: actionButtonsContainer.centerYAnchor),
+            previewButton.widthAnchor.constraint(equalToConstant: 80),
+            previewButton.heightAnchor.constraint(equalToConstant: 40),
+            
+            // 修复按钮（右侧）
+            enhanceButton.trailingAnchor.constraint(equalTo: actionButtonsContainer.trailingAnchor),
+            enhanceButton.centerYAnchor.constraint(equalTo: actionButtonsContainer.centerYAnchor),
+            enhanceButton.widthAnchor.constraint(equalToConstant: 80),
+            enhanceButton.heightAnchor.constraint(equalToConstant: 40)
+        ])
+    }
+    
+    private func setupCaptureButton() {
+        captureButton.setTitle("📷 截图", for: .normal)
+        captureButton.setTitleColor(.white, for: .normal)
+        captureButton.backgroundColor = ThemeManager.buttonPrimary
+        captureButton.layer.cornerRadius = ThemeManager.standardCornerRadius
+        captureButton.titleLabel?.font = ThemeManager.buttonFont
+        
+        captureButton.addTarget(self, action: #selector(captureButtonTapped), for: .touchUpInside)
+        addButtonTouchEffects(to: captureButton)
+    }
+    
+    private func setupPreviewButton() {
+        previewButton.setTitle("👁 预览", for: .normal)
+        previewButton.setTitleColor(.white, for: .normal)
+        previewButton.backgroundColor = ThemeManager.cardBackground
+        previewButton.layer.cornerRadius = ThemeManager.standardCornerRadius
+        previewButton.titleLabel?.font = ThemeManager.buttonFont
+        
+        previewButton.addTarget(self, action: #selector(previewButtonTapped), for: .touchUpInside)
+        addButtonTouchEffects(to: previewButton)
+    }
+    
+    private func setupEnhanceButton() {
+        enhanceButton.setTitle("✨ 修复", for: .normal)
+        enhanceButton.setTitleColor(.white, for: .normal)
+        enhanceButton.backgroundColor = ThemeManager.success
+        enhanceButton.layer.cornerRadius = ThemeManager.standardCornerRadius
+        enhanceButton.titleLabel?.font = ThemeManager.buttonFont
+        
+        enhanceButton.addTarget(self, action: #selector(enhanceButtonTapped), for: .touchUpInside)
+        addButtonTouchEffects(to: enhanceButton)
+    }
+    
+    private func addButtonTouchEffects(to button: UIButton) {
+        button.addTarget(self, action: #selector(buttonPressed(_:)), for: .touchDown)
+        button.addTarget(self, action: #selector(buttonReleased(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+    }
+    
+    private func setupConstraints() {
+        blurEffectView.translatesAutoresizingMaskIntoConstraints = false
+        containerView.translatesAutoresizingMaskIntoConstraints = false
+        headerView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        actionButtonsContainer.translatesAutoresizingMaskIntoConstraints = false
+        
+        NSLayoutConstraint.activate([
+            // 模糊背景视图
+            blurEffectView.topAnchor.constraint(equalTo: topAnchor),
+            blurEffectView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            blurEffectView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            blurEffectView.bottomAnchor.constraint(equalTo: bottomAnchor),
+            
+            // 主容器
+            containerView.topAnchor.constraint(equalTo: blurEffectView.contentView.topAnchor, constant: 12),
+            containerView.leadingAnchor.constraint(equalTo: blurEffectView.contentView.leadingAnchor, constant: 16),
+            containerView.trailingAnchor.constraint(equalTo: blurEffectView.contentView.trailingAnchor, constant: -16),
+            containerView.bottomAnchor.constraint(equalTo: blurEffectView.contentView.bottomAnchor, constant: -12),
+            
+            // 头部视图
+            headerView.topAnchor.constraint(equalTo: containerView.topAnchor),
+            headerView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            headerView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            headerView.heightAnchor.constraint(equalToConstant: 30),
+            
+            // 滚动视图
+            scrollView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 8),
+            scrollView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            scrollView.heightAnchor.constraint(equalToConstant: 60),
+            
+            // 操作按钮容器
+            actionButtonsContainer.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
+            actionButtonsContainer.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            actionButtonsContainer.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            actionButtonsContainer.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
+            actionButtonsContainer.heightAnchor.constraint(equalToConstant: 40)
+        ])
+    }
+    
+    // MARK: - Observers
+    private func setupObservers() {
+        // 监听ScreenshotManager的变化
+        screenshotManager.$screenshots
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateUI()
+            }
+            .store(in: &cancellables)
+        
+        screenshotManager.$currentMode
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateUI()
+            }
+            .store(in: &cancellables)
+        
+        // 监听通知
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screenshotAdded(_:)),
+            name: .screenshotAdded,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screenshotRemoved(_:)),
+            name: .screenshotRemoved,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(allScreenshotsCleared),
+            name: .allScreenshotsCleared,
+            object: nil
+        )
+    }
+    
+    // MARK: - UI Updates
+    private func updateUI() {
+        updateHintLabel()
+        updateScreenshots()
+        updateButtonStates()
+    }
+    
+    private func updateHintLabel() {
+        let count = screenshotManager.screenshotCount
+        let mode = screenshotManager.currentMode
+        let maxCount = mode.maxCount
+        
+        if count == 0 {
+            hintLabel.text = "\(mode.displayName)模式 (最多\(maxCount)张)"
+        } else {
+            hintLabel.text = "已截\(count)张: \(mode.displayName) (最多\(maxCount)张)"
+        }
+        
+        // 根据模式设置主题色
+        let themeColor = mode.themeColor
+        captureButton.backgroundColor = themeColor
+        
+        // 接近上限时的警告色
+        if count >= maxCount - 2 {
+            hintLabel.textColor = UIColor.systemOrange
+        } else {
+            hintLabel.textColor = UIColor.white.withAlphaComponent(0.8)
+        }
+    }
+    
+    private func updateScreenshots() {
+        // 清空现有视图
+        stackView.arrangedSubviews.forEach { view in
+            stackView.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+        
+        // 添加新的截图视图
+        for (index, screenshot) in screenshotManager.screenshots.enumerated() {
+            let thumbnailView = createScreenshotThumbnailView(for: screenshot, at: index)
+            stackView.addArrangedSubview(thumbnailView)
+        }
+        
+        // 自动滚动到最新截图
+        if !screenshotManager.screenshots.isEmpty {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.scrollToRight(animated: true)
+            }
+        }
+    }
+    
+    private func updateButtonStates() {
+        let count = screenshotManager.screenshotCount
+        let hasScreenshots = count > 0
+        let isAtLimit = screenshotManager.isAtMaxLimit
+        
+        // 截图按钮
+        captureButton.isEnabled = !isAtLimit
+        captureButton.alpha = isAtLimit ? 0.5 : 1.0
+        
+        // 预览按钮
+        previewButton.isEnabled = hasScreenshots
+        previewButton.alpha = hasScreenshots ? 1.0 : 0.5
+        
+        // 修复按钮（Live Photo模式下隐藏）
+        let shouldShowEnhance = hasScreenshots && screenshotManager.currentMode == .stillImage
+        enhanceButton.isHidden = !shouldShowEnhance
+        enhanceButton.alpha = shouldShowEnhance ? 1.0 : 0.5
+        
+        // 清空按钮
+        clearButton.isEnabled = hasScreenshots
+        clearButton.alpha = hasScreenshots ? 1.0 : 0.5
+    }
+    
+    private func createScreenshotThumbnailView(for screenshot: ScreenshotItem, at index: Int) -> ScreenshotThumbnailView {
+        let thumbnailView = ScreenshotThumbnailView()
+        thumbnailView.configure(with: screenshot)
+        
+        thumbnailView.onDeleteTap = { [weak self] in
+            self?.deleteScreenshot(at: index)
+        }
+        
+        thumbnailView.onTap = { [weak self] in
+            guard let self = self else { return }
+            self.delegate?.screenshotPreviewBar(self, didTapScreenshot: screenshot, at: index)
+        }
+        
+        return thumbnailView
+    }
+    
+    private func deleteScreenshot(at index: Int) {
+        screenshotManager.removeScreenshot(at: index)
+        HapticFeedbackManager.shared.lightImpact()
+    }
+    
+    private func scrollToRight(animated: Bool) {
+        let rightOffset = max(0, scrollView.contentSize.width - scrollView.bounds.width)
+        scrollView.setContentOffset(CGPoint(x: rightOffset, y: 0), animated: animated)
+    }
+    
+    // MARK: - Actions
+    @objc private func captureButtonTapped() {
+        HapticFeedbackManager.shared.buttonTap()
+        delegate?.screenshotPreviewBar(self, didRequestCapture: screenshotManager.currentMode)
+    }
+    
+    @objc private func previewButtonTapped() {
+        HapticFeedbackManager.shared.buttonTap()
+        delegate?.screenshotPreviewBar(self, didRequestPreviewAll: screenshotManager.screenshots)
+    }
+    
+    @objc private func enhanceButtonTapped() {
+        HapticFeedbackManager.shared.buttonTap()
+        delegate?.screenshotPreviewBar(self, didRequestEnhanceAll: screenshotManager.screenshots)
+    }
+    
+    @objc private func clearButtonTapped() {
+        HapticFeedbackManager.shared.lightImpact()
+        
+        let alert = UIAlertController(
+            title: "清空确认",
+            message: "确定要清空所有\(screenshotManager.currentMode.displayName)吗？",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "确定", style: .destructive) { [weak self] _ in
+            guard let self = self else { return }
+            self.delegate?.screenshotPreviewBar(self, didRequestClearAll: self.screenshotManager.currentMode)
+            self.screenshotManager.clearAllScreenshots()
+            HapticFeedbackManager.shared.notificationSuccess()
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        findParentViewController()?.present(alert, animated: true)
+    }
+    
+    @objc private func buttonPressed(_ button: UIButton) {
+        UIView.animate(withDuration: 0.1) {
+            button.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+        }
+    }
+    
+    @objc private func buttonReleased(_ button: UIButton) {
+        UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5) {
+            button.transform = .identity
+        }
+    }
+    
+    // MARK: - Notification Handlers
+    @objc private func screenshotAdded(_ notification: Notification) {
+        DispatchQueue.main.async {
+            self.updateUI()
+        }
+    }
+    
+    @objc private func screenshotRemoved(_ notification: Notification) {
+        DispatchQueue.main.async {
+            self.updateUI()
+        }
+    }
+    
+    @objc private func allScreenshotsCleared() {
+        DispatchQueue.main.async {
+            self.updateUI()
+        }
+    }
+}
