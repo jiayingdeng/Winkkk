@@ -404,7 +404,7 @@ class VideoPlayerViewController: UIViewController {
     
     private func setupMultiScreenshotSystem() {
         // 设置初始模式
-        captureModeSwitcher.setMode(.stillImage, animated: false)
+        captureModeSwitcher.setCurrentMode(CaptureMode.stillImage)
         
         // 订阅截图状态变化
         screenshotManager.$screenshots
@@ -601,18 +601,17 @@ class VideoPlayerViewController: UIViewController {
         let captureTime = timelineView.getCurrentCaptureTime()
         
         // 🆕 创建截图项目
-        let screenshot = ScreenshotItem(
-            image: image,
-            timestamp: captureTime,
-            videoURL: videoURL
-        )
+        let screenshot = ScreenshotItem()
+        screenshot.timestamp = captureTime
+        screenshot.videoURL = videoURL
+        // 注意：图片通过 image 计算属性显示，这里不直接存储
         
         do {
             // 添加到管理器
             try screenshotManager.addScreenshot(screenshot)
             
             // 触感反馈
-            HapticFeedbackManager.shared.successImpact()
+            HapticFeedbackManager.shared.lightImpact()
             
             // 显示成功动画
             showScreenshotSuccessAnimation()
@@ -637,13 +636,17 @@ class VideoPlayerViewController: UIViewController {
     private func handleScreenshotError(_ error: Error) {
         if let screenshotError = error as? ScreenshotSessionError {
             switch screenshotError {
-            case .maxLimitReached:
+            case .maxLimitReached(let mode, let count):
                 showMaxLimitAlert()
             case .needConfirmation(let currentMode, let newMode, let currentCount):
                 // 这种情况不应该在截图时发生
                 break
-            case .modeConflict:
+            case .modeConflict(let expected, let actual):
                 showModeConflictAlert()
+            case .captureFailed(let reason):
+                showAlert(title: "截图失败", message: reason)
+            case .saveFailed(let reason):
+                showAlert(title: "保存失败", message: reason)
             }
         } else {
             showError(error)
@@ -832,7 +835,7 @@ extension VideoPlayerViewController: CaptureModeSwitcherDelegate {
                     try? self?.screenshotManager.switchMode(to: mode, force: true)
                 } else {
                     // 恢复之前的模式
-                    switcher.setMode(currentMode, animated: true)
+                    switcher.setCurrentMode(currentMode)
                 }
             }
         } catch {
@@ -880,17 +883,23 @@ extension VideoPlayerViewController: ScreenshotPreviewBarDelegate {
         HapticFeedbackManager.shared.lightImpact()
     }
     
-    func screenshotPreviewBarDidTapPreviewAll(_ previewBar: ScreenshotPreviewBar) {
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestCapture mode: CaptureMode) {
+        // 请求截图
+        print("📷 请求截图: \(mode.displayName)")
+        // 这里可以直接触发截图功能
+    }
+    
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestPreviewAll screenshots: [ScreenshotItem]) {
         // 预览所有截图
         showScreenshotPreview()
     }
     
-    func screenshotPreviewBarDidTapEnhanceAll(_ previewBar: ScreenshotPreviewBar) {
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestEnhanceAll screenshots: [ScreenshotItem]) {
         // 批量画质修复
         showBatchEnhancement()
     }
     
-    func screenshotPreviewBarDidTapClearAll(_ previewBar: ScreenshotPreviewBar) {
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestClearAll mode: CaptureMode) {
         // 清空所有截图
         let alert = UIAlertController(
             title: "清空截图",
@@ -942,5 +951,14 @@ extension VideoPlayerViewController: ScreenshotPreviewBarDelegate {
             let navController = UINavigationController(rootViewController: enhanceVC)
             present(navController, animated: true)
         }
+    }
+    
+    // MARK: - 🆕 辅助方法
+    private func showAlert(title: String, message: String, completion: (() -> Void)? = nil) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in
+            completion?()
+        })
+        present(alert, animated: true)
     }
 }
