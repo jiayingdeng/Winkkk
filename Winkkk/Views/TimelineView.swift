@@ -27,7 +27,7 @@ extension TimelineViewDelegate {
     func timelineView(_ timelineView: TimelineView, didUpdateProgressDuringPlayback progress: Double) {
         // 默认行为：将播放进度更新转发给普通的跳转方法
         // 子类可以重写此方法来实现播放时的特殊处理
-        timelineView(_ timelineView, didSeekToProgress: progress)
+        self.timelineView(timelineView, didSeekToProgress: progress)
     }
     
     func timelineViewDidRequestPlay(_ timelineView: TimelineView) {
