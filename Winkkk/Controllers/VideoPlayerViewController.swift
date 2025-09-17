@@ -603,7 +603,8 @@ class VideoPlayerViewController: UIViewController {
         // 🆕 创建截图项目
         let screenshot = ScreenshotItem()
         screenshot.timestamp = captureTime
-        screenshot.videoURL = videoURL
+        // TODO: 设置videoSource关联到对应的VideoItem
+        // screenshot.videoSource = findOrCreateVideoItem(for: videoURL)
         // 注意：图片通过 image 计算属性显示，这里不直接存储
         
         do {
