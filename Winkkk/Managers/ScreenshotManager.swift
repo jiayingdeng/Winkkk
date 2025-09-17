@@ -74,11 +74,10 @@ class ScreenshotManager: ObservableObject {
             throw ScreenshotSessionError.maxLimitReached(mode: currentMode, count: currentMode.maxCount)
         }
         
-        // 设置截图属性
+        // 更新截图属性以匹配当前会话
         screenshot.mode = currentMode
         screenshot.selectionOrder = Int16(screenshots.count)
-        screenshot.status = .original
-        screenshot.isSelected = false
+        // status和isSelected已在创建时初始化
         
         // 添加到数组
         screenshots.append(screenshot)

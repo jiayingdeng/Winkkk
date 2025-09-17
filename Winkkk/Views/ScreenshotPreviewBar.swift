@@ -312,6 +312,10 @@ class ScreenshotPreviewBar: UIView {
     }
     
     // MARK: - UI Updates
+    func updateWithScreenshots(_ screenshots: [ScreenshotItem]) {
+        updateUI()
+    }
+    
     private func updateUI() {
         updateHintLabel()
         updateScreenshots()

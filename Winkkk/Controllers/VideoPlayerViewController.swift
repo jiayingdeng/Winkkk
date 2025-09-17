@@ -426,12 +426,29 @@ class VideoPlayerViewController: UIViewController {
     private func updatePreviewBarVisibility(screenshots: [ScreenshotItem]) {
         let shouldShow = !screenshots.isEmpty
         
-        UIView.animate(withDuration: 0.3) {
-            self.screenshotPreviewBar.isHidden = !shouldShow
-            if shouldShow {
+        // 更新预览栏数据
+        screenshotPreviewBar.updateWithScreenshots(screenshots)
+        
+        if shouldShow && screenshotPreviewBar.isHidden {
+            // 第一次显示：从底部滑入动画
+            screenshotPreviewBar.isHidden = false
+            screenshotPreviewBar.alpha = 0.0
+            screenshotPreviewBar.transform = CGAffineTransform(translationX: 0, y: 100)
+            
+            UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0, options: .curveEaseOut) {
                 self.screenshotPreviewBar.alpha = 1.0
-            } else {
+                self.screenshotPreviewBar.transform = .identity
+            }
+            
+            // 显示提示
+            print("📸 截图已添加到预览栏 (屏幕底部)")
+            
+        } else if !shouldShow {
+            // 隐藏动画
+            UIView.animate(withDuration: 0.3) {
                 self.screenshotPreviewBar.alpha = 0.0
+            } completion: { _ in
+                self.screenshotPreviewBar.isHidden = true
             }
         }
     }
@@ -600,12 +617,35 @@ class VideoPlayerViewController: UIViewController {
         // 🎯 使用截取时间作为时间戳，而非播放时间
         let captureTime = timelineView.getCurrentCaptureTime()
         
-        // 🆕 创建截图项目
-        let screenshot = ScreenshotItem()
-        screenshot.timestamp = captureTime
-        // TODO: 设置videoSource关联到对应的VideoItem
-        // screenshot.videoSource = findOrCreateVideoItem(for: videoURL)
-        // 注意：图片通过 image 计算属性显示，这里不直接存储
+        // 🆕 创建截图项目 - 使用正确的Core Data方式
+        // 先临时创建一个VideoItem（后续优化为复用现有的）
+        let tempVideoItem = PersistenceController.shared.createVideoItem(
+            fileName: videoURL.lastPathComponent,
+            filePath: videoURL,
+            duration: 120.0, // TODO: 获取真实时长
+            isFromCamera: false,
+            width: Int32(image.size.width),
+            height: Int32(image.size.height),
+            fileSize: 0 // TODO: 获取真实文件大小
+        )
+        
+        // 保存图片到临时路径（实际应用中应该保存到Documents目录）
+        let tempImagePath = FileManager.default.temporaryDirectory
+            .appendingPathComponent("screenshot_\(UUID().uuidString).jpg")
+        
+        // 保存图片到文件系统
+        if let imageData = image.jpegData(compressionQuality: 0.9) {
+            try? imageData.write(to: tempImagePath)
+        }
+        
+        let screenshot = PersistenceController.shared.createScreenshotItem(
+            originalImagePath: tempImagePath,
+            timestamp: captureTime,
+            width: Int32(image.size.width),
+            height: Int32(image.size.height),
+            originalFileSize: Int64(image.jpegData(compressionQuality: 0.9)?.count ?? 0),
+            videoSource: tempVideoItem
+        )
         
         do {
             // 添加到管理器

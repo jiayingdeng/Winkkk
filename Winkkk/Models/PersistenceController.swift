@@ -178,6 +178,12 @@ extension PersistenceController {
         screenshotItem.enhancedFileSize = 0
         screenshotItem.videoSource = videoSource
         
+        // 初始化会话隔离相关属性
+        screenshotItem.captureMode = CaptureMode.stillImage.rawValue
+        screenshotItem.selectionOrder = 0
+        screenshotItem.isSelected = false
+        screenshotItem.processingStatus = ProcessingStatus.original.rawValue
+        
         save()
         return screenshotItem
     }
