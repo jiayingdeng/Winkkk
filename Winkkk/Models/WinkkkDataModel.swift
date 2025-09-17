@@ -150,11 +150,37 @@ extension PersistenceController {
         enhancedFileSizeAttribute.isOptional = false
         enhancedFileSizeAttribute.defaultValue = 0
         
+        // 会话隔离相关属性
+        let captureModeAttribute = NSAttributeDescription()
+        captureModeAttribute.name = "captureMode"
+        captureModeAttribute.attributeType = .stringAttributeType
+        captureModeAttribute.isOptional = false
+        captureModeAttribute.defaultValue = CaptureMode.stillImage.rawValue
+        
+        let selectionOrderAttribute = NSAttributeDescription()
+        selectionOrderAttribute.name = "selectionOrder"
+        selectionOrderAttribute.attributeType = .integer16AttributeType
+        selectionOrderAttribute.isOptional = false
+        selectionOrderAttribute.defaultValue = 0
+        
+        let isSelectedAttribute = NSAttributeDescription()
+        isSelectedAttribute.name = "isSelected"
+        isSelectedAttribute.attributeType = .booleanAttributeType
+        isSelectedAttribute.isOptional = false
+        isSelectedAttribute.defaultValue = false
+        
+        let processingStatusAttribute = NSAttributeDescription()
+        processingStatusAttribute.name = "processingStatus"
+        processingStatusAttribute.attributeType = .stringAttributeType
+        processingStatusAttribute.isOptional = false
+        processingStatusAttribute.defaultValue = ProcessingStatus.original.rawValue
+        
         screenshotEntity.properties = [
             screenshotIdAttribute, originalImagePathAttribute, enhancedImagePathAttribute,
             timestampAttribute, enhanceLevelAttribute, screenshotCreatedDateAttribute,
             isEnhancedAttribute, screenshotWidthAttribute, screenshotHeightAttribute,
-            originalFileSizeAttribute, enhancedFileSizeAttribute
+            originalFileSizeAttribute, enhancedFileSizeAttribute,
+            captureModeAttribute, selectionOrderAttribute, isSelectedAttribute, processingStatusAttribute
         ]
         
         // 创建关系
