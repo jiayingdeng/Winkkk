@@ -7,6 +7,18 @@
 //
 
 import UIKit
+import Photos
+
+// MARK: - Error Types
+enum PhotoLibraryError: Error {
+    case permissionDenied
+    
+    var localizedDescription: String {
+        switch self {
+        case .permissionDenied:
+            return "需要相册访问权限才能保存图片"
+        }
+    }
 
 class ImageEnhanceViewController: UIViewController {
     
@@ -79,10 +91,13 @@ class ImageEnhanceViewController: UIViewController {
         
         // 动态调整控制面板高度，确保适配不同设备
         let safeAreaBottom = view.safeAreaInsets.bottom
-        let panelHeight = 200 + safeAreaBottom
+        // 增加基础高度以适应所有内容：
+        // segmentedControl(32) + enhanceButton(40) + progressView(6) + statusLabel(20) + bottomButtons(36) + 间距(20+16+12+8+16) = 约154px
+        // 加上上下内边距20px共约174px，保留一些额外空间使用260px
+        let panelHeight = 260 + safeAreaBottom
         
-        // 确保控制面板不会占用太多屏幕空间（最多不超过屏幕高度的40%）
-        let maxHeight = view.bounds.height * 0.4
+        // 调整最大高度比例从40%到45%，给小屏幕设备更多空间
+        let maxHeight = view.bounds.height * 0.45
         let finalHeight = min(panelHeight, maxHeight)
         
         controlPanelHeightConstraint?.constant = finalHeight
@@ -290,8 +305,9 @@ class ImageEnhanceViewController: UIViewController {
             statusLabel.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 20),
             statusLabel.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -20),
             
-            // 底部按钮
+            // 底部按钮（增加安全区域考虑）
             resetButton.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 16),
+            resetButton.bottomAnchor.constraint(lessThanOrEqualTo: controlPanelBlurView.safeAreaLayoutGuide.bottomAnchor, constant: -12),
             resetButton.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 20),
             resetButton.widthAnchor.constraint(equalTo: controlPanelBlurView.widthAnchor, multiplier: 0.25),
             resetButton.heightAnchor.constraint(equalToConstant: 36),
@@ -307,8 +323,8 @@ class ImageEnhanceViewController: UIViewController {
             shareButton.heightAnchor.constraint(equalTo: resetButton.heightAnchor)
         ])
         
-        // 创建控制面板高度约束（稍后在viewDidLayoutSubviews中设置）
-        controlPanelHeightConstraint = controlPanelBlurView.heightAnchor.constraint(equalToConstant: 220)
+        // 创建控制面板高度约束（稍后在viewDidLayoutSubviews中动态设置）
+        controlPanelHeightConstraint = controlPanelBlurView.heightAnchor.constraint(equalToConstant: 280)
         controlPanelHeightConstraint?.isActive = true
     }
     
@@ -476,43 +492,80 @@ class ImageEnhanceViewController: UIViewController {
     
     // MARK: - Save & Share
     private func saveEnhancedImage(_ image: UIImage) {
-        // 显示保存进度
-        let alertController = UIAlertController(title: "保存中", message: "正在保存图片...", preferredStyle: .alert)
-        present(alertController, animated: true)
-        
-        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
-            
-            do {
-                // 保存到文件系统
-                let fileName = "enhanced_\(Date().timeIntervalSince1970).jpg"
-                let imageURL = FileManagerHelper.screenshotsDirectory.appendingPathComponent(fileName)
-                
-                guard let imageData = image.jpegData(compressionQuality: 0.95) else {
-                    throw ImageEnhancementError.processingFailed("Failed to create image data")
-                }
-                
-                try imageData.write(to: imageURL)
-                
-                // 创建截图记录
-                let imageSize = image.size
-                let fileSize = imageURL.fileSize
-                
-                // TODO: 关联到对应的VideoItem
-                
-                DispatchQueue.main.async {
-                    alertController.dismiss(animated: true) {
-                        self.showSaveSuccessAlert()
-                    }
-                }
-                
-            } catch {
-                DispatchQueue.main.async {
-                    alertController.dismiss(animated: true) {
-                        self.showSaveErrorAlert(error)
-                    }
+        // 请求相册权限
+        requestPhotoLibraryPermission { [weak self] granted in
+            DispatchQueue.main.async {
+                if granted {
+                    self?.performSaveToPhotoLibrary(image)
+                } else {
+                    self?.showSaveErrorAlert(PhotoLibraryError.permissionDenied)
                 }
             }
+        }
+    }
+    
+    private func requestPhotoLibraryPermission(completion: @escaping (Bool) -> Void) {
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        
+        switch status {
+        case .authorized, .limited:
+            completion(true)
+        case .denied, .restricted:
+            completion(false)
+        case .notDetermined:
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
+                completion(newStatus == .authorized || newStatus == .limited)
+            }
+        @unknown default:
+            completion(false)
+        }
+    }
+    
+    private func performSaveToPhotoLibrary(_ image: UIImage) {
+        // 显示保存进度
+        let alertController = UIAlertController(title: "保存中", message: "正在保存图片到相册...", preferredStyle: .alert)
+        present(alertController, animated: true)
+        
+        // 保存到系统相册
+        UIImageWriteToSavedPhotosAlbum(image, self, #selector(image(_:didFinishSavingWithError:contextInfo:)), nil)
+        
+        // 异步保存到应用文件系统作为备份
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.saveToFileSystem(image)
+        }
+        
+        // 延迟关闭进度提示
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            alertController.dismiss(animated: true)
+        }
+    }
+    
+    private func saveToFileSystem(_ image: UIImage) {
+        do {
+            let fileName = "enhanced_\(Date().timeIntervalSince1970).jpg"
+            let imageURL = FileManagerHelper.screenshotsDirectory.appendingPathComponent(fileName)
+            
+            guard let imageData = image.jpegData(compressionQuality: 0.95) else {
+                return
+            }
+            
+            try imageData.write(to: imageURL)
+            
+            // 创建截图记录
+            // TODO: 关联到对应的VideoItem
+            
+        } catch {
+            print("❌ 保存到文件系统失败: \(error.localizedDescription)")
+        }
+    }
+    
+    @objc private func image(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        if let error = error {
+            showSaveErrorAlert(error)
+        } else {
+            showSaveSuccessAlert()
+            // 成功触觉反馈
+            HapticFeedbackManager.shared.notificationSuccess()
         }
     }
     
@@ -523,9 +576,19 @@ class ImageEnhanceViewController: UIViewController {
     }
     
     private func showSaveErrorAlert(_ error: Error) {
-        let alert = UIAlertController(title: "保存失败", message: error.localizedDescription, preferredStyle: .alert)
+        let message: String
+        if error is PhotoLibraryError {
+            message = "需要相册访问权限才能保存图片，请在设置中允许访问相册"
+        } else {
+            message = error.localizedDescription
+        }
+        
+        let alert = UIAlertController(title: "保存失败", message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "确定", style: .default))
         present(alert, animated: true)
+        
+        // 错误触觉反馈
+        HapticFeedbackManager.shared.notificationError()
     }
     
     private func showErrorAlert(_ error: ImageEnhancementError) {
