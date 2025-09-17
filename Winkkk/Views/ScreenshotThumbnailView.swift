@@ -21,7 +21,7 @@ class ScreenshotThumbnailView: UIView {
     private let deleteButton = UIButton()
     private let timestampLabel = UILabel()
     private let selectionIndicator = UIView()
-    private let processingIndicator = UIActivityIndicatorView(style: .small)
+    private let processingIndicator = UIActivityIndicatorView(style: .medium)
     private let statusBadge = UIView()
     private let statusLabel = UILabel()
     
@@ -134,7 +134,7 @@ class ScreenshotThumbnailView: UIView {
     }
     
     private func setupProcessingIndicator() {
-        processingIndicator.color = .white
+        processingIndicator.color = UIColor.white
         processingIndicator.backgroundColor = UIColor.black.withAlphaComponent(0.7)
         processingIndicator.layer.cornerRadius = 8
         processingIndicator.isHidden = true
