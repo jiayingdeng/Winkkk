@@ -660,6 +660,15 @@ class UnifiedPreviewViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "确定", style: .default))
         present(alert, animated: true)
     }
+    
+    // MARK: - 🆕 辅助方法
+    private func showAlert(title: String, message: String, completion: (() -> Void)? = nil) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in
+            completion?()
+        })
+        present(alert, animated: true)
+    }
 }
 
 // MARK: - UIScrollViewDelegate
@@ -770,16 +779,5 @@ class ThumbnailCollectionViewCell: UICollectionViewCell {
                 ThemeManager.buttonPrimary.cgColor : 
                 UIColor.white.withAlphaComponent(0.5).cgColor
         }
-    }
-}
-
-    
-    // MARK: - 🆕 辅助方法
-    private func showAlert(title: String, message: String, completion: (() -> Void)? = nil) {
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in
-            completion?()
-        })
-        present(alert, animated: true)
     }
 }
