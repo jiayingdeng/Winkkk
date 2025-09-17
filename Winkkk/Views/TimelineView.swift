@@ -13,6 +13,11 @@ protocol TimelineViewDelegate: AnyObject {
     func timelineView(_ timelineView: TimelineView, didSeekToProgress progress: Double)
     func timelineViewDidBeginSeeking(_ timelineView: TimelineView)
     func timelineViewDidEndSeeking(_ timelineView: TimelineView)
+    
+    // 🎯 新增：播放状态同步相关回调
+    func timelineView(_ timelineView: TimelineView, didUpdateProgressDuringPlayback progress: Double)
+    func timelineViewDidRequestPlay(_ timelineView: TimelineView)
+    func timelineViewDidRequestPause(_ timelineView: TimelineView)
 }
 
 // MARK: - Time Resolution Enum
@@ -75,6 +80,10 @@ class TimelineView: UIView {
     private var currentProgress: Double = 0
     private var isDragging = false
     private var isZooming = false
+    
+    // 🎯 新增：播放状态跟踪
+    private var isPlaying = false
+    private var isPlaybackProgressUpdate = false  // 标记是否为播放中的进度更新
     
     // MARK: - Scrolling Container Architecture
     private let scrollView = UIScrollView()
@@ -490,13 +499,33 @@ class TimelineView: UIView {
     }
     
     func setProgress(_ progress: Double) {
-        // 🎯 Wink编辑器模式：不再跟踪播放进度
-        // ❌ 移除currentProgress更新
-        // ❌ 移除传统播放器的进度跟踪逻辑
-        // ✅ 在编辑器模式下，播放进度与截图位置解耦
+        // 🎯 恢复播放时的进度更新功能
+        guard isPlaying else {
+            // 非播放状态下保持原有的编辑器模式：不执行任何操作
+            return
+        }
         
-        // 保留方法签名用于兼容性，但不执行任何操作
-        // 所有位置控制现在通过滚动时间轴实现
+        // 播放状态下，同步时间轴位置到播放进度
+        isPlaybackProgressUpdate = true
+        currentProgress = progress
+        let targetTime = progress * duration
+        scrollToCaptureTime(targetTime)
+        isPlaybackProgressUpdate = false
+    }
+    
+    // 🎯 新增：播放状态控制方法
+    func startPlayback() {
+        isPlaying = true
+        delegate?.timelineViewDidRequestPlay(self)
+    }
+    
+    func pausePlayback() {
+        isPlaying = false
+        delegate?.timelineViewDidRequestPause(self)
+    }
+    
+    func setPlaybackState(_ playing: Bool) {
+        isPlaying = playing
     }
     
     // MARK: - Time Resolution Management
@@ -598,8 +627,14 @@ class TimelineView: UIView {
                 .font: UIFont.systemFont(ofSize: 11, weight: .medium)
             ]) ?? CGSize(width: 40, height: 12)
             
+            // 🎯 添加边界检查，防止文字溢出屏幕边界
+            let halfTextWidth = textSize.width / 2
+            let minX = halfTextWidth  // 左边界
+            let maxX = timeScaleView.bounds.width - halfTextWidth  // 右边界
+            let clampedX = max(minX, min(maxX, x))  // 限制在有效范围内
+            
             textLayer.frame = CGRect(
-                x: x - textSize.width / 2,
+                x: clampedX - halfTextWidth,
                 y: 2,
                 width: textSize.width,
                 height: textSize.height
@@ -865,7 +900,17 @@ class TimelineView: UIView {
             // 🎯 实时通知截取时间变化（基于固定白色竖线）
             let captureTime = getCurrentCaptureTime()
             let progress = duration > 0 ? captureTime / duration : 0
-            delegate?.timelineView(self, didSeekToProgress: progress)
+            
+            // 🎯 区分播放中的进度更新和用户手动跳转
+            if isPlaybackProgressUpdate {
+                delegate?.timelineView(self, didUpdateProgressDuringPlayback: progress)
+            } else {
+                delegate?.timelineView(self, didSeekToProgress: progress)
+                // 用户手动操作时暂停播放
+                if isPlaying {
+                    pausePlayback()
+                }
+            }
             
         case .ended, .cancelled:
             isDragging = false
@@ -1104,7 +1149,13 @@ extension TimelineView: UIScrollViewDelegate {
         if !isDragging && !isZooming {  // 仅在非交互状态时回调
             let captureTime = getCurrentCaptureTime()
             let progress = duration > 0 ? captureTime / duration : 0
-            delegate?.timelineView(self, didSeekToProgress: progress)
+            
+            // 🎯 区分播放中的进度更新和用户手动跳转
+            if isPlaybackProgressUpdate {
+                delegate?.timelineView(self, didUpdateProgressDuringPlayback: progress)
+            } else {
+                delegate?.timelineView(self, didSeekToProgress: progress)
+            }
         }
         
         // 🎯 新增：滚动时刷新时间刻度
