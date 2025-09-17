@@ -19,6 +19,7 @@ enum PhotoLibraryError: Error {
             return "需要相册访问权限才能保存图片"
         }
     }
+}
 
 class ImageEnhanceViewController: UIViewController {
     
