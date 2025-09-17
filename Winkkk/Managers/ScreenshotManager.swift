@@ -104,7 +104,7 @@ class ScreenshotManager: ObservableObject {
         updateSelectionOrder()
         
         // 从数据库删除
-        persistenceController.delete(screenshot)
+        persistenceController.deleteScreenshotItem(screenshot)
         
         // 通知截图移除
         notifyScreenshotRemoved(screenshot, at: index)
@@ -126,7 +126,7 @@ class ScreenshotManager: ObservableObject {
         selectedScreenshots.removeAll()
         
         // 批量删除
-        allScreenshots.forEach { persistenceController.delete($0) }
+        allScreenshots.forEach { persistenceController.deleteScreenshotItem($0) }
         
         // 通知清空
         notifyAllScreenshotsCleared()
