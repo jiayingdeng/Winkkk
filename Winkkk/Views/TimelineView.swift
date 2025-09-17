@@ -115,6 +115,11 @@ class TimelineView: UIView {
         return scrollView
     }
     
+    // 🎯 提供playheadIndicator访问接口 (供VideoPlayerViewController约束控制)
+    var playheadIndicatorView: UIView {
+        return playheadIndicator
+    }
+    
     // MARK: - UI Components (now in content view)
     private let trackView = UIView()
     private let progressView = UIView()
@@ -140,6 +145,8 @@ class TimelineView: UIView {
     private var currentContentWidth: CGFloat = 0  // 当前实际内容宽度
     
     // MARK: - Content Padding (for complete scroll range)
+    // 🎯 内部逻辑：padding基于TimelineView自身宽度，保持内部一致性
+    private var screenWidth: CGFloat { UIScreen.main.bounds.width }  // 用于centerX计算
     private var leftPadding: CGFloat { bounds.width / 2 }  // 左侧填充，让视频开头能到达中心
     private var rightPadding: CGFloat { bounds.width / 2 } // 右侧填充，让视频结尾能到达中心
     
@@ -151,7 +158,7 @@ class TimelineView: UIView {
     private var timeToPixelRatio: Double = 0  // 时间到像素的转换比例
     
     // MARK: - Layout Constraints
-    private var playheadIndicatorCenterXConstraint: NSLayoutConstraint?  // 🎯 播放头指示器位置约束
+    // 🎯 播放头指示器约束将由VideoPlayerViewController管理
     
     // MARK: - Initialization
     override init(frame: CGRect) {
@@ -316,19 +323,19 @@ class TimelineView: UIView {
             // 时间刻度视图 (在内容视图中) - 🎯 与缩略图容器对齐
             timeScaleView.topAnchor.constraint(equalTo: contentView.topAnchor),
             timeScaleView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            timeScaleView.widthAnchor.constraint(equalTo: self.widthAnchor),  // 与TimelineView同宽
+            timeScaleView.widthAnchor.constraint(equalTo: self.widthAnchor),  // 🎯 与TimelineView同宽
             timeScaleView.heightAnchor.constraint(equalToConstant: 30),  // 20 → 30px
             
             // 缩略图容器 (在内容视图中) - 🎯 只占据视频内容区域，不包含padding
             thumbnailContainerView.topAnchor.constraint(equalTo: timeScaleView.bottomAnchor, constant: 6),  // 4 → 6px间距
             thumbnailContainerView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            thumbnailContainerView.widthAnchor.constraint(equalTo: self.widthAnchor),  // 与TimelineView同宽
+            thumbnailContainerView.widthAnchor.constraint(equalTo: self.widthAnchor),  // 🎯 与TimelineView同宽
             thumbnailContainerView.heightAnchor.constraint(equalToConstant: 60),  // 40 → 60px
             
             // 轨道 (在内容视图中) - 🎯 与缩略图容器对齐
             trackView.topAnchor.constraint(equalTo: thumbnailContainerView.bottomAnchor, constant: 8),
             trackView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            trackView.widthAnchor.constraint(equalTo: self.widthAnchor),  // 与TimelineView同宽
+            trackView.widthAnchor.constraint(equalTo: self.widthAnchor),  // 🎯 与TimelineView同宽
             trackView.heightAnchor.constraint(equalToConstant: 4),
             
             // 进度条 (在内容视图中)
@@ -350,9 +357,8 @@ class TimelineView: UIView {
             // centerX约束将动态更新，跟随播放进度
         ])
         
-        // 🎯 Wink风格：播放头指示器固定在TimelineView中心
-        playheadIndicatorCenterXConstraint = playheadIndicator.centerXAnchor.constraint(equalTo: self.centerXAnchor)
-        playheadIndicatorCenterXConstraint?.isActive = true
+        // 🎯 注意：playheadIndicator的centerX约束现在由VideoPlayerViewController管理
+        // 这确保了它能精确对齐到屏幕中心而不是TimelineView中心
         
         updateProgressConstraints()
     }
@@ -371,7 +377,7 @@ class TimelineView: UIView {
     /// 计算动态内容宽度（包含左右padding）
     private func calculateContentWidth() -> CGFloat {
         guard baseContentWidth > 0 else {
-            baseContentWidth = bounds.width
+            baseContentWidth = bounds.width  // 🎯 基于TimelineView宽度，保持内部一致性
             return baseContentWidth + leftPadding + rightPadding
         }
         // 🎯 总内容宽度 = 左padding + 实际视频内容 + 右padding
@@ -381,7 +387,7 @@ class TimelineView: UIView {
     
     /// 获取实际视频内容宽度（不包含padding）
     private func getActualVideoWidth() -> CGFloat {
-        guard baseContentWidth > 0 else { return bounds.width }
+        guard baseContentWidth > 0 else { return bounds.width }  // 🎯 fallback使用TimelineView宽度
         return baseContentWidth * zoomScale
     }
     
@@ -420,8 +426,8 @@ class TimelineView: UIView {
     
     /// 🎯 Wink风格：获取当前竖线位置对应的截取时间
     func getCurrentCaptureTime() -> Double {
-        // 🎯 计算竖线在内容视图中的绝对位置
-        let centerX = bounds.width / 2  // 竖线固定在TimelineView中心
+        // 🎯 计算竖线在内容视图中的绝对位置 - 现在基于屏幕中心
+        let centerX = screenWidth / 2  // 🎯 修复：竖线现在固定在屏幕中心，与约束一致
         let absoluteX = centerX + scrollView.contentOffset.x  // 相对于内容视图的绝对位置
         
         // 🎯 使用更新后的坐标转换方法（已考虑padding）
@@ -453,7 +459,7 @@ class TimelineView: UIView {
             return (min: 0, max: 0)
         }
         
-        let centerX = bounds.width / 2
+        let centerX = screenWidth / 2  // 🎯 修复：基于屏幕宽度计算中心位置
         
         // 让视频开头（时间0）能够到达中心竖线的滚动位置
         let timeZeroCoordinate = timeToCoordinate(0)
@@ -463,8 +469,8 @@ class TimelineView: UIView {
         let timeDurationCoordinate = timeToCoordinate(duration)
         let maxScrollOffset = timeDurationCoordinate - centerX
         
-        // 确保边界值有效
-        let validMin = max(0, minScrollOffset)
+        // 🎯 修复：移除错误的minScrollOffset限制，允许负偏移以支持视频开头到达中心
+        let validMin = minScrollOffset  // 允许负偏移，确保视频开头能到达中心竖线
         let validMax = max(validMin, maxScrollOffset)
         
         print("🔍 DEBUG-P4: getValidScrollRange calculations:")
@@ -485,7 +491,7 @@ class TimelineView: UIView {
     func scrollToCaptureTime(_ time: Double) {
         // 🎯 使用更新后的坐标转换（已考虑padding）
         let targetX = timeToCoordinate(time)
-        let centerX = bounds.width / 2
+        let centerX = screenWidth / 2  // 🎯 修复：基于屏幕宽度计算中心位置
         
         // 计算需要的滚动偏移，让目标时间点移动到中心竖线位置
         let scrollOffsetX = targetX - centerX
@@ -1114,7 +1120,7 @@ class TimelineView: UIView {
         
         // 初始化基础宽度（如果还未设置）
         if baseContentWidth == 0 && bounds.width > 0 {
-            baseContentWidth = bounds.width
+            baseContentWidth = bounds.width  // 🎯 基于TimelineView宽度，保持内部一致性
             print("📐 初始化基础宽度: \(baseContentWidth)")
         }
         
@@ -1134,7 +1140,7 @@ class TimelineView: UIView {
     private func updateThumbnailLayout() {
         guard currentThumbnailCount > 0, bounds.width > 0 else { return }
         
-        // 🎯 缩略图容器现在与TimelineView同宽，使用TimelineView宽度
+        // 🎯 缩略图容器与TimelineView同宽
         let containerWidth = bounds.width
         let thumbnailWidth = containerWidth / CGFloat(currentThumbnailCount)
         

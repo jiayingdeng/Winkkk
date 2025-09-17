@@ -282,6 +282,10 @@ class VideoPlayerViewController: UIViewController {
         let overflowWidth = screenWidth + (screenWidth * 0.15)  // 屏幕宽度 + 15%溢出
         timelineWidthConstraint = timelineView.widthAnchor.constraint(equalToConstant: overflowWidth)
         timelineWidthConstraint?.isActive = true
+        
+        // 🎯 关键修复：将playheadIndicator约束到屏幕中心而不是TimelineView中心
+        // 这是解决所有时间轴问题的核心
+        timelineView.playheadIndicatorView.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
     }
     
     // MARK: - Player Setup
