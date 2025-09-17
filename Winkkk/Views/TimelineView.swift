@@ -106,6 +106,10 @@ class TimelineView: UIView {
     private var isPlaying = false
     private var isPlaybackProgressUpdate = false  // 标记是否为播放中的进度更新
     
+    // 🆕 Live Photo模式支持
+    private var isLivePhotoMode = false
+    private let livePhotoRangeIndicator = UIView()  // 3秒范围指示器
+    
     // MARK: - Scrolling Container Architecture
     private let scrollView = UIScrollView()
     private let contentView = UIView()
@@ -127,6 +131,9 @@ class TimelineView: UIView {
     private let thumbnailContainerView = UIView()
     private let timeScaleView = UIView() // 新增：时间刻度显示
     private let playheadIndicator = UIView() // 🎯 新增：白色竖直指示器
+    
+    // 🆕 Live Photo模式组件
+    private let livePhotoRangeView = UIView()      // 3秒范围显示
     
     // 缩略图相关
     private var thumbnailImageViews: [UIImageView] = []
@@ -228,6 +235,10 @@ class TimelineView: UIView {
         setupPlayheadIndicator()
         contentView.addSubview(playheadIndicator)
         
+        // 🆕 Live Photo模式组件
+        setupLivePhotoComponents()
+        contentView.addSubview(livePhotoRangeView)
+        
         // 🎯 设置传统组件但隐藏（保持代码兼容性）
         setupThumbView()
         progressView.backgroundColor = ThemeManager.buttonPrimary
@@ -271,6 +282,60 @@ class TimelineView: UIView {
         pulseAnimation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
         
         playheadIndicator.layer.add(pulseAnimation, forKey: "pulse")
+    }
+    
+    // 🆕 设置Live Photo模式组件
+    private func setupLivePhotoComponents() {
+        // 设置3秒范围指示器
+        livePhotoRangeView.backgroundColor = UIColor.systemRed.withAlphaComponent(0.3)
+        livePhotoRangeView.layer.cornerRadius = 4
+        livePhotoRangeView.layer.borderWidth = 1
+        livePhotoRangeView.layer.borderColor = UIColor.systemRed.withAlphaComponent(0.6).cgColor
+        livePhotoRangeView.isHidden = true  // 默认隐藏
+        
+        // 添加文字标签
+        let label = UILabel()
+        label.text = "3s"
+        label.textColor = .white
+        label.font = UIFont.systemFont(ofSize: 10, weight: .bold)
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        livePhotoRangeView.addSubview(label)
+        
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: livePhotoRangeView.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: livePhotoRangeView.centerYAnchor)
+        ])
+    }
+    
+    // 🆕 公开方法：设置Live Photo模式
+    func setLivePhotoMode(_ enabled: Bool) {
+        isLivePhotoMode = enabled
+        livePhotoRangeView.isHidden = !enabled
+        
+        if enabled {
+            updateLivePhotoRangePosition()
+        }
+    }
+    
+    // 更新Live Photo范围位置（基于当前播放头位置）
+    private func updateLivePhotoRangePosition() {
+        guard isLivePhotoMode, duration > 0 else { return }
+        
+        // 计算3秒对应的宽度
+        let threeSecondsWidth = (3.0 / duration) * currentContentWidth
+        let indicatorX = playheadIndicator.frame.midX
+        
+        // 保证不超出边界
+        let maxX = currentContentWidth - threeSecondsWidth
+        let rangeX = min(indicatorX, maxX)
+        
+        livePhotoRangeView.frame = CGRect(
+            x: rangeX,
+            y: timeScaleView.frame.minY,
+            width: threeSecondsWidth,
+            height: timeScaleView.frame.height
+        )
     }
     
     private func setupThumbView() {

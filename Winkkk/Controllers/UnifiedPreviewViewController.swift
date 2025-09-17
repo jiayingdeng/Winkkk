@@ -447,8 +447,88 @@ class UnifiedPreviewViewController: UIViewController {
     
     @objc private func createCollage() {
         HapticFeedbackManager.shared.buttonTap()
-        // TODO: 集成拼图功能
-        print("🧩 创建拼图: \(screenshots.count)张")
+        
+        // 检查是否是普通截图模式且有多张图片
+        guard captureMode == .stillImage && screenshots.count > 1 else {
+            showAlert(title: "无法创建拼图", message: "拼图功能仅支持多张普通截图")
+            return
+        }
+        
+        // 提取所有图片
+        let images = screenshots.compactMap { $0.image }
+        guard images.count == screenshots.count else {
+            showAlert(title: "错误", message: "部分图片无法加载")
+            return
+        }
+        
+        // 创建拼图界面
+        createCollageViewController(with: images)
+    }
+    
+    private func createCollageViewController(with images: [UIImage]) {
+        // TODO: 实现拼图编辑界面
+        print("🧩 创建拼图: \(images.count)张图片")
+        
+        // 临时方案：显示选择对话框
+        showCollageOptionsAlert(images: images)
+    }
+    
+    private func showCollageOptionsAlert(images: [UIImage]) {
+        let alert = UIAlertController(
+            title: "选择拼图模式",
+            message: "请选择你希望的拼图布局",
+            preferredStyle: .actionSheet
+        )
+        
+        // 网格布局
+        alert.addAction(UIAlertAction(title: "🗺️ 网格布局", style: .default) { _ in
+            self.createGridCollage(images: images)
+        })
+        
+        // 横向排列
+        alert.addAction(UIAlertAction(title: "↔️ 横向排列", style: .default) { _ in
+            self.createHorizontalCollage(images: images)
+        })
+        
+        // 竖向排列
+        alert.addAction(UIAlertAction(title: "↕️ 竖向排列", style: .default) { _ in
+            self.createVerticalCollage(images: images)
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        // iPad适配
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
+        }
+        
+        present(alert, animated: true)
+    }
+    
+    private func createGridCollage(images: [UIImage]) {
+        // TODO: 实现网格拼图
+        print("🗺️ 创建网格拼图: \(images.count)张图片")
+        showCollageResult(type: "网格布局")
+    }
+    
+    private func createHorizontalCollage(images: [UIImage]) {
+        // TODO: 实现横向拼图
+        print("↔️ 创建横向拼图: \(images.count)张图片")
+        showCollageResult(type: "横向排列")
+    }
+    
+    private func createVerticalCollage(images: [UIImage]) {
+        // TODO: 实现竖向拼图
+        print("↕️ 创建竖向拼图: \(images.count)张图片")
+        showCollageResult(type: "竖向排列")
+    }
+    
+    private func showCollageResult(type: String) {
+        showAlert(title: "拼图功能待实现", message: "\(type)拼图功能正在开发中") {
+            // 在用户点击确定后返回
+            self.navigationController?.popViewController(animated: true)
+        }
     }
     
     // MARK: - Actions - Live Photo模式
@@ -690,5 +770,16 @@ class ThumbnailCollectionViewCell: UICollectionViewCell {
                 ThemeManager.buttonPrimary.cgColor : 
                 UIColor.white.withAlphaComponent(0.5).cgColor
         }
+    }
+}
+
+    
+    // MARK: - 🆕 辅助方法
+    private func showAlert(title: String, message: String, completion: (() -> Void)? = nil) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in
+            completion?()
+        })
+        present(alert, animated: true)
     }
 }

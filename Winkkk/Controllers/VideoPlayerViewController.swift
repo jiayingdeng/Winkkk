@@ -8,6 +8,7 @@
 
 import UIKit
 import AVFoundation
+import Combine
 
 // 🎯 流动速度控制枚举
 enum FlowSpeed {
@@ -54,6 +55,10 @@ class VideoPlayerViewController: UIViewController {
     // 截图按钮
     private let screenshotButton = UIButton()
     
+    // 🆕 多图截取系统组件
+    private let captureModeSwitcher = CaptureModeSwitcher()
+    private let screenshotPreviewBar = ScreenshotPreviewBar()
+    
     // 状态变量 - 🎯 编辑器模式重构
     private var isFlowing = false {  // 从isPlaying改为isFlowing
         didSet {
@@ -79,6 +84,10 @@ class VideoPlayerViewController: UIViewController {
     
     // MARK: - Dependencies
     private let screenshotEngine = ScreenshotEngine()
+    private let screenshotManager = ScreenshotManager.shared
+    
+    // 🆕 Combine订阅
+    private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Initialization
     init(videoURL: URL) {
@@ -97,6 +106,7 @@ class VideoPlayerViewController: UIViewController {
         setupConstraints()
         setupPlayer()
         setupTimelineView()
+        setupMultiScreenshotSystem()  // 🆕 新增
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -128,6 +138,10 @@ class VideoPlayerViewController: UIViewController {
         
         // 控制面板
         setupControlPanel()
+        
+        // 🆕 多图截取系统组件
+        setupCaptureModeSwitcher()
+        setupScreenshotPreviewBar()
         
         // 导航栏
         setupNavigationBar()
@@ -286,6 +300,29 @@ class VideoPlayerViewController: UIViewController {
         // 🎯 关键修复：将playheadIndicator约束到屏幕中心而不是TimelineView中心
         // 这是解决所有时间轴问题的核心
         timelineView.playheadIndicatorView.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
+        
+        // 🆕 新组件约束
+        setupNewComponentsConstraints()
+    }
+    
+    private func setupNewComponentsConstraints() {
+        captureModeSwitcher.translatesAutoresizingMaskIntoConstraints = false
+        screenshotPreviewBar.translatesAutoresizingMaskIntoConstraints = false
+        
+        NSLayoutConstraint.activate([
+            // 模式切换器：位于时间轴上方
+            captureModeSwitcher.bottomAnchor.constraint(equalTo: timelineView.topAnchor, constant: -16),
+            captureModeSwitcher.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            captureModeSwitcher.heightAnchor.constraint(equalToConstant: 44),
+            captureModeSwitcher.widthAnchor.constraint(equalToConstant: 280),
+            
+            // 截图预览栏：位于控制面板外侧底部
+            screenshotPreviewBar.topAnchor.constraint(equalTo: controlPanelBlurView.bottomAnchor, constant: 8),
+            screenshotPreviewBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            screenshotPreviewBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            screenshotPreviewBar.heightAnchor.constraint(equalToConstant: 100),
+            screenshotPreviewBar.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor)
+        ])
     }
     
     // MARK: - Player Setup
@@ -351,6 +388,63 @@ class VideoPlayerViewController: UIViewController {
     private func setupTimelineView() {
         timelineView.delegate = self
         timelineView.setVideoURL(videoURL)
+    }
+    
+    // MARK: - 🆕 多图截取系统设置
+    private func setupCaptureModeSwitcher() {
+        captureModeSwitcher.delegate = self
+        view.addSubview(captureModeSwitcher)
+    }
+    
+    private func setupScreenshotPreviewBar() {
+        screenshotPreviewBar.delegate = self
+        screenshotPreviewBar.isHidden = true  // 初始隐藏，有截图时显示
+        view.addSubview(screenshotPreviewBar)
+    }
+    
+    private func setupMultiScreenshotSystem() {
+        // 设置初始模式
+        captureModeSwitcher.setMode(.stillImage, animated: false)
+        
+        // 订阅截图状态变化
+        screenshotManager.$screenshots
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] screenshots in
+                self?.updatePreviewBarVisibility(screenshots: screenshots)
+            }
+            .store(in: &cancellables)
+        
+        // 订阅模式变化
+        screenshotManager.$currentMode
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] mode in
+                self?.updateTimelineForMode(mode)
+            }
+            .store(in: &cancellables)
+    }
+    
+    private func updatePreviewBarVisibility(screenshots: [ScreenshotItem]) {
+        let shouldShow = !screenshots.isEmpty
+        
+        UIView.animate(withDuration: 0.3) {
+            self.screenshotPreviewBar.isHidden = !shouldShow
+            if shouldShow {
+                self.screenshotPreviewBar.alpha = 1.0
+            } else {
+                self.screenshotPreviewBar.alpha = 0.0
+            }
+        }
+    }
+    
+    private func updateTimelineForMode(_ mode: CaptureMode) {
+        switch mode {
+        case .stillImage:
+            // 普通截图模式：正常显示
+            timelineView.setLivePhotoMode(false)
+        case .livePhoto:
+            // Live Photo模式：显示3秒范围指示
+            timelineView.setLivePhotoMode(true)
+        }
     }
     
     // MARK: - Flow Control (编辑器模式)
@@ -506,11 +600,82 @@ class VideoPlayerViewController: UIViewController {
         // 🎯 使用截取时间作为时间戳，而非播放时间
         let captureTime = timelineView.getCurrentCaptureTime()
         
-        // 显示截图预览界面（用户可选择是否进行画质修复）
-        let previewVC = ScreenshotPreviewViewController(image: image, timestamp: captureTime)
-        let navController = UINavigationController(rootViewController: previewVC)
-        navController.modalPresentationStyle = .fullScreen
-        present(navController, animated: true)
+        // 🆕 创建截图项目
+        let screenshot = ScreenshotItem(
+            image: image,
+            timestamp: captureTime,
+            videoURL: videoURL
+        )
+        
+        do {
+            // 添加到管理器
+            try screenshotManager.addScreenshot(screenshot)
+            
+            // 触感反馈
+            HapticFeedbackManager.shared.successImpact()
+            
+            // 显示成功动画
+            showScreenshotSuccessAnimation()
+            
+        } catch {
+            // 处理错误（如数量超限、模式冲突等）
+            handleScreenshotError(error)
+        }
+    }
+    
+    private func showScreenshotSuccessAnimation() {
+        // 简单的成功动画
+        UIView.animate(withDuration: 0.2, animations: {
+            self.screenshotButton.transform = CGAffineTransform(scaleX: 1.2, y: 1.2)
+        }) { _ in
+            UIView.animate(withDuration: 0.2) {
+                self.screenshotButton.transform = .identity
+            }
+        }
+    }
+    
+    private func handleScreenshotError(_ error: Error) {
+        if let screenshotError = error as? ScreenshotSessionError {
+            switch screenshotError {
+            case .maxLimitReached:
+                showMaxLimitAlert()
+            case .needConfirmation(let currentMode, let newMode, let currentCount):
+                // 这种情况不应该在截图时发生
+                break
+            case .modeConflict:
+                showModeConflictAlert()
+            }
+        } else {
+            showError(error)
+        }
+    }
+    
+    private func showMaxLimitAlert() {
+        let alert = UIAlertController(
+            title: "截图数量已达上限",
+            message: "最多只能截取20张图片。请先删除一些截图或切换到预览界面。",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "查看截图", style: .default) { _ in
+            self.showScreenshotPreview()
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        present(alert, animated: true)
+    }
+    
+    private func showModeConflictAlert() {
+        let alert = UIAlertController(
+            title: "模式冲突",
+            message: "截图失败，请检查当前模式设置。",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        
+        present(alert, animated: true)
     }
     
     // MARK: - Actions
@@ -651,5 +816,131 @@ extension VideoPlayerViewController: TimelineViewDelegate {
     func timelineViewDidEndSeeking(_ timelineView: TimelineView) {
         // 🎯 用户结束滚动，可以选择恢复流动或保持停止状态
         // 用户体验：让用户手动控制是否继续流动
+    }
+}
+
+// MARK: - 🆕 CaptureModeSwitcherDelegate
+extension VideoPlayerViewController: CaptureModeSwitcherDelegate {
+    
+    func captureModeSwitcher(_ switcher: CaptureModeSwitcher, didRequestSwitchTo mode: CaptureMode) {
+        // 检查是否需要确认
+        do {
+            try screenshotManager.switchMode(to: mode, force: false)
+        } catch ScreenshotSessionError.needConfirmation(let currentMode, let newMode, let currentCount) {
+            showModeConfirmationAlert(from: currentMode, to: newMode, currentCount: currentCount) { [weak self] confirmed in
+                if confirmed {
+                    try? self?.screenshotManager.switchMode(to: mode, force: true)
+                } else {
+                    // 恢复之前的模式
+                    switcher.setMode(currentMode, animated: true)
+                }
+            }
+        } catch {
+            print("模式切换失败: \(error)")
+        }
+    }
+    
+    func captureModeSwitcher(_ switcher: CaptureModeSwitcher, didConfirmSwitchTo mode: CaptureMode) {
+        // 已确认切换
+        print("已切换到模式: \(mode.displayName)")
+    }
+    
+    private func showModeConfirmationAlert(from currentMode: CaptureMode, to newMode: CaptureMode, currentCount: Int, completion: @escaping (Bool) -> Void) {
+        let alert = UIAlertController(
+            title: "切换模式",
+            message: "切换到\(newMode.displayName)模式将清空当前的\(currentCount)张截图，是否继续？",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "确定切换", style: .destructive) { _ in
+            completion(true)
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel) { _ in
+            completion(false)
+        })
+        
+        present(alert, animated: true)
+    }
+}
+
+// MARK: - 🆕 ScreenshotPreviewBarDelegate
+extension VideoPlayerViewController: ScreenshotPreviewBarDelegate {
+    
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didTapScreenshot screenshot: ScreenshotItem, at index: Int) {
+        // 点击单个截图：进入统一预览系统
+        showScreenshotPreview(startingAt: index)
+    }
+    
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didDeleteScreenshot screenshot: ScreenshotItem, at index: Int) {
+        // 删除截图
+        screenshotManager.removeScreenshot(at: index)
+        
+        // 触感反馈
+        HapticFeedbackManager.shared.lightImpact()
+    }
+    
+    func screenshotPreviewBarDidTapPreviewAll(_ previewBar: ScreenshotPreviewBar) {
+        // 预览所有截图
+        showScreenshotPreview()
+    }
+    
+    func screenshotPreviewBarDidTapEnhanceAll(_ previewBar: ScreenshotPreviewBar) {
+        // 批量画质修复
+        showBatchEnhancement()
+    }
+    
+    func screenshotPreviewBarDidTapClearAll(_ previewBar: ScreenshotPreviewBar) {
+        // 清空所有截图
+        let alert = UIAlertController(
+            title: "清空截图",
+            message: "确定要删除所有\(screenshotManager.screenshots.count)张截图吗？",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "删除", style: .destructive) { _ in
+            self.screenshotManager.clearAllScreenshots()
+            HapticFeedbackManager.shared.lightImpact()
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        present(alert, animated: true)
+    }
+    
+    // MARK: - 🆕 功能集成方法
+    private func showScreenshotPreview(startingAt index: Int = 0) {
+        let screenshots = screenshotManager.screenshots
+        guard !screenshots.isEmpty else { return }
+        
+        let previewVC = UnifiedPreviewViewController(
+            screenshots: screenshots,
+            captureMode: screenshotManager.currentMode,
+            initialIndex: index
+        )
+        
+        let navController = UINavigationController(rootViewController: previewVC)
+        navController.modalPresentationStyle = .fullScreen
+        present(navController, animated: true)
+    }
+    
+    private func showBatchEnhancement() {
+        let screenshots = screenshotManager.screenshots
+        guard !screenshots.isEmpty else { return }
+        
+        // TODO: 实现批量画质修复功能
+        // 这里可以创建一个BatchImageEnhanceViewController
+        print("🚧 批量画质修复功能待实现")
+        
+        // 临时：显示单个修复
+        if let firstScreenshot = screenshots.first,
+           let image = firstScreenshot.image {
+            let enhanceVC = ImageEnhanceViewController(
+                image: image,
+                timestamp: firstScreenshot.timestamp
+            )
+            let navController = UINavigationController(rootViewController: enhanceVC)
+            present(navController, animated: true)
+        }
     }
 }
