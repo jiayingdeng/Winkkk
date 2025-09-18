@@ -48,11 +48,15 @@ class ScreenshotThumbnailView: UIView {
     private func setupUI() {
         backgroundColor = .clear
         
-        // 设置固定尺寸
+        // 设置固定尺寸 - 使用高优先级约束以避免冲突
         translatesAutoresizingMaskIntoConstraints = false
+        let widthConstraint = widthAnchor.constraint(equalToConstant: 60)
+        let heightConstraint = heightAnchor.constraint(equalToConstant: 60)
+        widthConstraint.priority = UILayoutPriority(999)
+        heightConstraint.priority = UILayoutPriority(999)
         NSLayoutConstraint.activate([
-            widthAnchor.constraint(equalToConstant: 60),
-            heightAnchor.constraint(equalToConstant: 60)
+            widthConstraint,
+            heightConstraint
         ])
         
         // 图片视图

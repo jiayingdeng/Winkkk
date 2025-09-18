@@ -272,12 +272,12 @@ class ScreenshotPreviewBar: UIView {
             scrollView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
             scrollView.heightAnchor.constraint(equalToConstant: 60),
             
-            // 操作按钮容器
+            // 操作按钮容器 - 使用弹性高度适应比例布局
             actionButtonsContainer.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
             actionButtonsContainer.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
             actionButtonsContainer.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
             actionButtonsContainer.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
-            actionButtonsContainer.heightAnchor.constraint(equalToConstant: 40)
+            actionButtonsContainer.heightAnchor.constraint(greaterThanOrEqualToConstant: 36) // 最小高度36px，允许弹性增长
         ])
     }
     

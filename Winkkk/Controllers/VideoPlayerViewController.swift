@@ -98,7 +98,7 @@ class VideoPlayerViewController: UIViewController {
     private var lastPreviewUpdateTime: TimeInterval = 0
     
     // 🎯 响应式布局约束
-    private var controlPanelHeightConstraint: NSLayoutConstraint?
+    // private var controlPanelHeightConstraint: NSLayoutConstraint? // 三分屏布局使用比例约束，不需要动态高度
     private var timelineWidthConstraint: NSLayoutConstraint?  // 动态宽度约束
     
     // MARK: - Dependencies
@@ -270,17 +270,17 @@ class VideoPlayerViewController: UIViewController {
             gradientBackgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             gradientBackgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
-            // 播放器容器
+            // 🎯 三分屏布局：视频区域 (53.3%)
             playerContainerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
             playerContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             playerContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            playerContainerView.bottomAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: -20),
+            playerContainerView.heightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.heightAnchor, multiplier: 0.533),
             
-            // 控制面板
+            // 🎯 三分屏布局：控制面板 (21.3%) - 位于中间
+            controlPanelBlurView.topAnchor.constraint(equalTo: playerContainerView.bottomAnchor, constant: 20),
             controlPanelBlurView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             controlPanelBlurView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            controlPanelBlurView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -178), // 为ScreenshotPreviewBar(170px) + 间距(8px) 预留空间
-            // 高度约束将动态设置
+            controlPanelBlurView.heightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.heightAnchor, multiplier: 0.213),
             
             // 🎯 时间轴 - 允许视觉溢出屏幕边界 (Wink风格)
             timelineView.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 20),
@@ -309,9 +309,8 @@ class VideoPlayerViewController: UIViewController {
             screenshotButton.heightAnchor.constraint(equalToConstant: 40)
         ])
         
-        // 🎯 初始化动态约束
-        controlPanelHeightConstraint = controlPanelBlurView.heightAnchor.constraint(equalToConstant: 210)
-        controlPanelHeightConstraint?.isActive = true
+        // 🎯 初始化动态约束 - 三分屏布局不需要动态高度约束，使用比例约束
+        // controlPanelHeightConstraint 现在由比例约束替代
         
         // 🎯 初始化时间轴动态宽度约束 (实现15%溢出效果)
         let screenWidth = UIScreen.main.bounds.width
@@ -337,24 +336,23 @@ class VideoPlayerViewController: UIViewController {
         moreOptionsButton.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            // 模式切换器：位于时间轴上方
-            captureModeSwitcher.bottomAnchor.constraint(equalTo: timelineView.topAnchor, constant: -16),
+            // 🎯 三分屏布局：模式切换器 - 位于底部区域顶部 (5%)
+            captureModeSwitcher.topAnchor.constraint(equalTo: controlPanelBlurView.bottomAnchor, constant: 20),
             captureModeSwitcher.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             captureModeSwitcher.heightAnchor.constraint(equalToConstant: 44),
             captureModeSwitcher.widthAnchor.constraint(equalToConstant: 280),
             
-            // 截图预览栏：位于控制面板外侧底部
-            screenshotPreviewBar.topAnchor.constraint(equalTo: controlPanelBlurView.bottomAnchor, constant: 8),
+            // 🎯 三分屏布局：截图预览栏 (19%) - 位于底部主要区域
+            screenshotPreviewBar.topAnchor.constraint(equalTo: captureModeSwitcher.bottomAnchor, constant: 8),
             screenshotPreviewBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             screenshotPreviewBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            screenshotPreviewBar.heightAnchor.constraint(equalToConstant: 170),
-            screenshotPreviewBar.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor),
+            screenshotPreviewBar.heightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.heightAnchor, multiplier: 0.19),
             
-            // 🆕 批量操作面板：位于截图预览栏上方
-            batchOperationPanel.bottomAnchor.constraint(equalTo: screenshotPreviewBar.topAnchor, constant: -8),
+            // 🎯 三分屏布局：批量操作面板 (9%) - 位于最底部
+            batchOperationPanel.topAnchor.constraint(equalTo: screenshotPreviewBar.bottomAnchor, constant: 8),
             batchOperationPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             batchOperationPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            batchOperationPanel.heightAnchor.constraint(equalToConstant: 80),
+            batchOperationPanel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
             
             // 选择数量标签
             selectionCountLabel.topAnchor.constraint(equalTo: batchOperationPanel.topAnchor, constant: 8),
@@ -1083,31 +1081,22 @@ class VideoPlayerViewController: UIViewController {
         updateControlPanelHeight()
     }
     
-    // 🎯 动态响应式高度适配
+    // 🎯 三分屏布局响应式适配
     private func updateControlPanelHeight() {
-        let safeAreaBottom = view.safeAreaInsets.bottom
-        let baseHeight: CGFloat = 210  // 基础高度
-        let panelHeight = baseHeight + safeAreaBottom
-        
-        // 确保控制面板不会占用太多屏幕空间（最多不超过屏幕高度的40%）
-        let maxHeight = view.bounds.height * 0.4
-        let finalHeight = min(panelHeight, maxHeight)
-        
-        // 如果高度被限制，相应调整内部间距
-        let heightReduction = panelHeight - finalHeight
-        let adjustedSpacing = max(8, 20 - heightReduction * 0.3)  // 动态间距
-        
-        // 更新约束
-        controlPanelHeightConstraint?.constant = finalHeight
-        
         // 🎯 更新时间轴动态宽度 (响应屏幕变化)
         updateTimelineWidth()
         
-        print("📱 VideoPlayerViewController 响应式布局:")
-        print("   屏幕高度: \(view.bounds.height)")
-        print("   安全区域底部: \(safeAreaBottom)")
-        print("   最终面板高度: \(finalHeight) (限制前: \(panelHeight))")
-        print("   动态间距: \(adjustedSpacing)")
+        // 三分屏布局使用比例约束，自动适应不同设备尺寸
+        let safeAreaHeight = view.safeAreaLayoutGuide.layoutFrame.height
+        let videoAreaHeight = safeAreaHeight * 0.533  // 53.3%
+        let controlAreaHeight = safeAreaHeight * 0.213  // 21.3%
+        let bottomAreaHeight = safeAreaHeight * 0.254  // 25.4%
+        
+        print("📱 VideoPlayerViewController 三分屏响应式布局:")
+        print("   安全区域高度: \(safeAreaHeight)")
+        print("   视频区域高度: \(videoAreaHeight) (53.3%)")
+        print("   控制区域高度: \(controlAreaHeight) (21.3%)")
+        print("   底部区域高度: \(bottomAreaHeight) (25.4%)")
     }
     
     // 🎯 动态更新时间轴宽度 (实现15%溢出)
