@@ -20,7 +20,7 @@ protocol UnifiedBottomControlPanelDelegate: AnyObject {
     func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didEndSeeking time: Double)
     
     // 截图功能
-    func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didTapCapture mode: CaptureMode)
+    func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didTapCapture mode: UnifiedBottomControlPanel.CaptureMode)
     func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didTapClearScreenshots: Void)
     func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didSelectScreenshot item: ScreenshotItem)
     
@@ -29,9 +29,11 @@ protocol UnifiedBottomControlPanelDelegate: AnyObject {
 }
 
 // MARK: - 截图模式枚举
-enum CaptureMode {
-    case stillImage
-    case livePhoto
+extension UnifiedBottomControlPanel {
+    enum CaptureMode {
+        case stillImage
+        case livePhoto
+    }
 }
 
 // MARK: - 主类定义
@@ -105,7 +107,7 @@ class UnifiedBottomControlPanel: UIView {
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.backgroundColor = .clear
         collectionView.showsHorizontalScrollIndicator = false
-        collectionView.register(ScreenshotThumbnailView.self, forCellWithReuseIdentifier: "ScreenshotThumbnailView")
+        collectionView.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "ScreenshotThumbnailCell")
         return collectionView
     }()
     
@@ -146,7 +148,7 @@ class UnifiedBottomControlPanel: UIView {
         button.setImage(UIImage(systemName: "wand.and.stars"), for: .normal)
         button.setTitle("增强", for: .normal)
         button.tintColor = .white
-        button.backgroundColor = ThemeManager.accent.withAlphaComponent(0.8)
+        button.backgroundColor = ThemeManager.buttonPrimary.withAlphaComponent(0.8)
         button.layer.cornerRadius = ThemeManager.smallCornerRadius
         button.titleLabel?.font = ThemeManager.buttonFont
         return button
@@ -154,7 +156,7 @@ class UnifiedBottomControlPanel: UIView {
     
     // MARK: - 数据
     private var screenshots: [ScreenshotItem] = []
-    private var currentCaptureMode: CaptureMode = .stillImage
+    private var currentCaptureMode: UnifiedBottomControlPanel.CaptureMode = .stillImage
     private var isPlaying: Bool = false
     
     // MARK: - 初始化
@@ -321,7 +323,8 @@ extension UnifiedBottomControlPanel: UICollectionViewDataSource {
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "ScreenshotThumbnailView", for: indexPath) as! ScreenshotThumbnailView
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "ScreenshotThumbnailCell", for: indexPath)
+        // 配置将在后续阶段实现
         // 配置将在后续阶段实现
         return cell
     }
