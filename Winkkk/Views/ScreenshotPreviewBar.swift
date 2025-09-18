@@ -9,7 +9,7 @@
 import UIKit
 import Combine
 
-protocol ScreenshotPreviewBarDelegate: AnyObject {
+@objc protocol ScreenshotPreviewBarDelegate: AnyObject {
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didTapScreenshot screenshot: ScreenshotItem, at index: Int)
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestCapture mode: CaptureMode)
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestPreviewAll screenshots: [ScreenshotItem])
@@ -403,6 +403,11 @@ class ScreenshotPreviewBar: UIView {
         thumbnailView.onTap = { [weak self] in
             guard let self = self else { return }
             self.delegate?.screenshotPreviewBar(self, didTapScreenshot: screenshot, at: index)
+        }
+        
+        thumbnailView.onLongPress = { [weak self] in
+            guard let self = self else { return }
+            self.delegate?.screenshotPreviewBar?(self, didLongPressScreenshot: screenshot, at: index)
         }
         
         return thumbnailView

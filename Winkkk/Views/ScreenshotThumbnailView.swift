@@ -13,6 +13,7 @@ class ScreenshotThumbnailView: UIView {
     // MARK: - Properties
     var onDeleteTap: (() -> Void)?
     var onTap: (() -> Void)?
+    var onLongPress: (() -> Void)?
     
     private var screenshot: ScreenshotItem?
     
@@ -236,8 +237,15 @@ class ScreenshotThumbnailView: UIView {
     }
     
     private func setupGestures() {
+        // 点击手势
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(thumbnailTapped))
         addGestureRecognizer(tapGesture)
+        
+        // 长按手势
+        let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(thumbnailLongPressed))
+        longPressGesture.minimumPressDuration = 0.5  // 0.5秒长按
+        addGestureRecognizer(longPressGesture)
+        
         isUserInteractionEnabled = true
     }
     
@@ -354,6 +362,26 @@ class ScreenshotThumbnailView: UIView {
         
         // 回调
         onTap?()
+    }
+    
+    @objc private func thumbnailLongPressed(_ gesture: UILongPressGestureRecognizer) {
+        // 只在长按开始时触发，避免重复触发
+        guard gesture.state == .began else { return }
+        
+        // 添加长按反馈动画
+        UIView.animate(withDuration: 0.2, animations: {
+            self.transform = CGAffineTransform(scaleX: 1.05, y: 1.05)
+        }) { _ in
+            UIView.animate(withDuration: 0.2) {
+                self.transform = .identity
+            }
+        }
+        
+        // 长按触觉反馈 (比普通点击更强)
+        HapticFeedbackManager.shared.mediumImpact()
+        
+        // 回调
+        onLongPress?()
     }
 }
 
