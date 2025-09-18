@@ -9,15 +9,22 @@
 import UIKit
 import Combine
 
-@objc protocol ScreenshotPreviewBarDelegate: AnyObject {
+protocol ScreenshotPreviewBarDelegate: AnyObject {
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didTapScreenshot screenshot: ScreenshotItem, at index: Int)
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestCapture mode: CaptureMode)
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestPreviewAll screenshots: [ScreenshotItem])
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestEnhanceAll screenshots: [ScreenshotItem])
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestClearAll mode: CaptureMode)
     
-    // 🆕 添加长按手势支持（可选方法）
-    @objc optional func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didLongPressScreenshot screenshot: ScreenshotItem, at index: Int)
+    // 🆕 添加长按手势支持（可选方法，提供默认实现）
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didLongPressScreenshot screenshot: ScreenshotItem, at index: Int)
+}
+
+// 🆕 为长按手势提供默认实现，使其成为可选方法
+extension ScreenshotPreviewBarDelegate {
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didLongPressScreenshot screenshot: ScreenshotItem, at index: Int) {
+        // 默认空实现，委托方可以选择是否重写此方法
+    }
 }
 
 class ScreenshotPreviewBar: UIView {
@@ -407,7 +414,7 @@ class ScreenshotPreviewBar: UIView {
         
         thumbnailView.onLongPress = { [weak self] in
             guard let self = self else { return }
-            self.delegate?.screenshotPreviewBar?(self, didLongPressScreenshot: screenshot, at: index)
+            self.delegate?.screenshotPreviewBar(self, didLongPressScreenshot: screenshot, at: index)
         }
         
         return thumbnailView
