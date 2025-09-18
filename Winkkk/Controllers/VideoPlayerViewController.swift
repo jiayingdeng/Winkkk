@@ -361,14 +361,14 @@ class VideoPlayerViewController: UIViewController {
             captureModeSwitcher.heightAnchor.constraint(equalToConstant: 44),
             captureModeSwitcher.widthAnchor.constraint(equalToConstant: 280),
             
-            // 🎯 统一容器内：截图预览栏 - 无缝连接模式切换器
-            screenshotPreviewBar.topAnchor.constraint(equalTo: captureModeSwitcher.bottomAnchor, constant: 0),
-            screenshotPreviewBar.leadingAnchor.constraint(equalTo: unifiedControlPanelView.leadingAnchor),
-            screenshotPreviewBar.trailingAnchor.constraint(equalTo: unifiedControlPanelView.trailingAnchor)
+            // 🎯 统一容器内：截图预览栏 - 添加适当内边距，避免双重边界
+            screenshotPreviewBar.topAnchor.constraint(equalTo: captureModeSwitcher.bottomAnchor, constant: 8),
+            screenshotPreviewBar.leadingAnchor.constraint(equalTo: unifiedControlPanelView.leadingAnchor, constant: 16),
+            screenshotPreviewBar.trailingAnchor.constraint(equalTo: unifiedControlPanelView.trailingAnchor, constant: -16)
         ])
         
-        // 🔧 关键修复：使用优先级约束避免冲突
-        let bottomConstraint = screenshotPreviewBar.bottomAnchor.constraint(equalTo: unifiedControlPanelView.bottomAnchor)
+        // 🔧 关键修复：使用优先级约束避免冲突，添加底部边距
+        let bottomConstraint = screenshotPreviewBar.bottomAnchor.constraint(equalTo: unifiedControlPanelView.bottomAnchor, constant: -16)
         bottomConstraint.priority = UILayoutPriority(999)  // 高优先级但非必需
         bottomConstraint.isActive = true
         

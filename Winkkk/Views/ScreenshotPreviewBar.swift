@@ -35,7 +35,7 @@ class ScreenshotPreviewBar: UIView {
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - UI Components
-    private let containerView = UIView()
+    // 🔧 移除containerView - 直接使用self作为容器，避免双重边界
     // 🆕 移除独立毛玻璃效果，使用透明背景（统一容器提供毛玻璃）
     // private let blurEffectView = BlurEffectView(style: .regular, intensity: 0.95)
     
@@ -80,19 +80,16 @@ class ScreenshotPreviewBar: UIView {
         // 🆕 使用透明背景，毛玻璃效果由统一容器提供
         backgroundColor = .clear
         
-        // 主容器 - 直接添加到self，不再使用独立毛玻璃
-        containerView.backgroundColor = .clear
-        addSubview(containerView)
-        
+        // 🔧 直接使用self作为容器，避免双重边界
         // 设置子组件
         setupHeaderView()
         setupScrollView()
         setupActionButtons()
         
-        // 添加到容器
-        containerView.addSubview(headerView)
-        containerView.addSubview(scrollView)
-        containerView.addSubview(actionButtonsContainer)
+        // 直接添加到self
+        addSubview(headerView)
+        addSubview(scrollView)
+        addSubview(actionButtonsContainer)
     }
     
     private func setupHeaderView() {
@@ -237,39 +234,34 @@ class ScreenshotPreviewBar: UIView {
     }
     
     private func setupConstraints() {
-        containerView.translatesAutoresizingMaskIntoConstraints = false
         headerView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         actionButtonsContainer.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            // 🔧 优化：减少内部间距，避免约束冲突
-            containerView.topAnchor.constraint(equalTo: topAnchor, constant: 8),
-            containerView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            containerView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-            containerView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
+            // 🔧 直接使用self，减少内部间距，避免双重边界
             
             // 头部视图
-            headerView.topAnchor.constraint(equalTo: containerView.topAnchor),
-            headerView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            headerView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            headerView.topAnchor.constraint(equalTo: topAnchor, constant: 8),
+            headerView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            headerView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
             headerView.heightAnchor.constraint(equalToConstant: 30),
             
             // 滚动视图
             scrollView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 8),
-            scrollView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            scrollView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            scrollView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
             scrollView.heightAnchor.constraint(equalToConstant: 60),
             
             // 操作按钮容器 - 使用优先级约束避免冲突
             actionButtonsContainer.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 8),
-            actionButtonsContainer.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            actionButtonsContainer.trailingAnchor.constraint(equalTo: containerView.trailingAnchor)
+            actionButtonsContainer.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            actionButtonsContainer.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12)
         ])
         
         
         // 🔧 使用优先级约束避免冲突
-        let bottomConstraint = actionButtonsContainer.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
+        let bottomConstraint = actionButtonsContainer.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8)
         bottomConstraint.priority = UILayoutPriority(999)
         bottomConstraint.isActive = true
         
