@@ -62,6 +62,9 @@ class VideoPlayerViewController: UIViewController {
     private let captureModeSwitcher = CaptureModeSwitcher()
     private let screenshotPreviewBar = ScreenshotPreviewBar()
     
+    // 🆕 新的统一控制面板（临时并存）
+    private var bottomControlPanel: UnifiedBottomControlPanel?
+    
     // 🆕 批量操作面板 - 已移除，功能集成到ScreenshotPreviewBar中
     
     // 🆕 多选状态管理
@@ -124,6 +127,7 @@ class VideoPlayerViewController: UIViewController {
         setupPlayer()
         setupTimelineView()
         setupMultiScreenshotSystem()  // 🆕 新增
+        setupUnifiedControlPanel()    // 🆕 临时并存系统
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -486,6 +490,36 @@ class VideoPlayerViewController: UIViewController {
                 self?.updateTimelineForMode(mode)
             }
             .store(in: &cancellables)
+    }
+    
+    // MARK: - Unified Control Panel Setup (临时并存)
+    private func setupUnifiedControlPanel() {
+        print("🔧 设置统一控制面板（临时并存模式）")
+        
+        // 创建新组件
+        bottomControlPanel = UnifiedBottomControlPanel()
+        guard let panel = bottomControlPanel else { return }
+        
+        // 设置代理
+        panel.delegate = self
+        
+        // 临时隐藏新组件，稍后会切换显示
+        panel.isHidden = true
+        panel.alpha = 0.0
+        
+        // 添加到视图
+        view.addSubview(panel)
+        
+        // 设置约束 - 与现有控制面板相同的位置
+        panel.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            panel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            panel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            panel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            panel.heightAnchor.constraint(equalToConstant: 200) // 固定高度
+        ])
+        
+        print("✅ 统一控制面板设置完成")
     }
     
     private func updatePreviewBarVisibility(screenshots: [ScreenshotItem]) {
@@ -1080,6 +1114,62 @@ extension VideoPlayerViewController: CaptureModeSwitcherDelegate {
 }
 
 // MARK: - 🆕 ScreenshotPreviewBarDelegate
+// MARK: - UnifiedBottomControlPanelDelegate (临时并存)
+extension VideoPlayerViewController: UnifiedBottomControlPanelDelegate {
+    func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didTapPlayPause isPlaying: Bool) {
+        // 复用现有的播放/暂停逻辑
+        if isPlaying {
+            startFlowing()
+        } else {
+            stopFlowing()
+        }
+        print("🎯 统一面板 - 播放/暂停: \(isPlaying)")
+    }
+    
+    func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didSeekToTime time: Double) {
+        // 时间轴拖拽逻辑（阶段4实现）
+        print("🎯 统一面板 - 时间跳转: \(time)")
+    }
+    
+    func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didStartSeeking time: Double) {
+        // 开始拖拽时间轴（阶段4实现）
+        print("🎯 统一面板 - 开始拖拽: \(time)")
+    }
+    
+    func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didEndSeeking time: Double) {
+        // 结束拖拽时间轴（阶段4实现）
+        print("🎯 统一面板 - 结束拖拽: \(time)")
+    }
+    
+    func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didTapCapture mode: UnifiedBottomControlPanel.CaptureMode) {
+        // 转换模式并复用现有截图逻辑
+        let captureMode: CaptureMode = (mode == .stillImage) ? .stillImage : .livePhoto
+        screenshotManager.setCurrentMode(captureMode)
+        
+        // 复用现有截图逻辑
+        screenshotButtonTapped()
+        print("🎯 统一面板 - 截图: \(mode)")
+    }
+    
+    func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didTapClearScreenshots: Void) {
+        // 复用现有清空逻辑
+        screenshotManager.clearAllScreenshots()
+        print("🎯 统一面板 - 清空截图")
+    }
+    
+    func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didSelectScreenshot item: ScreenshotItem) {
+        // 复用现有截图选择逻辑
+        // TODO: 在阶段4中实现截图详情查看
+        print("🎯 统一面板 - 选择截图: \(item.id)")
+    }
+    
+    func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didTapEnhance screenshots: [ScreenshotItem]) {
+        // 复用现有增强逻辑
+        // TODO: 在阶段4中实现批量增强
+        print("🎯 统一面板 - 增强截图: \(screenshots.count)张")
+    }
+}
+
 extension VideoPlayerViewController: ScreenshotPreviewBarDelegate {
     
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didTapScreenshot screenshot: ScreenshotItem, at index: Int) {

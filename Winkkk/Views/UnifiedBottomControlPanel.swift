@@ -42,6 +42,10 @@ class UnifiedBottomControlPanel: UIView {
     // MARK: - 代理
     weak var delegate: UnifiedBottomControlPanelDelegate?
     
+    // MARK: - 截图管理相关
+    private let screenshotManager = ScreenshotManager.shared
+    private var cancellables = Set<AnyCancellable>()
+    
     // MARK: - UI组件
     
     // 背景毛玻璃效果
@@ -164,12 +168,138 @@ class UnifiedBottomControlPanel: UIView {
         super.init(frame: frame)
         setupLayout()
         setupActions()
+        setupScreenshotsContainer()
+        setupObservers()
+        updateUI()
     }
     
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         setupLayout()
         setupActions()
+        setupScreenshotsContainer()
+        setupObservers()
+        updateUI()
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    // MARK: - 截图预览设置方法
+    private func setupScreenshotsContainer() {
+        // 设置头部信息区域
+        setupPreviewHeader()
+        
+        // 设置CollectionView
+        setupCollectionView()
+        
+        // 添加到截图容器
+        screenshotsContainer.addSubview(previewHeaderStackView)
+        screenshotsContainer.addSubview(screenshotsCollectionView)
+        
+        // 设置约束
+        setupScreenshotsConstraints()
+    }
+    
+    private func setupPreviewHeader() {
+        // 配置提示标签
+        hintLabel.font = ThemeManager.captionFont
+        hintLabel.textColor = UIColor.white.withAlphaComponent(0.8)
+        hintLabel.textAlignment = .left
+        
+        // 配置清空按钮
+        clearButton.setTitle("🗑 清空", for: .normal)
+        clearButton.setTitleColor(UIColor.systemRed, for: .normal)
+        clearButton.titleLabel?.font = ThemeManager.captionFont
+        clearButton.backgroundColor = UIColor.systemRed.withAlphaComponent(0.1)
+        clearButton.layer.cornerRadius = ThemeManager.smallCornerRadius
+        clearButton.addTarget(self, action: #selector(clearButtonTapped), for: .touchUpInside)
+        
+        // 添加到头部容器
+        previewHeaderStackView.addArrangedSubview(hintLabel)
+        previewHeaderStackView.addArrangedSubview(clearButton)
+        
+        // 设置清空按钮尺寸
+        clearButton.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            clearButton.widthAnchor.constraint(equalToConstant: 60),
+            clearButton.heightAnchor.constraint(equalToConstant: 28)
+        ])
+    }
+    
+    private func setupCollectionView() {
+        screenshotsCollectionView.backgroundColor = .clear
+        screenshotsCollectionView.showsHorizontalScrollIndicator = false
+        screenshotsCollectionView.alwaysBounceHorizontal = true
+        screenshotsCollectionView.decelerationRate = .fast
+        
+        // 设置数据源和代理
+        screenshotsCollectionView.dataSource = self
+        screenshotsCollectionView.delegate = self
+        
+        // 注册cell（临时使用UICollectionViewCell）
+        screenshotsCollectionView.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "ScreenshotThumbnailCell")
+    }
+    
+    private func setupScreenshotsConstraints() {
+        previewHeaderStackView.translatesAutoresizingMaskIntoConstraints = false
+        screenshotsCollectionView.translatesAutoresizingMaskIntoConstraints = false
+        
+        NSLayoutConstraint.activate([
+            // 头部区域
+            previewHeaderStackView.topAnchor.constraint(equalTo: screenshotsContainer.topAnchor, constant: 8),
+            previewHeaderStackView.leadingAnchor.constraint(equalTo: screenshotsContainer.leadingAnchor, constant: 12),
+            previewHeaderStackView.trailingAnchor.constraint(equalTo: screenshotsContainer.trailingAnchor, constant: -12),
+            previewHeaderStackView.heightAnchor.constraint(equalToConstant: 30),
+            
+            // CollectionView
+            screenshotsCollectionView.topAnchor.constraint(equalTo: previewHeaderStackView.bottomAnchor, constant: 8),
+            screenshotsCollectionView.leadingAnchor.constraint(equalTo: screenshotsContainer.leadingAnchor, constant: 12),
+            screenshotsCollectionView.trailingAnchor.constraint(equalTo: screenshotsContainer.trailingAnchor, constant: -12),
+            screenshotsCollectionView.bottomAnchor.constraint(equalTo: screenshotsContainer.bottomAnchor, constant: -8),
+            screenshotsCollectionView.heightAnchor.constraint(equalToConstant: 60)
+        ])
+    }
+    
+    // MARK: - 观察者设置方法
+    private func setupObservers() {
+        // 监听ScreenshotManager的变化
+        screenshotManager.$screenshots
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateUI()
+            }
+            .store(in: &cancellables)
+        
+        screenshotManager.$currentMode
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                self?.updateUI()
+            }
+            .store(in: &cancellables)
+        
+        // 监听通知
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screenshotAdded(_:)),
+            name: .screenshotAdded,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screenshotRemoved(_:)),
+            name: .screenshotRemoved,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(allScreenshotsCleared),
+            name: .allScreenshotsCleared,
+            object: nil
+        )
     }
     
     // MARK: - 基础设置方法
@@ -292,48 +422,248 @@ class UnifiedBottomControlPanel: UIView {
         captureButton.addTarget(self, action: #selector(captureButtonTapped), for: .touchUpInside)
         enhanceButton.addTarget(self, action: #selector(enhanceButtonTapped), for: .touchUpInside)
         clearButton.addTarget(self, action: #selector(clearButtonTapped), for: .touchUpInside)
+        
+        // 添加触摸效果
+        addButtonTouchEffects(to: playPauseButton)
+        addButtonTouchEffects(to: captureButton)
+        addButtonTouchEffects(to: enhanceButton)
     }
     
-    // MARK: - 按钮事件处理 (基础框架)
+    private func addButtonTouchEffects(to button: UIButton) {
+        button.addTarget(self, action: #selector(buttonPressed(_:)), for: .touchDown)
+        button.addTarget(self, action: #selector(buttonReleased(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+    }
+    
+    // MARK: - UI更新方法
+    private func updateUI() {
+        updateHintLabel()
+        updateCollectionView()
+        updateButtonStates()
+    }
+    
+    private func updateHintLabel() {
+        let count = screenshotManager.screenshotCount
+        let mode = screenshotManager.currentMode
+        let maxCount = mode.maxCount
+        
+        if count == 0 {
+            hintLabel.text = "\(mode.displayName)模式 (最多\(maxCount)张)"
+        } else {
+            hintLabel.text = "已截\(count)张: \(mode.displayName) (最多\(maxCount)张)"
+        }
+        
+        // 接近上限时的警告色
+        if count >= maxCount - 2 {
+            hintLabel.textColor = UIColor.systemOrange
+        } else {
+            hintLabel.textColor = UIColor.white.withAlphaComponent(0.8)
+        }
+    }
+    
+    private func updateCollectionView() {
+        screenshotsCollectionView.reloadData()
+        
+        // 自动滚动到最新截图
+        if !screenshotManager.screenshots.isEmpty {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                let lastIndex = IndexPath(item: self.screenshotManager.screenshots.count - 1, section: 0)
+                self.screenshotsCollectionView.scrollToItem(at: lastIndex, at: .right, animated: true)
+            }
+        }
+    }
+    
+    private func updateButtonStates() {
+        let count = screenshotManager.screenshotCount
+        let hasScreenshots = count > 0
+        let isAtLimit = screenshotManager.isAtMaxLimit
+        
+        // 截图按钮状态
+        captureButton.isEnabled = !isAtLimit
+        captureButton.alpha = isAtLimit ? 0.5 : 1.0
+        
+        // 修复按钮状态（Live Photo模式下隐藏）
+        let shouldShowEnhance = hasScreenshots && screenshotManager.currentMode == .stillImage
+        enhanceButton.isHidden = !shouldShowEnhance
+        enhanceButton.alpha = shouldShowEnhance ? 1.0 : 0.5
+        
+        // 清空按钮状态
+        clearButton.isEnabled = hasScreenshots
+        clearButton.alpha = hasScreenshots ? 1.0 : 0.5
+    }
+    
+    // MARK: - 通知处理方法
+    @objc private func screenshotAdded(_ notification: Notification) {
+        DispatchQueue.main.async {
+            self.updateUI()
+        }
+    }
+    
+    @objc private func screenshotRemoved(_ notification: Notification) {
+        DispatchQueue.main.async {
+            self.updateUI()
+        }
+    }
+    
+    @objc private func allScreenshotsCleared() {
+        DispatchQueue.main.async {
+            self.updateUI()
+        }
+    }
+    
+    // MARK: - 按钮事件处理
     @objc private func playPauseButtonTapped() {
-        // 将在后续阶段实现
-        print("🎯 PlayPause button tapped")
+        isPlaying.toggle()
+        updatePlayPauseButtonState()
+        delegate?.bottomControlPanel(self, didTapPlayPause: isPlaying)
+        HapticFeedbackManager.shared.buttonTap()
+        print("🎯 PlayPause button tapped - isPlaying: \(isPlaying)")
     }
     
     @objc private func captureButtonTapped() {
-        // 将在后续阶段实现
-        print("🎯 Capture button tapped")
+        let mode = currentCaptureMode
+        delegate?.bottomControlPanel(self, didTapCapture: mode)
+        HapticFeedbackManager.shared.buttonTap()
+        print("🎯 Capture button tapped - mode: \(mode)")
     }
     
     @objc private func enhanceButtonTapped() {
-        // 将在后续阶段实现
-        print("🎯 Enhance button tapped")
+        let screenshots = screenshotManager.screenshots
+        delegate?.bottomControlPanel(self, didTapEnhance: screenshots)
+        HapticFeedbackManager.shared.buttonTap()
+        print("🎯 Enhance button tapped - screenshots count: \(screenshots.count)")
     }
     
     @objc private func clearButtonTapped() {
-        // 将在后续阶段实现
+        HapticFeedbackManager.shared.lightImpact()
+        
+        let alert = UIAlertController(
+            title: "清空确认",
+            message: "确定要清空所有\(screenshotManager.currentMode.displayName)吗？",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "确定", style: .destructive) { [weak self] _ in
+            guard let self = self else { return }
+            self.delegate?.bottomControlPanel(self, didTapClearScreenshots: ())
+            self.screenshotManager.clearAllScreenshots()
+            HapticFeedbackManager.shared.notificationSuccess()
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        // 找到父级视图控制器并显示弹窗
+        var responder: UIResponder? = self
+        while responder != nil {
+            if let viewController = responder as? UIViewController {
+                viewController.present(alert, animated: true)
+                break
+            }
+            responder = responder?.next
+        }
+        
         print("🎯 Clear button tapped")
+    }
+    
+    // MARK: - 按钮状态更新
+    private func updatePlayPauseButtonState() {
+        let imageName = isPlaying ? "pause.fill" : "play.fill"
+        playPauseButton.setImage(UIImage(systemName: imageName), for: .normal)
+        
+        let title = isPlaying ? "暂停" : "播放"
+        playPauseButton.accessibilityLabel = title
+    }
+    
+    // MARK: - 按钮触摸效果
+    @objc private func buttonPressed(_ button: UIButton) {
+        UIView.animate(withDuration: 0.1) {
+            button.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+        }
+    }
+    
+    @objc private func buttonReleased(_ button: UIButton) {
+        UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5) {
+            button.transform = .identity
+        }
+    }
+    
+    // MARK: - 公共方法
+    func updateWithScreenshots(_ screenshots: [ScreenshotItem]) {
+        updateUI()
+    }
+    
+    func setPlayingState(_ isPlaying: Bool) {
+        self.isPlaying = isPlaying
+        updatePlayPauseButtonState()
+    }
+    
+    func setCaptureMode(_ mode: UnifiedBottomControlPanel.CaptureMode) {
+        self.currentCaptureMode = mode
+        updateUI()
     }
 }
 
-// MARK: - CollectionView DataSource (基础框架)
+// MARK: - CollectionView DataSource
 extension UnifiedBottomControlPanel: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return screenshots.count
+        return screenshotManager.screenshots.count
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "ScreenshotThumbnailCell", for: indexPath)
-        // 配置将在后续阶段实现
-        // 配置将在后续阶段实现
+        
+        // 临时配置 - 基础样式
+        let screenshot = screenshotManager.screenshots[indexPath.item]
+        cell.backgroundColor = ThemeManager.cardBackground
+        cell.layer.cornerRadius = 8
+        cell.layer.masksToBounds = true
+        
+        // 清除之前的子视图
+        cell.contentView.subviews.forEach { $0.removeFromSuperview() }
+        
+        // 添加缩略图
+        let imageView = UIImageView()
+        imageView.image = screenshot.image
+        imageView.contentMode = .scaleAspectFill
+        imageView.clipsToBounds = true
+        cell.contentView.addSubview(imageView)
+        
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            imageView.topAnchor.constraint(equalTo: cell.contentView.topAnchor),
+            imageView.leadingAnchor.constraint(equalTo: cell.contentView.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: cell.contentView.trailingAnchor),
+            imageView.bottomAnchor.constraint(equalTo: cell.contentView.bottomAnchor)
+        ])
+        
         return cell
     }
 }
 
-// MARK: - CollectionView Delegate (基础框架)
+// MARK: - CollectionView Delegate
 extension UnifiedBottomControlPanel: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        // 选择逻辑将在后续阶段实现
+        let screenshot = screenshotManager.screenshots[indexPath.item]
+        delegate?.bottomControlPanel(self, didSelectScreenshot: screenshot)
         print("🎯 Screenshot selected at index: \(indexPath.item)")
+    }
+}
+
+// MARK: - CollectionView FlowLayout Delegate
+extension UnifiedBottomControlPanel: UICollectionViewDelegateFlowLayout {
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        // 60高度的正方形缩略图
+        return CGSize(width: 60, height: 60)
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
+        return 8
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumLineSpacingForSectionAt section: Int) -> CGFloat {
+        return 8
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
+        return UIEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
     }
 }
