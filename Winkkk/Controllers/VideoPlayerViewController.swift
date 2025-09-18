@@ -504,7 +504,7 @@ class VideoPlayerViewController: UIViewController {
     private func setupBatchDeleteButton() {
         batchDeleteButton.setTitle("批量删除", for: .normal)
         batchDeleteButton.setTitleColor(.white, for: .normal)
-        batchDeleteButton.backgroundColor = ThemeManager.danger
+        batchDeleteButton.backgroundColor = ThemeManager.error
         batchDeleteButton.layer.cornerRadius = ThemeManager.smallCornerRadius
         batchDeleteButton.titleLabel?.font = ThemeManager.buttonFont
         
@@ -1295,6 +1295,18 @@ extension VideoPlayerViewController: ScreenshotPreviewBarDelegate {
             HapticFeedbackManager.shared.mediumImpact()
             print("🔄 长按进入多选模式，已选择第 \(index + 1) 张截图")
         }
+    }
+}
+
+// MARK: - 🆕 辅助方法扩展
+extension VideoPlayerViewController {
+    
+    private func showAlert(title: String, message: String, completion: (() -> Void)? = nil) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default) { _ in
+            completion?()
+        })
+        present(alert, animated: true)
     }
 }
 
