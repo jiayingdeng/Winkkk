@@ -1340,6 +1340,46 @@ extension TimelineView: UIGestureRecognizerDelegate {
         return false
     }
     
+    // 🎯 新增：关键修复 - 允许按钮区域的触摸事件优先处理
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        let touchPoint = touch.location(in: self)
+        
+        // 🚨 方法1: 通过响应链查找是否点击了UIButton
+        if let superview = self.superview {
+            let touchPointInSuperview = touch.location(in: superview)
+            if let hitView = superview.hitTest(touchPointInSuperview, with: nil) {
+                // 检查是否点击了UIButton或其子视图
+                var currentView: UIView? = hitView
+                while currentView != nil {
+                    if currentView is UIButton {
+                        print("🎯 TimelineView: 检测到按钮点击(\(type(of: currentView!))), 手势识别器让步")
+                        return false
+                    }
+                    currentView = currentView?.superview
+                }
+            }
+        }
+        
+        // 🚨 方法2: 直接检查触摸视图类型
+        let touchView = touch.view
+        if touchView is UIButton {
+            print("🎯 TimelineView: 直接检测到按钮触摸, 手势识别器让步")
+            return false
+        }
+        
+        // 🚨 方法3: 检查触摸视图的父视图
+        var parentView = touchView?.superview
+        while parentView != nil {
+            if parentView is UIButton {
+                print("🎯 TimelineView: 检测到按钮父视图触摸, 手势识别器让步")
+                return false
+            }
+            parentView = parentView?.superview
+        }
+        
+        return true
+    }
+    
     override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
         if gestureRecognizer == panGesture {
             // 🎯 Wink编辑器模式：拖拽在整个时间轴区域都可以进行

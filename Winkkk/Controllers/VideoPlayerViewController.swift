@@ -245,7 +245,12 @@ class VideoPlayerViewController: UIViewController {
         screenshotButton.addTarget(self, action: #selector(buttonPressed(_:)), for: .touchDown)
         screenshotButton.addTarget(self, action: #selector(buttonReleased(_:)), for: [.touchUpInside, .touchUpOutside])
         
-        print("🔧 截图按钮设置完成 - 可交互: \(screenshotButton.isUserInteractionEnabled), 可见: \(!screenshotButton.isHidden)")
+        // 🎯 关键修复：优化按钮触摸响应
+        screenshotButton.isUserInteractionEnabled = true
+        screenshotButton.isExclusiveTouch = true  // 独占触摸，防止手势干扰
+        screenshotButton.layer.zPosition = 1000  // 确保在最顶层
+        
+        print("🔧 截图按钮设置完成 - 可交互: \(screenshotButton.isUserInteractionEnabled), 可见: \(!screenshotButton.isHidden), 独占触摸: \(screenshotButton.isExclusiveTouch)")
     }
     
     private func setupTimeLabels() {
@@ -303,15 +308,16 @@ class VideoPlayerViewController: UIViewController {
             totalTimeLabel.trailingAnchor.constraint(equalTo: timelineView.trailingAnchor),
             totalTimeLabel.widthAnchor.constraint(equalToConstant: 50),
             
-            // 播放按钮
-            playPauseButton.topAnchor.constraint(equalTo: currentTimeLabel.bottomAnchor, constant: 16),
-            playPauseButton.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor, constant: -60),
+            // 🎯 修复：播放和截图按钮与时间轴在同一水平区域，但固定在屏幕边界内
+            // 播放按钮 - 位于屏幕左侧，与时间轴同一水平线
+            playPauseButton.centerYAnchor.constraint(equalTo: timelineView.centerYAnchor),
+            playPauseButton.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 20),
             playPauseButton.widthAnchor.constraint(equalToConstant: 50),
             playPauseButton.heightAnchor.constraint(equalToConstant: 50),
             
-            // 截图按钮
-            screenshotButton.centerYAnchor.constraint(equalTo: playPauseButton.centerYAnchor),
-            screenshotButton.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor, constant: 60),
+            // 截图按钮 - 位于屏幕右侧，与时间轴同一水平线
+            screenshotButton.centerYAnchor.constraint(equalTo: timelineView.centerYAnchor),
+            screenshotButton.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -20),
             screenshotButton.widthAnchor.constraint(equalToConstant: 80),
             screenshotButton.heightAnchor.constraint(equalToConstant: 40)
         ])
@@ -458,7 +464,8 @@ class VideoPlayerViewController: UIViewController {
     
     private func setupScreenshotPreviewBar() {
         screenshotPreviewBar.delegate = self
-        screenshotPreviewBar.isHidden = true  // 初始隐藏，有截图时显示
+        screenshotPreviewBar.isHidden = false  // 🎯 固定三分屏：底部区域始终显示
+        screenshotPreviewBar.alpha = 1.0
         view.addSubview(screenshotPreviewBar)
     }
     
@@ -555,32 +562,19 @@ class VideoPlayerViewController: UIViewController {
     }
     
     private func updatePreviewBarVisibility(screenshots: [ScreenshotItem]) {
-        let shouldShow = !screenshots.isEmpty
-        
+        // 🎯 固定三分屏设计：底部区域始终显示，不管是否有截图
         // 更新预览栏数据
         screenshotPreviewBar.updateWithScreenshots(screenshots)
         
-        if shouldShow && screenshotPreviewBar.isHidden {
-            // 第一次显示：从底部滑入动画
-            screenshotPreviewBar.isHidden = false
-            screenshotPreviewBar.alpha = 0.0
-            screenshotPreviewBar.transform = CGAffineTransform(translationX: 0, y: 100)
-            
-            UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0, options: .curveEaseOut) {
-                self.screenshotPreviewBar.alpha = 1.0
-                self.screenshotPreviewBar.transform = .identity
-            }
-            
-            // 显示提示
-            print("📸 截图已添加到预览栏 (屏幕底部)")
-            
-        } else if !shouldShow {
-            // 隐藏动画
-            UIView.animate(withDuration: 0.3) {
-                self.screenshotPreviewBar.alpha = 0.0
-            } completion: { _ in
-                self.screenshotPreviewBar.isHidden = true
-            }
+        // 确保预览栏始终可见
+        screenshotPreviewBar.isHidden = false
+        screenshotPreviewBar.alpha = 1.0
+        screenshotPreviewBar.transform = .identity
+        
+        if !screenshots.isEmpty {
+            print("📸 截图已添加到预览栏 (固定三分屏底部区域)")
+        } else {
+            print("📸 预览栏已清空，但底部区域保持显示 (固定三分屏)")
         }
     }
     
@@ -867,6 +861,40 @@ class VideoPlayerViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "确定", style: .default))
         
         present(alert, animated: true)
+    }
+    
+    private func showOperationHint() {
+        // 🎯 固定三分屏模式：显示操作提示，不弹出界面
+        print("💡 提示：长按截图进入多选模式，或点击右上角更多选项")
+        
+        // 可选：在底部区域显示简短的操作提示文字
+        // 这里可以添加一个临时的提示标签，几秒后自动消失
+        let hintLabel = UILabel()
+        hintLabel.text = "长按截图进入多选模式"
+        hintLabel.font = UIFont.systemFont(ofSize: 14)
+        hintLabel.textColor = UIColor.secondaryLabel
+        hintLabel.textAlignment = .center
+        hintLabel.alpha = 0.0
+        hintLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        view.addSubview(hintLabel)
+        NSLayoutConstraint.activate([
+            hintLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            hintLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
+            hintLabel.heightAnchor.constraint(equalToConstant: 20)
+        ])
+        
+        // 显示动画
+        UIView.animate(withDuration: 0.3) {
+            hintLabel.alpha = 1.0
+        } completion: { _ in
+            // 2秒后自动消失
+            UIView.animate(withDuration: 0.3, delay: 2.0) {
+                hintLabel.alpha = 0.0
+            } completion: { _ in
+                hintLabel.removeFromSuperview()
+            }
+        }
     }
     
     // MARK: - Actions
@@ -1217,8 +1245,15 @@ extension VideoPlayerViewController: ScreenshotPreviewBarDelegate {
             // 更新缩略图栏的选择显示
             screenshotPreviewBar.setScreenshotSelected(screenshot, isSelected: selectedScreenshots.contains(screenshot))
         } else {
-            // 单击查看模式：弹出Sheet查看大图
-            presentScreenshotViewSheet(screenshot)
+            // 🎯 固定三分屏设计：单击截图时不弹出界面，保持界面连续性
+            // 根据Wink风格设计，在固定布局内操作，不破坏用户体验
+            print("📸 单击截图 - 固定三分屏模式，无需弹出界面")
+            
+            // 触感反馈
+            HapticFeedbackManager.shared.lightImpact()
+            
+            // 🎯 提示用户可以长按进入多选模式
+            showOperationHint()
         }
     }
     
