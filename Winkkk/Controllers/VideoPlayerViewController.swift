@@ -205,12 +205,12 @@ class VideoPlayerViewController: UIViewController {
         // 时间标签
         setupTimeLabels()
         
-        // 添加到控制面板
-        controlPanelBlurView.contentView.addSubview(playPauseButton)
-        controlPanelBlurView.contentView.addSubview(screenshotButton)
+        // 添加到控制面板 - 🔧 时间轴放在最下层，避免遮挡按钮
         controlPanelBlurView.contentView.addSubview(timelineView)
         controlPanelBlurView.contentView.addSubview(currentTimeLabel)
         controlPanelBlurView.contentView.addSubview(totalTimeLabel)
+        controlPanelBlurView.contentView.addSubview(playPauseButton)
+        controlPanelBlurView.contentView.addSubview(screenshotButton)
     }
     
     private func setupPlayPauseButton() {
@@ -232,6 +232,11 @@ class VideoPlayerViewController: UIViewController {
         screenshotButton.layer.cornerRadius = ThemeManager.smallCornerRadius
         screenshotButton.titleLabel?.font = ThemeManager.buttonFont
         
+        // 🔧 确保按钮可交互
+        screenshotButton.isUserInteractionEnabled = true
+        screenshotButton.isHidden = false
+        screenshotButton.alpha = 1.0
+        
         // 设置图文布局
         screenshotButton.imageEdgeInsets = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 8)
         screenshotButton.titleEdgeInsets = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: 0)
@@ -239,6 +244,8 @@ class VideoPlayerViewController: UIViewController {
         screenshotButton.addTarget(self, action: #selector(screenshotButtonTapped), for: .touchUpInside)
         screenshotButton.addTarget(self, action: #selector(buttonPressed(_:)), for: .touchDown)
         screenshotButton.addTarget(self, action: #selector(buttonReleased(_:)), for: [.touchUpInside, .touchUpOutside])
+        
+        print("🔧 截图按钮设置完成 - 可交互: \(screenshotButton.isUserInteractionEnabled), 可见: \(!screenshotButton.isHidden)")
     }
     
     private func setupTimeLabels() {
@@ -718,12 +725,16 @@ class VideoPlayerViewController: UIViewController {
     
     // MARK: - Screenshot
     @objc private func screenshotButtonTapped() {
+        print("📸 截图按钮被点击！")
+        
         // 🎯 编辑器模式：停止流动以便精确截图
         stopFlowing()
         
         // 🎯 Wink风格：使用竖线位置的截取时间，而非当前播放时间
         let captureTime = timelineView.getCurrentCaptureTime()
         let cmCaptureTime = CMTime(seconds: captureTime, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        
+        print("📸 准备截图 - 时间: \(captureTime)秒, CMTime: \(cmCaptureTime)")
         
         screenshotEngine.captureFrame(from: videoURL, at: cmCaptureTime) { [weak self] result in
             DispatchQueue.main.async {
@@ -1026,6 +1037,9 @@ class VideoPlayerViewController: UIViewController {
     }
     
     @objc private func buttonPressed(_ button: UIButton) {
+        if button == screenshotButton {
+            print("🔧 截图按钮被按下")
+        }
         UIView.animate(withDuration: 0.1) {
             button.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
         }
