@@ -8,6 +8,7 @@
 
 import UIKit
 import AVFoundation
+import Combine
 
 // MARK: - 协议定义
 protocol UnifiedBottomControlPanelDelegate: AnyObject {
@@ -168,7 +169,6 @@ class UnifiedBottomControlPanel: UIView {
         super.init(frame: frame)
         setupLayout()
         setupActions()
-        setupScreenshotsContainer()
         setupObservers()
         updateUI()
     }
@@ -177,7 +177,6 @@ class UnifiedBottomControlPanel: UIView {
         super.init(coder: coder)
         setupLayout()
         setupActions()
-        setupScreenshotsContainer()
         setupObservers()
         updateUI()
     }
@@ -342,22 +341,6 @@ class UnifiedBottomControlPanel: UIView {
         timelineContainer.addSubview(timelineView)
         timelineContainer.addSubview(currentTimeLabel)
         timelineContainer.addSubview(totalTimeLabel)
-    }
-    
-    private func setupScreenshotsContainer() {
-        // 设置固定高度容器
-        screenshotsContainer.translatesAutoresizingMaskIntoConstraints = false
-        
-        // 头部信息区域
-        previewHeaderStackView.addArrangedSubview(hintLabel)
-        previewHeaderStackView.addArrangedSubview(clearButton)
-        
-        // CollectionView设置
-        screenshotsCollectionView.dataSource = self
-        screenshotsCollectionView.delegate = self
-        
-        screenshotsContainer.addSubview(previewHeaderStackView)
-        screenshotsContainer.addSubview(screenshotsCollectionView)
     }
     
     private func setupMainControlsContainer() {
