@@ -279,7 +279,7 @@ class VideoPlayerViewController: UIViewController {
             // 控制面板
             controlPanelBlurView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             controlPanelBlurView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            controlPanelBlurView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            controlPanelBlurView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -178), // 为ScreenshotPreviewBar(170px) + 间距(8px) 预留空间
             // 高度约束将动态设置
             
             // 🎯 时间轴 - 允许视觉溢出屏幕边界 (Wink风格)
@@ -347,7 +347,7 @@ class VideoPlayerViewController: UIViewController {
             screenshotPreviewBar.topAnchor.constraint(equalTo: controlPanelBlurView.bottomAnchor, constant: 8),
             screenshotPreviewBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             screenshotPreviewBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            screenshotPreviewBar.heightAnchor.constraint(equalToConstant: 100),
+            screenshotPreviewBar.heightAnchor.constraint(equalToConstant: 170),
             screenshotPreviewBar.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor),
             
             // 🆕 批量操作面板：位于截图预览栏上方
