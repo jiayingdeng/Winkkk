@@ -36,7 +36,8 @@ class ScreenshotPreviewBar: UIView {
     
     // MARK: - UI Components
     private let containerView = UIView()
-    private let blurEffectView = BlurEffectView(style: .regular, intensity: 0.95)
+    // 🆕 移除独立毛玻璃效果，使用透明背景（统一容器提供毛玻璃）
+    // private let blurEffectView = BlurEffectView(style: .regular, intensity: 0.95)
     
     // 头部信息区域
     private let headerView = UIView()
@@ -76,17 +77,12 @@ class ScreenshotPreviewBar: UIView {
     
     // MARK: - UI Setup
     private func setupUI() {
+        // 🆕 使用透明背景，毛玻璃效果由统一容器提供
         backgroundColor = .clear
         
-        // 模糊背景
-        blurEffectView.layer.cornerRadius = ThemeManager.largeCornerRadius
-        blurEffectView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        blurEffectView.clipsToBounds = true
-        addSubview(blurEffectView)
-        
-        // 主容器
+        // 主容器 - 直接添加到self，不再使用独立毛玻璃
         containerView.backgroundColor = .clear
-        blurEffectView.contentView.addSubview(containerView)
+        addSubview(containerView)
         
         // 设置子组件
         setupHeaderView()
@@ -241,24 +237,17 @@ class ScreenshotPreviewBar: UIView {
     }
     
     private func setupConstraints() {
-        blurEffectView.translatesAutoresizingMaskIntoConstraints = false
         containerView.translatesAutoresizingMaskIntoConstraints = false
         headerView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         actionButtonsContainer.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            // 模糊背景视图
-            blurEffectView.topAnchor.constraint(equalTo: topAnchor),
-            blurEffectView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            blurEffectView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            blurEffectView.bottomAnchor.constraint(equalTo: bottomAnchor),
-            
-            // 主容器
-            containerView.topAnchor.constraint(equalTo: blurEffectView.contentView.topAnchor, constant: 12),
-            containerView.leadingAnchor.constraint(equalTo: blurEffectView.contentView.leadingAnchor, constant: 16),
-            containerView.trailingAnchor.constraint(equalTo: blurEffectView.contentView.trailingAnchor, constant: -16),
-            containerView.bottomAnchor.constraint(equalTo: blurEffectView.contentView.bottomAnchor, constant: -12),
+            // 🔧 优化：减少内部间距，避免约束冲突
+            containerView.topAnchor.constraint(equalTo: topAnchor, constant: 8),
+            containerView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
+            containerView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
+            containerView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8),
             
             // 头部视图
             headerView.topAnchor.constraint(equalTo: containerView.topAnchor),
@@ -272,13 +261,21 @@ class ScreenshotPreviewBar: UIView {
             scrollView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
             scrollView.heightAnchor.constraint(equalToConstant: 60),
             
-            // 操作按钮容器 - 使用弹性高度适应比例布局
-            actionButtonsContainer.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 12),
+            // 操作按钮容器 - 使用优先级约束避免冲突
+            actionButtonsContainer.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 8),
             actionButtonsContainer.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            actionButtonsContainer.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-            actionButtonsContainer.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
-            actionButtonsContainer.heightAnchor.constraint(greaterThanOrEqualToConstant: 36) // 最小高度36px，允许弹性增长
+            actionButtonsContainer.trailingAnchor.constraint(equalTo: containerView.trailingAnchor)
         ])
+        
+        
+        // 🔧 使用优先级约束避免冲突
+        let bottomConstraint = actionButtonsContainer.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
+        bottomConstraint.priority = UILayoutPriority(999)
+        bottomConstraint.isActive = true
+        
+        let minHeightConstraint = actionButtonsContainer.heightAnchor.constraint(greaterThanOrEqualToConstant: 32)
+        minHeightConstraint.priority = UILayoutPriority(1000)
+        minHeightConstraint.isActive = true
     }
     
     // MARK: - Observers
@@ -500,33 +497,71 @@ class ScreenshotPreviewBar: UIView {
     
     // MARK: - 🆕 多选状态管理方法
     private var isInSelectionMode = false
+    private var selectedScreenshots: Set<ScreenshotItem> = []
     
     func setSelectionMode(_ selectionMode: Bool) {
         isInSelectionMode = selectionMode
-        // TODO: 更新UI以显示选择状态
         updateSelectionModeUI()
+        
+        if !selectionMode {
+            selectedScreenshots.removeAll()
+            updateAllThumbnailSelectionStates()
+        }
     }
     
     func selectAllItems() {
-        // TODO: 选择所有缩略图
-        print("🔄 选择所有截图")
+        selectedScreenshots = Set(screenshotManager.screenshots)
+        updateAllThumbnailSelectionStates()
+        print("🔄 已选择所有 \(selectedScreenshots.count) 张截图")
     }
     
     func deselectAllItems() {
-        // TODO: 取消选择所有缩略图
-        print("🔄 取消选择所有截图")
+        selectedScreenshots.removeAll()
+        updateAllThumbnailSelectionStates()
+        print("🔄 已取消选择所有截图")
     }
     
     func setScreenshotSelected(_ screenshot: ScreenshotItem, isSelected: Bool) {
-        // TODO: 设置特定截图的选择状态
-        print("🔄 设置截图选择状态: \(isSelected)")
+        if isSelected {
+            selectedScreenshots.insert(screenshot)
+        } else {
+            selectedScreenshots.remove(screenshot)
+        }
+        
+        // 更新对应缩略图的选择状态
+        updateThumbnailSelectionState(for: screenshot, isSelected: isSelected)
+        print("🔄 设置截图选择状态: \(isSelected), 当前已选择: \(selectedScreenshots.count)")
     }
     
     private func updateSelectionModeUI() {
-        // TODO: 更新UI以反映选择模式
         UIView.animate(withDuration: 0.3) {
-            // 这里可以更新缩略图的显示样式
-            self.alpha = self.isInSelectionMode ? 0.9 : 1.0
+            // 在多选模式下，可以调整整体透明度或其他视觉效果
+            if self.isInSelectionMode {
+                // 多选模式下的视觉反馈
+                self.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
+            } else {
+                // 普通模式
+                self.backgroundColor = .clear
+            }
+        }
+    }
+    
+    private func updateAllThumbnailSelectionStates() {
+        // 更新所有缩略图的选择状态
+        for (index, screenshot) in screenshotManager.screenshots.enumerated() {
+            let isSelected = selectedScreenshots.contains(screenshot)
+            updateThumbnailSelectionState(for: screenshot, isSelected: isSelected)
+        }
+    }
+    
+    private func updateThumbnailSelectionState(for screenshot: ScreenshotItem, isSelected: Bool) {
+        // 找到对应的缩略图视图并更新选择状态
+        for subview in scrollView.subviews {
+            if let thumbnailView = subview as? ScreenshotThumbnailView {
+                // 这里需要通过某种方式识别对应的截图
+                // 可以通过tag或其他方式关联
+                thumbnailView.setSelected(isSelected, animated: true)
+            }
         }
     }
 }

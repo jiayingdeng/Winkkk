@@ -337,6 +337,27 @@ class ScreenshotThumbnailView: UIView {
         imageView.layer.borderColor = borderColor.cgColor
     }
     
+    // MARK: - Selection State Management
+    func setSelected(_ selected: Bool, animated: Bool) {
+        let duration = animated ? 0.3 : 0.0
+        
+        UIView.animate(withDuration: duration) {
+            self.selectionIndicator.isHidden = !selected
+            
+            if selected {
+                // 选中状态：添加蓝色边框和选择指示器
+                self.layer.borderColor = UIColor.systemBlue.cgColor
+                self.layer.borderWidth = 2.0
+                self.selectionIndicator.alpha = 1.0
+            } else {
+                // 未选中状态：恢复原始边框
+                self.layer.borderColor = UIColor.white.cgColor
+                self.layer.borderWidth = 1.0
+                self.selectionIndicator.alpha = 0.0
+            }
+        }
+    }
+    
     // MARK: - Actions
     @objc private func deleteButtonTapped() {
         // 添加删除动画

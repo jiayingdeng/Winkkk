@@ -44,7 +44,10 @@ class VideoPlayerViewController: UIViewController {
     // MARK: - UI Components
     private let gradientBackgroundView = GradientBackgroundView()
     private let playerContainerView = UIView()
-    private let controlPanelBlurView = BlurEffectView(style: .regular, intensity: 0.9)
+    
+    // 🆕 统一毛玻璃容器 - 包含控制面板+截图预览栏
+    private let unifiedControlPanelView = BlurEffectView(style: .regular, intensity: 0.92)
+    private let controlPanelBlurView = BlurEffectView(style: .regular, intensity: 0.9)  // 保留作为内容容器
     
     // 播放控制
     private let playPauseButton = UIButton()
@@ -59,12 +62,7 @@ class VideoPlayerViewController: UIViewController {
     private let captureModeSwitcher = CaptureModeSwitcher()
     private let screenshotPreviewBar = ScreenshotPreviewBar()
     
-    // 🆕 批量操作面板
-    private let batchOperationPanel = UIView()
-    private let batchSaveButton = UIButton()
-    private let batchDeleteButton = UIButton()
-    private let moreOptionsButton = UIButton()
-    private let selectionCountLabel = UILabel()
+    // 🆕 批量操作面板 - 已移除，功能集成到ScreenshotPreviewBar中
     
     // 🆕 多选状态管理
     private var isInSelectionMode = false {
@@ -162,8 +160,7 @@ class VideoPlayerViewController: UIViewController {
         setupCaptureModeSwitcher()
         setupScreenshotPreviewBar()
         
-        // 🆕 批量操作面板
-        setupBatchOperationPanel()
+        // 🆕 批量操作功能已集成到ScreenshotPreviewBar中
         
         // 导航栏
         setupNavigationBar()
@@ -190,11 +187,17 @@ class VideoPlayerViewController: UIViewController {
     }
     
     private func setupControlPanel() {
-        controlPanelBlurView.layer.cornerRadius = ThemeManager.largeCornerRadius
-        controlPanelBlurView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        // 🎯 允许时间轴溢出控制面板边界
+        // 🆕 设置统一毛玻璃容器
+        unifiedControlPanelView.layer.cornerRadius = ThemeManager.largeCornerRadius
+        unifiedControlPanelView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        unifiedControlPanelView.clipsToBounds = false
+        view.addSubview(unifiedControlPanelView)
+        
+        // 控制面板内容容器 - 透明背景
+        controlPanelBlurView.backgroundColor = .clear
+        controlPanelBlurView.layer.cornerRadius = 0
         controlPanelBlurView.clipsToBounds = false
-        view.addSubview(controlPanelBlurView)
+        unifiedControlPanelView.contentView.addSubview(controlPanelBlurView)
         
         // 播放/暂停按钮
         setupPlayPauseButton()
@@ -266,8 +269,10 @@ class VideoPlayerViewController: UIViewController {
     }
     
     private func setupConstraints() {
+        // 🔧 关键修复：确保所有视图都禁用自动布局掩码
         gradientBackgroundView.translatesAutoresizingMaskIntoConstraints = false
         playerContainerView.translatesAutoresizingMaskIntoConstraints = false
+        unifiedControlPanelView.translatesAutoresizingMaskIntoConstraints = false  // 🚨 关键修复
         controlPanelBlurView.translatesAutoresizingMaskIntoConstraints = false
         playPauseButton.translatesAutoresizingMaskIntoConstraints = false
         screenshotButton.translatesAutoresizingMaskIntoConstraints = false
@@ -288,11 +293,17 @@ class VideoPlayerViewController: UIViewController {
             playerContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             playerContainerView.heightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.heightAnchor, multiplier: 0.533),
             
-            // 🎯 三分屏布局：控制面板 (21.3%) - 位于中间
-            controlPanelBlurView.topAnchor.constraint(equalTo: playerContainerView.bottomAnchor, constant: 20),
-            controlPanelBlurView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            controlPanelBlurView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            controlPanelBlurView.heightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.heightAnchor, multiplier: 0.213),
+            // 🎯 统一毛玻璃容器 - 包含控制面板+模式切换器+截图预览栏
+            unifiedControlPanelView.topAnchor.constraint(equalTo: playerContainerView.bottomAnchor, constant: 8),
+            unifiedControlPanelView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            unifiedControlPanelView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            unifiedControlPanelView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
+            
+            // 🎯 控制面板内容区域 - 在统一容器内部，使用弹性高度
+            controlPanelBlurView.topAnchor.constraint(equalTo: unifiedControlPanelView.topAnchor),
+            controlPanelBlurView.leadingAnchor.constraint(equalTo: unifiedControlPanelView.leadingAnchor),
+            controlPanelBlurView.trailingAnchor.constraint(equalTo: unifiedControlPanelView.trailingAnchor),
+            controlPanelBlurView.heightAnchor.constraint(greaterThanOrEqualToConstant: 140),
             
             // 🎯 时间轴 - 允许视觉溢出屏幕边界 (Wink风格)
             timelineView.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 20),
@@ -342,53 +353,29 @@ class VideoPlayerViewController: UIViewController {
     private func setupNewComponentsConstraints() {
         captureModeSwitcher.translatesAutoresizingMaskIntoConstraints = false
         screenshotPreviewBar.translatesAutoresizingMaskIntoConstraints = false
-        batchOperationPanel.translatesAutoresizingMaskIntoConstraints = false
-        selectionCountLabel.translatesAutoresizingMaskIntoConstraints = false
-        batchSaveButton.translatesAutoresizingMaskIntoConstraints = false
-        batchDeleteButton.translatesAutoresizingMaskIntoConstraints = false
-        moreOptionsButton.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            // 🎯 三分屏布局：模式切换器 - 位于底部区域顶部 (5%)
-            captureModeSwitcher.topAnchor.constraint(equalTo: controlPanelBlurView.bottomAnchor, constant: 20),
-            captureModeSwitcher.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            // 🎯 统一容器内：模式切换器 - 无缝连接控制面板
+            captureModeSwitcher.topAnchor.constraint(equalTo: controlPanelBlurView.bottomAnchor, constant: 0),
+            captureModeSwitcher.centerXAnchor.constraint(equalTo: unifiedControlPanelView.centerXAnchor),
             captureModeSwitcher.heightAnchor.constraint(equalToConstant: 44),
             captureModeSwitcher.widthAnchor.constraint(equalToConstant: 280),
             
-            // 🎯 三分屏布局：截图预览栏 (19%) - 位于底部主要区域
-            screenshotPreviewBar.topAnchor.constraint(equalTo: captureModeSwitcher.bottomAnchor, constant: 8),
-            screenshotPreviewBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            screenshotPreviewBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            screenshotPreviewBar.heightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.heightAnchor, multiplier: 0.19),
-            
-            // 🎯 三分屏布局：批量操作面板 (9%) - 位于最底部
-            batchOperationPanel.topAnchor.constraint(equalTo: screenshotPreviewBar.bottomAnchor, constant: 8),
-            batchOperationPanel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
-            batchOperationPanel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            batchOperationPanel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
-            
-            // 选择数量标签
-            selectionCountLabel.topAnchor.constraint(equalTo: batchOperationPanel.topAnchor, constant: 8),
-            selectionCountLabel.leadingAnchor.constraint(equalTo: batchOperationPanel.leadingAnchor, constant: 16),
-            selectionCountLabel.trailingAnchor.constraint(equalTo: batchOperationPanel.trailingAnchor, constant: -16),
-            selectionCountLabel.heightAnchor.constraint(equalToConstant: 20),
-            
-            // 批量操作按钮
-            batchSaveButton.topAnchor.constraint(equalTo: selectionCountLabel.bottomAnchor, constant: 8),
-            batchSaveButton.leadingAnchor.constraint(equalTo: batchOperationPanel.leadingAnchor, constant: 16),
-            batchSaveButton.heightAnchor.constraint(equalToConstant: 36),
-            batchSaveButton.widthAnchor.constraint(equalTo: batchOperationPanel.widthAnchor, multiplier: 0.25),
-            
-            batchDeleteButton.centerYAnchor.constraint(equalTo: batchSaveButton.centerYAnchor),
-            batchDeleteButton.centerXAnchor.constraint(equalTo: batchOperationPanel.centerXAnchor),
-            batchDeleteButton.heightAnchor.constraint(equalToConstant: 36),
-            batchDeleteButton.widthAnchor.constraint(equalTo: batchOperationPanel.widthAnchor, multiplier: 0.25),
-            
-            moreOptionsButton.centerYAnchor.constraint(equalTo: batchSaveButton.centerYAnchor),
-            moreOptionsButton.trailingAnchor.constraint(equalTo: batchOperationPanel.trailingAnchor, constant: -16),
-            moreOptionsButton.heightAnchor.constraint(equalToConstant: 36),
-            moreOptionsButton.widthAnchor.constraint(equalTo: batchOperationPanel.widthAnchor, multiplier: 0.25)
+            // 🎯 统一容器内：截图预览栏 - 无缝连接模式切换器
+            screenshotPreviewBar.topAnchor.constraint(equalTo: captureModeSwitcher.bottomAnchor, constant: 0),
+            screenshotPreviewBar.leadingAnchor.constraint(equalTo: unifiedControlPanelView.leadingAnchor),
+            screenshotPreviewBar.trailingAnchor.constraint(equalTo: unifiedControlPanelView.trailingAnchor)
         ])
+        
+        // 🔧 关键修复：使用优先级约束避免冲突
+        let bottomConstraint = screenshotPreviewBar.bottomAnchor.constraint(equalTo: unifiedControlPanelView.bottomAnchor)
+        bottomConstraint.priority = UILayoutPriority(999)  // 高优先级但非必需
+        bottomConstraint.isActive = true
+        
+        // 最小高度约束保证可用性
+        let minHeightConstraint = screenshotPreviewBar.heightAnchor.constraint(greaterThanOrEqualToConstant: 120)
+        minHeightConstraint.priority = UILayoutPriority(1000)  // 必需约束
+        minHeightConstraint.isActive = true
     }
     
     // MARK: - Player Setup
@@ -459,81 +446,21 @@ class VideoPlayerViewController: UIViewController {
     // MARK: - 🆕 多图截取系统设置
     private func setupCaptureModeSwitcher() {
         captureModeSwitcher.delegate = self
-        view.addSubview(captureModeSwitcher)
+        captureModeSwitcher.backgroundColor = .clear  // 🆕 透明背景
+        unifiedControlPanelView.contentView.addSubview(captureModeSwitcher)
     }
     
     private func setupScreenshotPreviewBar() {
         screenshotPreviewBar.delegate = self
         screenshotPreviewBar.isHidden = false  // 🎯 固定三分屏：底部区域始终显示
         screenshotPreviewBar.alpha = 1.0
-        view.addSubview(screenshotPreviewBar)
+        // 🆕 添加到统一容器中，而不是直接添加到view
+        unifiedControlPanelView.contentView.addSubview(screenshotPreviewBar)
     }
     
-    private func setupBatchOperationPanel() {
-        // 面板背景
-        batchOperationPanel.backgroundColor = UIColor.black.withAlphaComponent(0.8)
-        batchOperationPanel.layer.cornerRadius = ThemeManager.standardCornerRadius
-        batchOperationPanel.isHidden = true  // 初始隐藏，多选模式时显示
-        view.addSubview(batchOperationPanel)
-        
-        // 选择数量标签
-        setupSelectionCountLabel()
-        
-        // 批量保存按钮
-        setupBatchSaveButton()
-        
-        // 批量删除按钮
-        setupBatchDeleteButton()
-        
-        // 更多选项按钮
-        setupMoreOptionsButton()
-        
-        // 添加到面板
-        batchOperationPanel.addSubview(selectionCountLabel)
-        batchOperationPanel.addSubview(batchSaveButton)
-        batchOperationPanel.addSubview(batchDeleteButton)
-        batchOperationPanel.addSubview(moreOptionsButton)
-    }
+    // setupBatchOperationPanel 已移除 - 功能集成到ScreenshotPreviewBar中
     
-    private func setupSelectionCountLabel() {
-        selectionCountLabel.text = "已选择 0 张"
-        selectionCountLabel.textColor = .white
-        selectionCountLabel.font = ThemeManager.captionFont
-        selectionCountLabel.textAlignment = .center
-    }
-    
-    private func setupBatchSaveButton() {
-        batchSaveButton.setTitle("批量保存", for: .normal)
-        batchSaveButton.setTitleColor(.white, for: .normal)
-        batchSaveButton.backgroundColor = ThemeManager.buttonPrimary
-        batchSaveButton.layer.cornerRadius = ThemeManager.smallCornerRadius
-        batchSaveButton.titleLabel?.font = ThemeManager.buttonFont
-        
-        batchSaveButton.addTarget(self, action: #selector(batchSaveButtonTapped), for: .touchUpInside)
-        addButtonTouchEffects(to: batchSaveButton)
-    }
-    
-    private func setupBatchDeleteButton() {
-        batchDeleteButton.setTitle("批量删除", for: .normal)
-        batchDeleteButton.setTitleColor(.white, for: .normal)
-        batchDeleteButton.backgroundColor = ThemeManager.error
-        batchDeleteButton.layer.cornerRadius = ThemeManager.smallCornerRadius
-        batchDeleteButton.titleLabel?.font = ThemeManager.buttonFont
-        
-        batchDeleteButton.addTarget(self, action: #selector(batchDeleteButtonTapped), for: .touchUpInside)
-        addButtonTouchEffects(to: batchDeleteButton)
-    }
-    
-    private func setupMoreOptionsButton() {
-        moreOptionsButton.setTitle("更多", for: .normal)
-        moreOptionsButton.setTitleColor(.white, for: .normal)
-        moreOptionsButton.backgroundColor = ThemeManager.cardBackground
-        moreOptionsButton.layer.cornerRadius = ThemeManager.smallCornerRadius
-        moreOptionsButton.titleLabel?.font = ThemeManager.buttonFont
-        
-        moreOptionsButton.addTarget(self, action: #selector(moreOptionsButtonTapped), for: .touchUpInside)
-        addButtonTouchEffects(to: moreOptionsButton)
-    }
+    // 批量操作UI设置方法已移除 - 功能集成到ScreenshotPreviewBar中
     
     private func addButtonTouchEffects(to button: UIButton) {
         button.addTarget(self, action: #selector(buttonPressed(_:)), for: .touchDown)
@@ -907,100 +834,18 @@ class VideoPlayerViewController: UIViewController {
         dismiss(animated: true)
     }
     
-    // MARK: - 🆕 批量操作按钮动作
-    @objc private func batchSaveButtonTapped() {
-        HapticFeedbackManager.shared.buttonTap()
-        
-        guard !selectedScreenshots.isEmpty else { return }
-        
-        // 跳转到处理中心
-        let screenshots = Array(selectedScreenshots)
-        let currentMode = screenshotManager.currentMode
-        
-        let processingVC = ScreenshotProcessingViewController(screenshots: screenshots, mode: currentMode)
-        let navController = UINavigationController(rootViewController: processingVC)
-        navController.modalPresentationStyle = .fullScreen
-        
-        present(navController, animated: true)
-    }
-    
-    @objc private func batchDeleteButtonTapped() {
-        HapticFeedbackManager.shared.buttonTap()
-        
-        guard !selectedScreenshots.isEmpty else { return }
-        
-        let alert = UIAlertController(
-            title: "批量删除",
-            message: "确定要删除选中的 \(selectedScreenshots.count) 张截图吗？",
-            preferredStyle: .alert
-        )
-        
-        alert.addAction(UIAlertAction(title: "删除", style: .destructive) { [weak self] _ in
-            self?.performBatchDelete()
-        })
-        
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        
-        present(alert, animated: true)
-    }
-    
-    @objc private func moreOptionsButtonTapped() {
-        HapticFeedbackManager.shared.buttonTap()
-        
-        let alert = UIAlertController(title: "更多操作", message: nil, preferredStyle: .actionSheet)
-        
-        alert.addAction(UIAlertAction(title: "全选", style: .default) { [weak self] _ in
-            self?.selectAll()
-        })
-        
-        alert.addAction(UIAlertAction(title: "全不选", style: .default) { [weak self] _ in
-            self?.deselectAll()
-        })
-        
-        alert.addAction(UIAlertAction(title: "退出多选", style: .default) { [weak self] _ in
-            self?.exitSelectionMode()
-        })
-        
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        
-        // iPad支持
-        if let popover = alert.popoverPresentationController {
-            popover.sourceView = moreOptionsButton
-            popover.sourceRect = moreOptionsButton.bounds
-        }
-        
-        present(alert, animated: true)
-    }
+    // MARK: - 批量操作按钮动作已移除 - 功能集成到ScreenshotPreviewBar中
     
     // MARK: - 🆕 多选状态管理方法
     private func updateSelectionModeUI() {
-        UIView.animate(withDuration: 0.3) {
-            self.batchOperationPanel.isHidden = !self.isInSelectionMode
-            
-            if self.isInSelectionMode {
-                self.batchOperationPanel.alpha = 1.0
-                self.batchOperationPanel.transform = .identity
-            } else {
-                self.batchOperationPanel.alpha = 0.0
-                self.batchOperationPanel.transform = CGAffineTransform(translationX: 0, y: 20)
-            }
-        }
-        
-        // 更新缩略图栏的选择模式
+        // 更新缩略图栏的选择模式 - 批量操作UI已集成到ScreenshotPreviewBar中
         screenshotPreviewBar.setSelectionMode(isInSelectionMode)
     }
     
     private func updateSelectionCountLabel() {
+        // 选择数量更新逻辑已集成到ScreenshotPreviewBar中
         let count = selectedScreenshots.count
-        let modeText = screenshotManager.currentMode == .stillImage ? "张" : "个"
-        selectionCountLabel.text = "已选择 \(count) \(modeText)"
-        
-        // 更新按钮状态
-        batchSaveButton.isEnabled = count > 0
-        batchDeleteButton.isEnabled = count > 0
-        
-        batchSaveButton.alpha = count > 0 ? 1.0 : 0.5
-        batchDeleteButton.alpha = count > 0 ? 1.0 : 0.5
+        print("🔄 已选择 \(count) 张截图")
     }
     
     private func enterSelectionMode() {
