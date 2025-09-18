@@ -35,14 +35,17 @@ class BlurEffectView: UIVisualEffectView {
     
     private let customIntensity: CGFloat
     private let customBlurEffect: UIBlurEffect
+    private let shouldAddShadow: Bool
     
     /// 初始化方法
     /// - Parameters:
     ///   - style: 毛玻璃样式
     ///   - intensity: 强度 (0.0 - 1.0)
-    init(style: BlurStyle = .light, intensity: CGFloat = 1.0) {
+    ///   - shouldAddShadow: 是否添加阴影 (默认为true)
+    init(style: BlurStyle = .light, intensity: CGFloat = 1.0, shouldAddShadow: Bool = true) {
         self.customIntensity = max(0.0, min(1.0, intensity))
         self.customBlurEffect = style.blurEffect
+        self.shouldAddShadow = shouldAddShadow
         
         super.init(effect: customBlurEffect)
         
@@ -52,6 +55,7 @@ class BlurEffectView: UIVisualEffectView {
     required init?(coder: NSCoder) {
         self.customIntensity = 1.0
         self.customBlurEffect = BlurStyle.light.blurEffect
+        self.shouldAddShadow = true
         
         super.init(coder: coder)
         
@@ -66,10 +70,12 @@ class BlurEffectView: UIVisualEffectView {
         layer.borderColor = ThemeManager.primaryGradientStart.withAlphaComponent(0.3).cgColor
         layer.borderWidth = 0.5
         layer.cornerRadius = ThemeManager.standardCornerRadius
-        layer.masksToBounds = true
+        layer.masksToBounds = shouldAddShadow ? false : true
         
-        // 添加阴影
-        addShadow()
+        // 根据参数决定是否添加阴影
+        if shouldAddShadow {
+            addShadow()
+        }
     }
     
     private func addShadow() {
@@ -95,14 +101,16 @@ class BlurEffectView: UIVisualEffectView {
 struct BlurEffect: UIViewRepresentable {
     let style: BlurEffectView.BlurStyle
     let intensity: CGFloat
+    let shouldAddShadow: Bool
     
-    init(style: BlurEffectView.BlurStyle = .light, intensity: CGFloat = 1.0) {
+    init(style: BlurEffectView.BlurStyle = .light, intensity: CGFloat = 1.0, shouldAddShadow: Bool = true) {
         self.style = style
         self.intensity = intensity
+        self.shouldAddShadow = shouldAddShadow
     }
     
     func makeUIView(context: Context) -> BlurEffectView {
-        return BlurEffectView(style: style, intensity: intensity)
+        return BlurEffectView(style: style, intensity: intensity, shouldAddShadow: shouldAddShadow)
     }
     
     func updateUIView(_ uiView: BlurEffectView, context: Context) {

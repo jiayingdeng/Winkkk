@@ -46,7 +46,7 @@ class VideoPlayerViewController: UIViewController {
     private let playerContainerView = UIView()
     
     // 🆕 统一毛玻璃容器 - 包含控制面板+截图预览栏
-    private let unifiedControlPanelView = BlurEffectView(style: .regular, intensity: 0.92)
+    private let unifiedControlPanelView = BlurEffectView(style: .regular, intensity: 0.92, shouldAddShadow: false)
     private let controlPanelBlurView = BlurEffectView(style: .regular, intensity: 0.9)  // 保留作为内容容器
     
     // 播放控制

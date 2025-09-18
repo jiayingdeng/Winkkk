@@ -265,7 +265,7 @@ class ScreenshotPreviewBar: UIView {
         bottomConstraint.priority = UILayoutPriority(999)
         bottomConstraint.isActive = true
         
-        let minHeightConstraint = actionButtonsContainer.heightAnchor.constraint(greaterThanOrEqualToConstant: 32)
+        let minHeightConstraint = actionButtonsContainer.heightAnchor.constraint(greaterThanOrEqualToConstant: 48)
         minHeightConstraint.priority = UILayoutPriority(1000)
         minHeightConstraint.isActive = true
     }
