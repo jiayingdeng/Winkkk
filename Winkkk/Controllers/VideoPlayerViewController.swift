@@ -1144,7 +1144,12 @@ extension VideoPlayerViewController: UnifiedBottomControlPanelDelegate {
     func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didTapCapture mode: UnifiedBottomControlPanel.CaptureMode) {
         // 转换模式并复用现有截图逻辑
         let captureMode: CaptureMode = (mode == .stillImage) ? .stillImage : .livePhoto
-        screenshotManager.setCurrentMode(captureMode)
+        
+        do {
+            try screenshotManager.switchMode(to: captureMode, force: true)
+        } catch {
+            print("⚠️ 截图模式切换失败: \(error)")
+        }
         
         // 复用现有截图逻辑
         screenshotButtonTapped()
