@@ -64,17 +64,8 @@ class VideoPlayerViewController: UIViewController {
     
     // 🆕 批量操作面板 - 已移除，功能集成到ScreenshotPreviewBar中
     
-    // 🆕 多选状态管理
-    private var isInSelectionMode = false {
-        didSet {
-            updateSelectionModeUI()
-        }
-    }
-    private var selectedScreenshots: Set<ScreenshotItem> = [] {
-        didSet {
-            updateSelectionCountLabel()
-        }
-    }
+    // 🆕 多选状态管理 - 使用统一的MultiSelectionManager
+    private let multiSelectionManager = MultiSelectionManager.shared
     
     // 状态变量 - 🎯 编辑器模式重构
     private var isFlowing = false {  // 从isPlaying改为isFlowing
@@ -471,11 +462,16 @@ class VideoPlayerViewController: UIViewController {
         // 设置初始模式
         captureModeSwitcher.setCurrentMode(CaptureMode.stillImage)
         
+        // 设置MultiSelectionManager给ScreenshotPreviewBar
+        screenshotPreviewBar.setMultiSelectionManager(multiSelectionManager)
+        
         // 订阅截图状态变化
         screenshotManager.$screenshots
             .receive(on: DispatchQueue.main)
             .sink { [weak self] screenshots in
                 self?.updatePreviewBarVisibility(screenshots: screenshots)
+                // 验证MultiSelectionManager的选中项目是否仍然有效
+                self?.multiSelectionManager.validateSelection(validItems: screenshots)
             }
             .store(in: &cancellables)
         
@@ -759,8 +755,8 @@ class VideoPlayerViewController: UIViewController {
         
         alert.addAction(UIAlertAction(title: "查看截图", style: .default) { _ in
             // 进入多选模式查看所有截图
-            self.enterSelectionMode()
-            self.selectedScreenshots = Set(self.screenshotManager.screenshots)
+            self.multiSelectionManager.enterSelectionMode()
+            self.multiSelectionManager.selectAll(self.screenshotManager.screenshots)
             
             // 跳转到处理中心
             let screenshots = self.screenshotManager.screenshots
@@ -836,64 +832,7 @@ class VideoPlayerViewController: UIViewController {
     
     // MARK: - 批量操作按钮动作已移除 - 功能集成到ScreenshotPreviewBar中
     
-    // MARK: - 🆕 多选状态管理方法
-    private func updateSelectionModeUI() {
-        // 更新缩略图栏的选择模式 - 批量操作UI已集成到ScreenshotPreviewBar中
-        screenshotPreviewBar.setSelectionMode(isInSelectionMode)
-    }
-    
-    private func updateSelectionCountLabel() {
-        // 选择数量更新逻辑已集成到ScreenshotPreviewBar中
-        let count = selectedScreenshots.count
-        print("🔄 已选择 \(count) 张截图")
-    }
-    
-    private func enterSelectionMode() {
-        isInSelectionMode = true
-        HapticFeedbackManager.shared.lightImpact()
-    }
-    
-    private func exitSelectionMode() {
-        isInSelectionMode = false
-        selectedScreenshots.removeAll()
-        HapticFeedbackManager.shared.lightImpact()
-    }
-    
-    private func selectAll() {
-        selectedScreenshots = Set(screenshotManager.screenshots)
-        HapticFeedbackManager.shared.lightImpact()
-        
-        // 更新缩略图栏的选择状态
-        screenshotPreviewBar.selectAllItems()
-    }
-    
-    private func deselectAll() {
-        selectedScreenshots.removeAll()
-        HapticFeedbackManager.shared.lightImpact()
-        
-        // 更新缩略图栏的选择状态
-        screenshotPreviewBar.deselectAllItems()
-    }
-    
-    private func performBatchDelete() {
-        let screenshotsToDelete = Array(selectedScreenshots)
-        
-        for screenshot in screenshotsToDelete {
-            screenshotManager.removeScreenshot(screenshot)
-        }
-        
-        exitSelectionMode()
-        HapticFeedbackManager.shared.notificationSuccess()
-    }
-    
-    private func toggleScreenshotSelection(_ screenshot: ScreenshotItem) {
-        if selectedScreenshots.contains(screenshot) {
-            selectedScreenshots.remove(screenshot)
-        } else {
-            selectedScreenshots.insert(screenshot)
-        }
-        HapticFeedbackManager.shared.lightImpact()
-    }
+    // MARK: - 🆕 多选状态管理方法 - 现在使用MultiSelectionManager统一管理
     
     private func presentScreenshotViewSheet(_ screenshot: ScreenshotItem) {
         let viewSheet = ScreenshotViewSheet(screenshot: screenshot)
@@ -1083,12 +1022,10 @@ extension VideoPlayerViewController: CaptureModeSwitcherDelegate {
 extension VideoPlayerViewController: ScreenshotPreviewBarDelegate {
     
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didTapScreenshot screenshot: ScreenshotItem, at index: Int) {
-        if isInSelectionMode {
+        if multiSelectionManager.isInSelectionMode {
             // 多选模式：切换选中状态
-            toggleScreenshotSelection(screenshot)
-            
-            // 更新缩略图栏的选择显示
-            screenshotPreviewBar.setScreenshotSelected(screenshot, isSelected: selectedScreenshots.contains(screenshot))
+            multiSelectionManager.selectItem(screenshot)
+            HapticFeedbackManager.shared.lightImpact()
         } else {
             // 🎯 固定三分屏设计：单击截图时不弹出界面，保持界面连续性
             // 根据Wink风格设计，在固定布局内操作，不破坏用户体验
@@ -1119,10 +1056,6 @@ extension VideoPlayerViewController: ScreenshotPreviewBarDelegate {
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestPreviewAll screenshots: [ScreenshotItem]) {
         // 预览所有截图 - 使用新的批量保存逻辑
         guard !screenshots.isEmpty else { return }
-        
-        // 进入多选模式并选择所有截图
-        enterSelectionMode()
-        selectedScreenshots = Set(screenshots)
         
         // 直接跳转到处理中心
         let processingVC = ScreenshotProcessingViewController(
@@ -1168,16 +1101,59 @@ extension VideoPlayerViewController: ScreenshotPreviewBarDelegate {
     // 🆕 长按手势处理
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didLongPressScreenshot screenshot: ScreenshotItem, at index: Int) {
         // 长按进入多选模式
-        if !isInSelectionMode {
-            enterSelectionMode()
+        if !multiSelectionManager.isInSelectionMode {
+            multiSelectionManager.enterSelectionMode()
             
             // 自动选择被长按的截图
-            selectedScreenshots.insert(screenshot)
-            screenshotPreviewBar.setScreenshotSelected(screenshot, isSelected: true)
+            multiSelectionManager.selectItem(screenshot)
             
             HapticFeedbackManager.shared.mediumImpact()
             print("🔄 长按进入多选模式，已选择第 \(index + 1) 张截图")
         }
+    }
+    
+    // 🆕 批量操作委托方法
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestBatchDelete screenshots: [ScreenshotItem]) {
+        guard !screenshots.isEmpty else { return }
+        
+        let alert = UIAlertController(
+            title: "删除截图",
+            message: "确定要删除选中的 \(screenshots.count) 张截图吗？",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "删除", style: .destructive) { _ in
+            // 批量删除截图
+            for screenshot in screenshots {
+                self.screenshotManager.removeScreenshot(screenshot)
+            }
+            
+            // 退出多选模式
+            self.multiSelectionManager.exitSelectionMode()
+            
+            HapticFeedbackManager.shared.notificationSuccess()
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        present(alert, animated: true)
+    }
+    
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestBatchShare screenshots: [ScreenshotItem]) {
+        guard !screenshots.isEmpty else { return }
+        
+        let images = screenshots.map { $0.image }
+        let activityVC = UIActivityViewController(activityItems: images, applicationActivities: nil)
+        
+        // iPad适配
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = previewBar
+            popover.sourceRect = previewBar.bounds
+        }
+        
+        present(activityVC, animated: true)
+        
+        HapticFeedbackManager.shared.lightImpact()
     }
 }
 

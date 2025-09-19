@@ -19,6 +19,10 @@ protocol ScreenshotPreviewBarDelegate: AnyObject {
     // 🆕 新增：选择相关的委托方法
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didSelectScreenshots screenshots: [ScreenshotItem])
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestProcessingCenter screenshots: [ScreenshotItem])
+    
+    // 🆕 批量操作委托方法
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestBatchDelete screenshots: [ScreenshotItem])
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestBatchShare screenshots: [ScreenshotItem])
 }
 
 // 🆕 为可选方法提供默认实现
@@ -34,6 +38,14 @@ extension ScreenshotPreviewBarDelegate {
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestProcessingCenter screenshots: [ScreenshotItem]) {
         // 默认空实现，委托方可以选择是否重写此方法
     }
+    
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestBatchDelete screenshots: [ScreenshotItem]) {
+        // 默认空实现，委托方可以选择是否重写此方法
+    }
+    
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestBatchShare screenshots: [ScreenshotItem]) {
+        // 默认空实现，委托方可以选择是否重写此方法
+    }
 }
 
 class ScreenshotPreviewBar: UIView {
@@ -41,8 +53,8 @@ class ScreenshotPreviewBar: UIView {
     // MARK: - Properties
     weak var delegate: ScreenshotPreviewBarDelegate?
     private let screenshotManager = ScreenshotManager.shared
+    private var multiSelectionManager: MultiSelectionManager!
     private var cancellables = Set<AnyCancellable>()
-    private var selectedScreenshots = Set<String>() // 📝 新增：跟踪选中状态
     
     // MARK: - UI Components
     // 🔧 移除containerView - 直接使用self作为容器，避免双重边界
@@ -58,6 +70,14 @@ class ScreenshotPreviewBar: UIView {
     private let scrollView = UIScrollView()
     private let stackView = UIStackView()
     
+    // 多选工具栏
+    private lazy var batchSelectionToolbar: BatchSelectionToolbar = {
+        let toolbar = BatchSelectionToolbar()
+        toolbar.isHidden = true
+        toolbar.alpha = 0
+        return toolbar
+    }()
+    
     // 📝 操作按钮区域已移除 - 使用点击预览替代
     
     // MARK: - Initialization
@@ -65,7 +85,6 @@ class ScreenshotPreviewBar: UIView {
         super.init(frame: frame)
         setupUI()
         setupConstraints()
-        setupObservers()
         updateUI()
     }
     
@@ -73,7 +92,6 @@ class ScreenshotPreviewBar: UIView {
         super.init(coder: coder)
         setupUI()
         setupConstraints()
-        setupObservers()
         updateUI()
     }
     
@@ -98,6 +116,10 @@ class ScreenshotPreviewBar: UIView {
         // 直接添加到self
         addSubview(headerView)
         addSubview(scrollView)
+        addSubview(batchSelectionToolbar)
+        
+        // 设置工具栏回调
+        setupBatchToolbarActions()
     }
     
     private func setupHeaderView() {
@@ -173,6 +195,7 @@ class ScreenshotPreviewBar: UIView {
     private func setupConstraints() {
         headerView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
+        batchSelectionToolbar.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
             // 🔧 直接使用self，减少内部间距，避免双重边界
@@ -183,13 +206,45 @@ class ScreenshotPreviewBar: UIView {
             headerView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
             headerView.heightAnchor.constraint(equalToConstant: 30),
             
-            // 滚动视图 - 现在直接连接到底部
+            // 滚动视图
             scrollView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 8),
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
             scrollView.heightAnchor.constraint(equalToConstant: 60),
-            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8)
+            
+            // 批量选择工具栏
+            batchSelectionToolbar.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 8),
+            batchSelectionToolbar.leadingAnchor.constraint(equalTo: leadingAnchor),
+            batchSelectionToolbar.trailingAnchor.constraint(equalTo: trailingAnchor),
+            batchSelectionToolbar.heightAnchor.constraint(equalToConstant: 50),
+            batchSelectionToolbar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8)
         ])
+    }
+    
+    private func setupBatchToolbarActions() {
+        batchSelectionToolbar.onSelectAll = { [weak self] in
+            self?.multiSelectionManager.selectAll()
+        }
+        
+        batchSelectionToolbar.onDeselectAll = { [weak self] in
+            self?.multiSelectionManager.deselectAll()
+        }
+        
+        batchSelectionToolbar.onDelete = { [weak self] in
+            guard let self = self else { return }
+            let selectedItems = self.multiSelectionManager.selectedItems
+            self.delegate?.screenshotPreviewBar(self, didRequestBatchDelete: selectedItems)
+        }
+        
+        batchSelectionToolbar.onShare = { [weak self] in
+            guard let self = self else { return }
+            let selectedItems = self.multiSelectionManager.selectedItems
+            self.delegate?.screenshotPreviewBar(self, didRequestBatchShare: selectedItems)
+        }
+        
+        batchSelectionToolbar.onCancel = { [weak self] in
+            self?.multiSelectionManager.exitSelectionMode()
+        }
     }
     
     // MARK: - Observers
@@ -206,6 +261,24 @@ class ScreenshotPreviewBar: UIView {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
                 self?.updateUI()
+            }
+            .store(in: &cancellables)
+        
+        // 监听多选管理器的状态变化（仅在设置后）
+        guard multiSelectionManager != nil else { return }
+        
+        multiSelectionManager.$isInSelectionMode
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] isInSelectionMode in
+                self?.updateSelectionModeUI(isInSelectionMode: isInSelectionMode)
+            }
+            .store(in: &cancellables)
+        
+        multiSelectionManager.$selectedItems
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] (selectedItems: [ScreenshotItem]) in
+                self?.batchSelectionToolbar.updateSelectedCount(selectedItems.count)
+                self?.updateThumbnailSelectionStates()
             }
             .store(in: &cancellables)
         
@@ -235,6 +308,13 @@ class ScreenshotPreviewBar: UIView {
     // MARK: - UI Updates
     func updateWithScreenshots(_ screenshots: [ScreenshotItem]) {
         updateUI()
+    }
+    
+    // MARK: - MultiSelectionManager Setup
+    func setMultiSelectionManager(_ manager: MultiSelectionManager) {
+        self.multiSelectionManager = manager
+        setupObservers()
+        setupBatchToolbarActions()
     }
     
     private func updateUI() {
@@ -375,72 +455,39 @@ class ScreenshotPreviewBar: UIView {
         }
     }
     
-    // MARK: - 🆕 多选状态管理方法
-    private var isInSelectionMode = false
-    private var selectedScreenshots: Set<ScreenshotItem> = []
-    
-    func setSelectionMode(_ selectionMode: Bool) {
-        isInSelectionMode = selectionMode
-        updateSelectionModeUI()
-        
-        if !selectionMode {
-            selectedScreenshots.removeAll()
-            updateAllThumbnailSelectionStates()
-        }
-    }
-    
-    func selectAllItems() {
-        selectedScreenshots = Set(screenshotManager.screenshots)
-        updateAllThumbnailSelectionStates()
-        print("🔄 已选择所有 \(selectedScreenshots.count) 张截图")
-    }
-    
-    func deselectAllItems() {
-        selectedScreenshots.removeAll()
-        updateAllThumbnailSelectionStates()
-        print("🔄 已取消选择所有截图")
-    }
-    
-    func setScreenshotSelected(_ screenshot: ScreenshotItem, isSelected: Bool) {
-        if isSelected {
-            selectedScreenshots.insert(screenshot)
-        } else {
-            selectedScreenshots.remove(screenshot)
-        }
-        
-        // 更新对应缩略图的选择状态
-        updateThumbnailSelectionState(for: screenshot, isSelected: isSelected)
-        print("🔄 设置截图选择状态: \(isSelected), 当前已选择: \(selectedScreenshots.count)")
-    }
-    
-    private func updateSelectionModeUI() {
+    // MARK: - 多选状态管理方法
+    private func updateSelectionModeUI(isInSelectionMode: Bool) {
         UIView.animate(withDuration: 0.3) {
-            // 在多选模式下，可以调整整体透明度或其他视觉效果
-            if self.isInSelectionMode {
-                // 多选模式下的视觉反馈
-                self.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
+            if isInSelectionMode {
+                self.batchSelectionToolbar.isHidden = false
+                self.batchSelectionToolbar.alpha = 1
+                self.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.05)
             } else {
-                // 普通模式
+                self.batchSelectionToolbar.isHidden = true
+                self.batchSelectionToolbar.alpha = 0
                 self.backgroundColor = .clear
             }
         }
     }
     
-    private func updateAllThumbnailSelectionStates() {
+    private func updateThumbnailSelectionStates() {
         // 更新所有缩略图的选择状态
+        let selectedItems = multiSelectionManager.selectedItems
+        
         for (index, screenshot) in screenshotManager.screenshots.enumerated() {
-            let isSelected = selectedScreenshots.contains(screenshot.id)
+            let isSelected = selectedItems.contains(where: { $0.id == screenshot.id })
             updateThumbnailSelectionState(for: screenshot, isSelected: isSelected)
         }
     }
     
     private func updateThumbnailSelectionState(for screenshot: ScreenshotItem, isSelected: Bool) {
         // 找到对应的缩略图视图并更新选择状态
-        for subview in scrollView.subviews {
-            if let thumbnailView = subview as? ScreenshotThumbnailView {
-                // 这里需要通过某种方式识别对应的截图
-                // 可以通过tag或其他方式关联
+        for (index, arrangedSubview) in stackView.arrangedSubviews.enumerated() {
+            if let thumbnailView = arrangedSubview as? ScreenshotThumbnailView,
+               index < screenshotManager.screenshots.count,
+               screenshotManager.screenshots[index].id == screenshot.id {
                 thumbnailView.setSelected(isSelected, animated: true)
+                break
             }
         }
     }
@@ -450,7 +497,7 @@ class ScreenshotPreviewBar: UIView {
         let screenshots = screenshotManager.screenshots
         let detailSheet = ScreenshotDetailSheet(screenshots: screenshots, currentIndex: index)
         detailSheet.delegate = self
-        detailSheet.setSelectedScreenshots(selectedScreenshots)
+        // 详情页会自动监听MultiSelectionManager的状态
         
         findParentViewController()?.present(detailSheet, animated: true)
     }
@@ -460,17 +507,16 @@ class ScreenshotPreviewBar: UIView {
 extension ScreenshotPreviewBar: ScreenshotDetailSheetDelegate {
     func screenshotDetailSheet(_ sheet: ScreenshotDetailSheet, didSelectScreenshot screenshot: ScreenshotItem, isSelected: Bool) {
         if isSelected {
-            selectedScreenshots.insert(screenshot.id)
+            multiSelectionManager.selectItem(screenshot)
         } else {
-            selectedScreenshots.remove(screenshot.id)
+            multiSelectionManager.deselectItem(screenshot)
         }
         
         // 更新UI显示选中状态
         updateSelectionDisplay()
         
         // 通知委托
-        let selected = screenshotManager.screenshots.filter { selectedScreenshots.contains($0.id) }
-        delegate?.screenshotPreviewBar(self, didSelectScreenshots: selected)
+        delegate?.screenshotPreviewBar(self, didSelectScreenshots: multiSelectionManager.selectedItems)
     }
     
     func screenshotDetailSheet(_ sheet: ScreenshotDetailSheet, didRequestProcessingCenter selectedScreenshots: [ScreenshotItem]) {

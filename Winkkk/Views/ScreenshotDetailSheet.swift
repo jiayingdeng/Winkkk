@@ -19,7 +19,7 @@ class ScreenshotDetailSheet: UIViewController {
     weak var delegate: ScreenshotDetailSheetDelegate?
     private let screenshots: [ScreenshotItem]
     private var currentIndex: Int
-    private var selectedScreenshots = Set<String>() // 使用ID集合跟踪选中状态
+    private var selectedScreenshots = Set<UUID>() // 使用ID集合跟踪选中状态
     
     // MARK: - UI Components
     private let scrollView = UIScrollView()
@@ -278,7 +278,7 @@ class ScreenshotDetailSheet: UIViewController {
     }
     
     // MARK: - Public Methods
-    func setSelectedScreenshots(_ selected: Set<String>) {
+    func setSelectedScreenshots(_ selected: Set<UUID>) {
         selectedScreenshots = selected
         updateUI()
     }
