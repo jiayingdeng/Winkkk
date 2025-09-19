@@ -313,6 +313,9 @@ enum ScreenshotError: LocalizedError {
     case saveFailed(String)
     case insufficientStorage
     case permissionDenied
+    case imageProcessingFailed
+    case fileSaveFailed
+    case directoryCreationFailed
     
     var errorDescription: String? {
         switch self {
@@ -326,6 +329,12 @@ enum ScreenshotError: LocalizedError {
             return "存储空间不足"
         case .permissionDenied:
             return "权限被拒绝"
+        case .imageProcessingFailed:
+            return "图片处理失败"
+        case .fileSaveFailed:
+            return "文件保存失败"
+        case .directoryCreationFailed:
+            return "目录创建失败"
         }
     }
 }

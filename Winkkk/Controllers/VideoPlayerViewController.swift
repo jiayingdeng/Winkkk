@@ -9,6 +9,7 @@
 import UIKit
 import AVFoundation
 import Combine
+import Photos
 
 // 🎯 流动速度控制枚举
 enum FlowSpeed {
@@ -32,6 +33,8 @@ enum FlowSpeed {
         }
     }
 }
+
+// ScreenshotError 定义已移至 ScreenshotEngine.swift 中统一管理
 
 class VideoPlayerViewController: UIViewController {
     
@@ -707,34 +710,38 @@ class VideoPlayerViewController: UIViewController {
         // 🎯 使用截取时间作为时间戳，而非播放时间
         let captureTime = timelineView.getCurrentCaptureTime()
         
-        // 🆕 创建截图项目 - 使用正确的Core Data方式
-        // 先临时创建一个VideoItem（后续优化为复用现有的）
-        let tempVideoItem = PersistenceController.shared.createVideoItem(
-            fileName: videoURL.lastPathComponent,
-            filePath: videoURL,
-            duration: 120.0, // TODO: 获取真实时长
-            isFromCamera: false,
-            width: Int32(image.size.width),
-            height: Int32(image.size.height),
-            fileSize: 0 // TODO: 获取真实文件大小
-        )
+        // 🆕 创建截图项目 - 直接创建ScreenshotItem，不依赖VideoItem
+        // 保存图片到Documents/Screenshots目录
+        let documentsPath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let screenshotsDirectory = documentsPath.appendingPathComponent("Screenshots")
         
-        // 保存图片到临时路径（实际应用中应该保存到Documents目录）
-        let tempImagePath = FileManager.default.temporaryDirectory
-            .appendingPathComponent("screenshot_\(UUID().uuidString).jpg")
+        // 确保截图目录存在
+        try? FileManager.default.createDirectory(at: screenshotsDirectory, withIntermediateDirectories: true)
+        
+        let imageFileName = "screenshot_\(Date().timeIntervalSince1970)_\(UUID().uuidString).jpg"
+        let imagePath = screenshotsDirectory.appendingPathComponent(imageFileName)
         
         // 保存图片到文件系统
-        if let imageData = image.jpegData(compressionQuality: 0.9) {
-            try? imageData.write(to: tempImagePath)
+        guard let imageData = image.jpegData(compressionQuality: 0.9) else {
+            handleScreenshotError(ScreenshotError.imageProcessingFailed)
+            return
         }
         
+        do {
+            try imageData.write(to: imagePath)
+        } catch {
+            handleScreenshotError(ScreenshotError.fileSaveFailed)
+            return
+        }
+        
+        // 创建截图项目，不依赖VideoItem - 直接使用Core Data
         let screenshot = PersistenceController.shared.createScreenshotItem(
-            originalImagePath: tempImagePath,
+            originalImagePath: imagePath,
             timestamp: captureTime,
             width: Int32(image.size.width),
             height: Int32(image.size.height),
-            originalFileSize: Int64(image.jpegData(compressionQuality: 0.9)?.count ?? 0),
-            videoSource: tempVideoItem
+            originalFileSize: Int64(imageData.count),
+            videoSource: nil // 暂时不关联VideoItem，避免创建临时对象
         )
         
         do {
@@ -864,7 +871,142 @@ class VideoPlayerViewController: UIViewController {
     }
     
     @objc private func doneButtonTapped() {
-        // 保存当前编辑状态或其他操作
+        // 检查是否有截图需要处理
+        let screenshots = screenshotManager.screenshots
+        
+        if screenshots.isEmpty {
+            // 无截图，直接返回
+            dismiss(animated: true)
+            return
+        }
+        
+        // 有截图，请求相册权限并保存
+        requestPhotosPermissionAndSave(screenshots: screenshots)
+    }
+    
+    // MARK: - Photos Permission & Save
+    private func requestPhotosPermissionAndSave(screenshots: [ScreenshotItem]) {
+        PHPhotoLibrary.requestAuthorization { [weak self] status in
+            DispatchQueue.main.async {
+                switch status {
+                case .authorized, .limited:
+                    self?.saveScreenshotsToPhotoLibrary(screenshots: screenshots)
+                    
+                case .denied, .restricted:
+                    self?.showPhotosPermissionDeniedAlert()
+                    
+                case .notDetermined:
+                    // 用户取消了权限请求，直接返回
+                    self?.dismiss(animated: true)
+                    
+                @unknown default:
+                    self?.showPhotosPermissionDeniedAlert()
+                }
+            }
+        }
+    }
+    
+    private func saveScreenshotsToPhotoLibrary(screenshots: [ScreenshotItem]) {
+        var savedCount = 0
+        let totalCount = screenshots.count
+        
+        for screenshot in screenshots {
+            // 从文件路径加载图片
+            guard let imageData = try? Data(contentsOf: screenshot.originalImagePath),
+                  let image = UIImage(data: imageData) else {
+                continue
+            }
+            
+            // 保存到系统相册
+            UIImageWriteToSavedPhotosAlbum(image, self, #selector(image(_:didFinishSavingWithError:contextInfo:)), nil)
+            savedCount += 1
+        }
+        
+        // 显示保存进度或结果
+        if savedCount > 0 {
+            showSaveProgressAndNavigate(savedCount: savedCount, totalCount: totalCount)
+        } else {
+            showSaveFailureAlert()
+        }
+    }
+    
+    @objc private func image(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        // 这个方法会在每张图片保存完成后被调用
+        // 可以在这里更新保存进度，但由于是异步的，需要额外的计数管理
+        if let error = error {
+            print("❌ 截图保存到相册失败: \(error.localizedDescription)")
+        } else {
+            print("✅ 截图已保存到相册")
+        }
+    }
+    
+    private func showSaveProgressAndNavigate(savedCount: Int, totalCount: Int) {
+        // 显示保存成功提示
+        let message = totalCount == savedCount ? 
+            "已将 \(savedCount) 张截图保存到相册" : 
+            "已保存 \(savedCount)/\(totalCount) 张截图到相册"
+        
+        let alert = UIAlertController(title: "保存完成", message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "继续处理", style: .default) { [weak self] _ in
+            self?.navigateToScreenshotProcessing()
+        })
+        alert.addAction(UIAlertAction(title: "完成", style: .cancel) { [weak self] _ in
+            self?.dismiss(animated: true)
+        })
+        
+        present(alert, animated: true)
+    }
+    
+    private func showPhotosPermissionDeniedAlert() {
+        let alert = UIAlertController(
+            title: "需要相册权限",
+            message: "请在设置中允许访问相册，以保存截图",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "去设置", style: .default) { _ in
+            if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(settingsURL)
+            }
+        })
+        
+        alert.addAction(UIAlertAction(title: "跳过保存", style: .default) { [weak self] _ in
+            self?.navigateToScreenshotProcessing()
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel) { [weak self] _ in
+            self?.dismiss(animated: true)
+        })
+        
+        present(alert, animated: true)
+    }
+    
+    private func showSaveFailureAlert() {
+        let alert = UIAlertController(
+            title: "保存失败",
+            message: "无法保存截图到相册，请检查权限设置",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "重试", style: .default) { [weak self] _ in
+            let screenshots = self?.screenshotManager.screenshots ?? []
+            self?.requestPhotosPermissionAndSave(screenshots: screenshots)
+        })
+        
+        alert.addAction(UIAlertAction(title: "跳过", style: .default) { [weak self] _ in
+            self?.navigateToScreenshotProcessing()
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel) { [weak self] _ in
+            self?.dismiss(animated: true)
+        })
+        
+        present(alert, animated: true)
+    }
+    
+    private func navigateToScreenshotProcessing() {
+        // TODO: 创建并展示ScreenshotProcessingViewController
+        // 目前暂时直接返回，后续实现处理中心
         dismiss(animated: true)
     }
     

@@ -161,7 +161,7 @@ extension PersistenceController {
         width: Int32,
         height: Int32,
         originalFileSize: Int64,
-        videoSource: VideoItem
+        videoSource: VideoItem?
     ) -> ScreenshotItem {
         let context = container.viewContext
         let screenshotItem = ScreenshotItem(context: context)

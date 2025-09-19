@@ -55,6 +55,10 @@ class VideoGalleryViewController: UIViewController {
     private var fetchedResultsController: NSFetchedResultsController<VideoItem>!
     private var videos: [VideoItem] = []
     
+    // 防抖机制
+    private var updateTimer: Timer?
+    private let updateDelay: TimeInterval = 0.3
+    
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -68,6 +72,13 @@ class VideoGalleryViewController: UIViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         refreshData()
+    }
+    
+    deinit {
+        // 清理定时器，避免内存泄漏
+        updateTimer?.invalidate()
+        updateTimer = nil
+        print("📱 VideoGallery: Deinitializing")
     }
     
     // MARK: - UI Setup
@@ -208,18 +219,33 @@ class VideoGalleryViewController: UIViewController {
             try fetchedResultsController.performFetch()
             videos = fetchedResultsController.fetchedObjects ?? []
             print("✅ VideoGallery: Refreshed \(videos.count) videos")
-            updateUI()
+            scheduleUIUpdate()
         } catch {
             print("❌ VideoGallery: 刷新数据失败: \(error)")
         }
     }
     
     private func updateUI() {
-        collectionView.reloadData()
+        // 异步更新UI，避免阻塞主线程
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            self.collectionView.reloadData()
+            
+            let hasVideos = !self.videos.isEmpty
+            self.emptyStateView.isHidden = hasVideos
+            self.collectionView.isHidden = !hasVideos
+        }
+    }
+    
+    private func scheduleUIUpdate() {
+        // 取消之前的更新任务
+        updateTimer?.invalidate()
         
-        let hasVideos = !videos.isEmpty
-        emptyStateView.isHidden = hasVideos
-        collectionView.isHidden = !hasVideos
+        // 设置新的延迟更新任务
+        updateTimer = Timer.scheduledTimer(withTimeInterval: updateDelay, repeats: false) { [weak self] _ in
+            self?.updateUI()
+        }
     }
     
     // MARK: - Actions
@@ -575,6 +601,8 @@ extension VideoGalleryViewController: NSFetchedResultsControllerDelegate {
     func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
         print("📱 VideoGallery: Core Data content changed")
         videos = fetchedResultsController.fetchedObjects ?? []
-        updateUI()
+        
+        // 使用防抖机制，避免频繁更新UI
+        scheduleUIUpdate()
     }
 }

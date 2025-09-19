@@ -108,7 +108,6 @@ class TimelineView: UIView {
     
     // 🆕 Live Photo模式支持
     private var isLivePhotoMode = false
-    private let livePhotoRangeIndicator = UIView()  // 3秒范围指示器
     
     // MARK: - Scrolling Container Architecture
     private let scrollView = UIScrollView()
@@ -318,24 +317,50 @@ class TimelineView: UIView {
         }
     }
     
-    // 更新Live Photo范围位置（基于当前播放头位置）
+    // 更新Live Photo范围位置（基于屏幕中心的白色竖线位置）
     private func updateLivePhotoRangePosition() {
-        guard isLivePhotoMode, duration > 0 else { return }
+        guard isLivePhotoMode, duration > 0, timeToPixelRatio > 0 else { return }
         
-        // 计算3秒对应的宽度
-        let threeSecondsWidth = (3.0 / duration) * currentContentWidth
-        let indicatorX = playheadIndicator.frame.midX
+        // 🎯 使用时间到像素转换比例计算3秒宽度（已包含缩放因子）
+        let threeSecondsWidth = CGFloat(3.0 * timeToPixelRatio)
         
-        // 保证不超出边界
-        let maxX = currentContentWidth - threeSecondsWidth
-        let rangeX = min(indicatorX, maxX)
+        // 🎯 关键修复：基于屏幕中心计算白色竖线在TimelineView坐标系中的位置
+        // 白色竖线固定在屏幕中心，我们需要将其转换为TimelineView内部坐标
+        let screenCenterX = UIScreen.main.bounds.width / 2
+        
+        // 🎯 将屏幕中心坐标转换为TimelineView内部坐标（考虑滚动偏移）
+        let timelineViewCenterX = screenCenterX + scrollView.contentOffset.x
+        
+        // 🎯 边界检查：基于实际视频内容区域
+        let actualVideoWidth = getActualVideoWidth()
+        let videoContentStartX = leftPadding
+        let videoContentEndX = leftPadding + actualVideoWidth
+        
+        // 🎯 Live Photo范围始终从白色竖线开始向右延伸3秒
+        let rangeStartX = timelineViewCenterX
+        let rangeEndX = rangeStartX + threeSecondsWidth
+        
+        // 🎯 确保范围不超出视频内容边界
+        let clampedStartX = max(videoContentStartX, rangeStartX)
+        let clampedEndX = min(videoContentEndX, rangeEndX)
+        let finalWidth = max(0, clampedEndX - clampedStartX)
+        
+        // 🎯 如果白色竖线超出视频范围，则隐藏Live Photo范围指示器
+        if rangeStartX < videoContentStartX || rangeStartX > videoContentEndX {
+            livePhotoRangeView.isHidden = true
+            return
+        } else {
+            livePhotoRangeView.isHidden = false
+        }
         
         livePhotoRangeView.frame = CGRect(
-            x: rangeX,
+            x: clampedStartX,
             y: timeScaleView.frame.minY,
-            width: threeSecondsWidth,
+            width: finalWidth,
             height: timeScaleView.frame.height
         )
+        
+        print("🎥 Live Photo范围更新: screenCenterX=\(screenCenterX), timelineViewCenterX=\(timelineViewCenterX), rangeStartX=\(rangeStartX), finalWidth=\(finalWidth)")
     }
     
     private func setupThumbView() {
@@ -566,6 +591,13 @@ class TimelineView: UIView {
         let clampedOffset = max(scrollRange.min, min(scrollRange.max, scrollOffsetX))
         
         scrollView.setContentOffset(CGPoint(x: clampedOffset, y: 0), animated: true)
+        
+        // 🎯 滚动后更新Live Photo范围指示器
+        if isLivePhotoMode {
+            DispatchQueue.main.async {
+                self.updateLivePhotoRangePosition()
+            }
+        }
     }
     
     // MARK: - Public Methods
@@ -625,6 +657,12 @@ class TimelineView: UIView {
         currentProgress = progress
         let targetTime = progress * duration
         scrollToCaptureTime(targetTime)
+        
+        // 🎯 播放时更新Live Photo范围指示器
+        if isLivePhotoMode {
+            updateLivePhotoRangePosition()
+        }
+        
         isPlaybackProgressUpdate = false
     }
     
@@ -1032,6 +1070,11 @@ class TimelineView: UIView {
                 }
             }
             
+            // 🎯 拖拽时更新Live Photo范围指示器
+            if isLivePhotoMode {
+                updateLivePhotoRangePosition()
+            }
+            
         case .ended, .cancelled:
             isDragging = false
             delegate?.timelineViewDidEndSeeking(self)
@@ -1113,6 +1156,11 @@ class TimelineView: UIView {
     private func updateZoomScale() {
         // 更新内容尺寸（这是关键的变化！）
         updateContentSize()
+        
+        // 🎯 缩放时更新Live Photo范围指示器
+        if isLivePhotoMode {
+            updateLivePhotoRangePosition()
+        }
         
         // 根据缩放级别重新生成缩略图
         regenerateThumbnailsForZoom()
@@ -1276,6 +1324,11 @@ extension TimelineView: UIScrollViewDelegate {
             } else {
                 delegate?.timelineView(self, didSeekToProgress: progress)
             }
+        }
+        
+        // 🎯 滚动时更新Live Photo范围指示器
+        if isLivePhotoMode {
+            updateLivePhotoRangePosition()
         }
         
         // 🎯 新增：滚动时刷新时间刻度
