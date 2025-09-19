@@ -294,10 +294,11 @@ class VideoPlayerViewController: UIViewController {
             controlPanelBlurView.topAnchor.constraint(equalTo: unifiedControlPanelView.topAnchor),
             controlPanelBlurView.leadingAnchor.constraint(equalTo: unifiedControlPanelView.leadingAnchor),
             controlPanelBlurView.trailingAnchor.constraint(equalTo: unifiedControlPanelView.trailingAnchor),
-            controlPanelBlurView.heightAnchor.constraint(greaterThanOrEqualToConstant: 260),  // 🆕 增加高度以容纳截图预览栏
+            controlPanelBlurView.bottomAnchor.constraint(equalTo: unifiedControlPanelView.bottomAnchor),  // 🎯 直接贴底部
+            controlPanelBlurView.heightAnchor.constraint(greaterThanOrEqualToConstant: 320),  // 🆕 增加高度以容纳模式切换器+截图预览栏
             
             // 🎯 时间轴 - 允许视觉溢出屏幕边界 (Wink风格)
-            timelineView.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 20),
+            timelineView.topAnchor.constraint(equalTo: captureModeSwitcher.bottomAnchor, constant: 12),
             timelineView.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
             timelineView.heightAnchor.constraint(equalToConstant: 110),
             
@@ -352,9 +353,9 @@ class VideoPlayerViewController: UIViewController {
             screenshotPreviewBar.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -16),
             screenshotPreviewBar.bottomAnchor.constraint(equalTo: controlPanelBlurView.bottomAnchor, constant: -16),
             
-            // 🎯 统一容器内：模式切换器 - 紧接控制面板
-            captureModeSwitcher.topAnchor.constraint(equalTo: controlPanelBlurView.bottomAnchor, constant: 0),
-            captureModeSwitcher.centerXAnchor.constraint(equalTo: unifiedControlPanelView.centerXAnchor),
+            // 🎯 控制面板内：模式切换器 - 位于顶部
+            captureModeSwitcher.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 16),
+            captureModeSwitcher.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
             captureModeSwitcher.heightAnchor.constraint(equalToConstant: 44),
             captureModeSwitcher.widthAnchor.constraint(equalToConstant: 280)
         ])
@@ -434,7 +435,7 @@ class VideoPlayerViewController: UIViewController {
     private func setupCaptureModeSwitcher() {
         captureModeSwitcher.delegate = self
         captureModeSwitcher.backgroundColor = .clear  // 🆕 透明背景
-        unifiedControlPanelView.contentView.addSubview(captureModeSwitcher)
+        controlPanelBlurView.contentView.addSubview(captureModeSwitcher)  // 🎯 修改：移入内层容器
     }
     
     private func setupScreenshotPreviewBar() {
