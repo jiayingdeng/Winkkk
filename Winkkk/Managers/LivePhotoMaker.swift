@@ -12,6 +12,7 @@ import AVFoundation
 import UIKit
 import MobileCoreServices
 import UniformTypeIdentifiers
+import os
 
 /// Live Photo组装器
 /// 负责将视频片段和封面图片组装成iOS原生支持的Live Photo格式
@@ -279,18 +280,26 @@ class LivePhotoMaker {
     ) async throws -> PHLivePhoto {
         
         return try await withCheckedThrowingContinuation { continuation in
+            let hasResumed = OSAllocatedUnfairLock(initialState: false)
+            
             PHLivePhoto.request(
                 withResourceFileURLs: [videoURL, imageURL],
                 placeholderImage: nil,
                 targetSize: .zero,
                 contentMode: .aspectFit
             ) { livePhoto, info in
-                if let livePhoto = livePhoto {
-                    continuation.resume(returning: livePhoto)
-                } else {
-                    let error = info[PHLivePhotoInfoErrorKey] as? Error
-                    let errorMessage = error?.localizedDescription ?? "Live Photo创建失败"
-                    continuation.resume(throwing: LivePhotoError.livePhotoCreationFailed(errorMessage))
+                hasResumed.withLock { resumed in
+                    // 确保continuation只被resume一次
+                    guard !resumed else { return }
+                    resumed = true
+                    
+                    if let livePhoto = livePhoto {
+                        continuation.resume(returning: livePhoto)
+                    } else {
+                        let error = info[PHLivePhotoInfoErrorKey] as? Error
+                        let errorMessage = error?.localizedDescription ?? "Live Photo创建失败"
+                        continuation.resume(throwing: LivePhotoError.livePhotoCreationFailed(errorMessage))
+                    }
                 }
             }
         }
