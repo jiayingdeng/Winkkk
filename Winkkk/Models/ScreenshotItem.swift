@@ -224,7 +224,7 @@ extension ScreenshotItem {
         livePhotoVideoPath = videoPath
         livePhotoIdentifier = identifier
         livePhotoDuration = duration
-        keyPhotoOffset = keyPhotoOffset
+        self.keyPhotoOffset = keyPhotoOffset
         captureMode = CaptureMode.livePhoto.rawValue
     }
     
