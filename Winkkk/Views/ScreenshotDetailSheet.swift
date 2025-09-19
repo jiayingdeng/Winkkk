@@ -15,7 +15,7 @@ protocol ScreenshotDetailSheetDelegate: AnyObject {
     func screenshotDetailSheet(_ sheet: ScreenshotDetailSheet, didRequestProcessingCenter selectedScreenshots: [ScreenshotItem])
 }
 
-class ScreenshotDetailSheet: UIViewController {
+class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     
     // MARK: - Properties
     weak var delegate: ScreenshotDetailSheetDelegate?
@@ -160,6 +160,16 @@ class ScreenshotDetailSheet: UIViewController {
             livePhotoView.contentMode = .scaleAspectFit
             livePhotoView.translatesAutoresizingMaskIntoConstraints = false
             
+            // 🎯 关键配置：启用音频播放和手势识别
+            livePhotoView.isMuted = false
+            
+            // 确保手势识别器已启用（用于长按播放）
+            livePhotoView.playbackGestureRecognizer.isEnabled = true
+            print("✅ Live Photo手势识别器已启用")
+            
+            // 设置委托来监听播放状态
+            livePhotoView.delegate = self
+            
             // 异步加载Live Photo
             Task {
                 do {
@@ -170,9 +180,22 @@ class ScreenshotDetailSheet: UIViewController {
                     
                     await MainActor.run {
                         livePhotoView.livePhoto = livePhoto
+                        print("📸 Live Photo已加载到视图")
+                        
+                        // 🎯 关键修复：Live Photo加载完成后自动开始播放
+                        // 延迟一小段时间确保视图已经完全布局完成
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                            // 检查Live Photo是否成功加载
+                            if livePhotoView.livePhoto != nil {
+                                livePhotoView.startPlayback(with: .full)
+                                print("🎥 Live Photo自动播放已启动")
+                            } else {
+                                print("❌ Live Photo未能正确加载，无法自动播放")
+                            }
+                        }
                     }
                 } catch {
-                    print("Failed to load Live Photo: \(error)")
+                    print("❌ Live Photo加载失败: \(error)")
                     // 如果Live Photo加载失败，显示静态图片
                     await MainActor.run {
                         self.setupStaticImageView(in: containerView, with: screenshot)
@@ -375,6 +398,27 @@ class ScreenshotDetailSheet: UIViewController {
     private func scrollToCurrentIndex(animated: Bool) {
         let offsetX = CGFloat(currentIndex) * scrollView.frame.width
         scrollView.setContentOffset(CGPoint(x: offsetX, y: 0), animated: animated)
+    }
+    
+    // MARK: - Cleanup Methods
+    
+    // MARK: - PHLivePhotoViewDelegate
+    func livePhotoView(_ livePhotoView: PHLivePhotoView, willBeginPlaybackWith playbackStyle: PHLivePhotoViewPlaybackStyle) {
+        print("🎬 Live Photo开始播放")
+    }
+    
+    func livePhotoView(_ livePhotoView: PHLivePhotoView, didEndPlaybackWith playbackStyle: PHLivePhotoViewPlaybackStyle) {
+        print("⏹️ Live Photo播放结束")
+    }
+    
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        // 清理委托引用
+        for subview in stackView.arrangedSubviews {
+            if let livePhotoView = subview as? PHLivePhotoView {
+                livePhotoView.delegate = nil
+            }
+        }
     }
     
     /// 设置静态图片视图的辅助方法

@@ -772,6 +772,15 @@ class ProcessingOptionCell: UITableViewCell {
         iconImageView.image = UIImage(systemName: option.icon)
         titleLabel.text = option.title
         descriptionLabel.text = option.description
+        
+        // 🌟 为时间序列模式添加特殊的渐变背景突出显示
+        if option.title.contains("时间序列模式") {
+            backgroundColor = ThemeManager.primaryGradientStart.withAlphaComponent(0.3)
+            layer.cornerRadius = ThemeManager.standardCornerRadius
+        } else {
+            backgroundColor = .clear
+            layer.cornerRadius = 0
+        }
     }
 }
 
