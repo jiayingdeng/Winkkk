@@ -21,7 +21,8 @@ class VideoGalleryViewController: UIViewController {
         cv.dataSource = self
         cv.backgroundColor = .clear
         cv.showsVerticalScrollIndicator = false
-        cv.contentInset = UIEdgeInsets(top: 20, left: 8, bottom: 20, right: 8)
+        // 修复：移除此处的contentInset，统一交由Compositional Layout管理
+        // cv.contentInset = UIEdgeInsets(top: 20, left: 8, bottom: 20, right: 8)
         
         // 注册cell
         cv.register(VideoThumbnailCell.self, forCellWithReuseIdentifier: VideoThumbnailCell.identifier)
@@ -148,22 +149,22 @@ class VideoGalleryViewController: UIViewController {
             heightDimension: .fractionalWidth(0.7)
         )
         let item = NSCollectionLayoutItem(layoutSize: itemSize)
-        // 移除item的contentInsets以避免宽度溢出导致的水平滚动
-        // item.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4)
+        // 修复：启用item的contentInsets来创建间距，避免宽度溢出导致的水平滚动
+        // 这会在每个item的frame内部创建边距，左右item的边距会相加形成中间间距
+        item.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4)
         
         let groupSize = NSCollectionLayoutSize(
             widthDimension: .fractionalWidth(1.0),
             heightDimension: .fractionalWidth(0.7)
         )
-        // 修复：每个group包含2个item，而不是只有1个
         let group = NSCollectionLayoutGroup.horizontal(layoutSize: groupSize, subitem: item, count: 2)
-        // 在group级别添加间距，避免宽度计算问题
-        group.interItemSpacing = .fixed(8)
+        // 修复：移除group级别的间距，因为间距现在由item.contentInsets负责
+        // group.interItemSpacing = .fixed(8)
         
         let section = NSCollectionLayoutSection(group: group)
         section.interGroupSpacing = 8
-        // 调整section的内边距来替代item的contentInsets
-        section.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 4, bottom: 4, trailing: 4)
+        // 修复：将collectionView的边距合并到section的内边距中，以确保宽度计算的准确性
+        section.contentInsets = NSDirectionalEdgeInsets(top: 20, leading: 12, bottom: 20, trailing: 12)
         
         return UICollectionViewCompositionalLayout(section: section)
     }

@@ -1047,9 +1047,15 @@ class VideoPlayerViewController: UIViewController {
     }
     
     private func navigateToScreenshotProcessing() {
-        // TODO: 创建并展示ScreenshotProcessingViewController
-        // 目前暂时直接返回，后续实现处理中心
-        dismiss(animated: true)
+        // 跳转到处理中心
+        let screenshots = screenshotManager.screenshots
+        let processingVC = ScreenshotProcessingViewController(
+            screenshots: screenshots,
+            mode: screenshotManager.currentMode
+        )
+        let navController = UINavigationController(rootViewController: processingVC)
+        navController.modalPresentationStyle = .fullScreen
+        present(navController, animated: true)
     }
     
     // MARK: - 批量操作按钮动作已移除 - 功能集成到ScreenshotPreviewBar中
