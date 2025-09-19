@@ -8,6 +8,8 @@
 
 import UIKit
 import AVFoundation
+import Photos
+import PhotosUI
 
 class ScreenshotProcessingViewController: UIViewController {
     
@@ -437,22 +439,151 @@ extension ScreenshotProcessingViewController {
     
     private func playLivePhotos() {
         print("▶️ 播放Live Photo")
-        // TODO: 实现Live Photo播放功能
+        
+        // 获取Live Photo类型的截图
+        let livePhotos = screenshots.filter { $0.mode == .livePhoto }
+        guard !livePhotos.isEmpty else {
+            showAlert(title: "提示", message: "没有Live Photo可以播放")
+            return
+        }
+        
+        // 使用现有的截图详情界面来播放Live Photo
+        let detailSheet = ScreenshotDetailSheet(screenshots: livePhotos, currentIndex: 0)
+        present(detailSheet, animated: true)
     }
     
     private func setCoverFrame() {
         print("🖼️ 设置封面")
-        // TODO: 实现Live Photo封面设置功能
+        
+        // 获取Live Photo类型的截图
+        let livePhotos = screenshots.filter { $0.mode == .livePhoto }
+        guard !livePhotos.isEmpty else {
+            showAlert(title: "提示", message: "没有Live Photo可以设置封面")
+            return
+        }
+        
+        // 使用现有的截图详情界面来设置Live Photo封面
+        let detailSheet = ScreenshotDetailSheet(screenshots: livePhotos, currentIndex: 0)
+        present(detailSheet, animated: true)
     }
     
     private func saveLivePhotos() {
         print("💾 保存Live Photo")
-        // TODO: 实现Live Photo保存功能
+        
+        // 获取Live Photo类型的截图
+        let livePhotos = screenshots.filter { $0.mode == .livePhoto }
+        guard !livePhotos.isEmpty else {
+            showAlert(title: "提示", message: "没有Live Photo可以保存")
+            return
+        }
+        
+        // 显示保存确认
+        let alert = UIAlertController(
+            title: "保存Live Photo",
+            message: "将\(livePhotos.count)个Live Photo保存到系统相册？",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "保存", style: .default) { _ in
+            self.performLivePhotoSave(livePhotos)
+        })
+        
+        present(alert, animated: true)
     }
     
     private func shareLivePhotos() {
         print("📤 分享Live Photo")
-        // TODO: 实现Live Photo分享功能
+        
+        // 获取Live Photo类型的截图
+        let livePhotos = screenshots.filter { $0.mode == .livePhoto }
+        guard !livePhotos.isEmpty else {
+            showAlert(title: "提示", message: "没有Live Photo可以分享")
+            return
+        }
+        
+        // 检查是否有有效的Live Photo
+        let validLivePhotos = livePhotos.compactMap { screenshot -> URL? in
+            guard let livePhotoVideoPath = screenshot.livePhotoVideoPath,
+                  FileManager.default.fileExists(atPath: livePhotoVideoPath.path) else {
+                return nil
+            }
+            return livePhotoVideoPath
+        }
+        
+        guard !validLivePhotos.isEmpty else {
+            showAlert(title: "错误", message: "没有可用的Live Photo文件")
+            return
+        }
+        
+        // 创建分享界面
+        let activityVC = UIActivityViewController(
+            activityItems: validLivePhotos,
+            applicationActivities: nil
+        )
+        
+        // iPad适配
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+        
+        present(activityVC, animated: true)
+    }
+    
+    /// 执行Live Photo保存操作
+    private func performLivePhotoSave(_ livePhotos: [ScreenshotItem]) {
+        // 显示保存进度
+        let progressAlert = UIAlertController(
+            title: "保存中",
+            message: "正在保存Live Photo到相册...",
+            preferredStyle: .alert
+        )
+        present(progressAlert, animated: true)
+        
+        // 使用ScreenshotManager的批量保存功能
+        ScreenshotManager.shared.batchSaveLivePhotosToAlbum(
+            livePhotos,
+            progress: { completed, total in
+                DispatchQueue.main.async {
+                    progressAlert.message = "正在保存Live Photo (\(completed)/\(total))..."
+                }
+            },
+            completion: { successCount, failureCount in
+                DispatchQueue.main.async {
+                    progressAlert.dismiss(animated: true) {
+                        self.showSaveResult(successCount: successCount, failureCount: failureCount)
+                    }
+                }
+            }
+        )
+    }
+    
+    /// 显示保存结果
+    private func showSaveResult(successCount: Int, failureCount: Int) {
+        let title: String
+        let message: String
+        
+        if failureCount == 0 {
+            title = "保存成功"
+            message = "已成功保存\(successCount)个Live Photo到相册"
+        } else if successCount == 0 {
+            title = "保存失败"
+            message = "保存失败，请检查相册权限设置"
+        } else {
+            title = "部分保存成功"
+            message = "成功保存\(successCount)个，失败\(failureCount)个Live Photo"
+        }
+        
+        showAlert(title: title, message: message)
+    }
+    
+    /// 显示提示对话框
+    private func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
     }
 }
 

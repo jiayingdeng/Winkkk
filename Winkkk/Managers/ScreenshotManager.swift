@@ -9,6 +9,7 @@
 import Foundation
 import UIKit
 import Combine
+import Photos
 
 // MARK: - 截图管理器
 class ScreenshotManager: ObservableObject {
@@ -320,6 +321,135 @@ extension ScreenshotManager {
     /// - Returns: 符合状态的截图数组
     func getScreenshots(withStatus status: ProcessingStatus) -> [ScreenshotItem] {
         return screenshots.filter { $0.status == status }
+    }
+}
+
+// MARK: - Live Photo保存功能
+extension ScreenshotManager {
+    
+    /// 保存Live Photo到系统相册
+    /// - Parameters:
+    ///   - screenshotItem: Live Photo截图项目
+    ///   - completion: 完成回调
+    func saveLivePhotoToAlbum(_ screenshotItem: ScreenshotItem, completion: @escaping (Result<Void, Error>) -> Void) {
+        guard screenshotItem.mode == .livePhoto,
+              let livePhotoVideoPath = screenshotItem.livePhotoVideoPath,
+              let livePhotoIdentifier = screenshotItem.livePhotoIdentifier else {
+            completion(.failure(ScreenshotError.invalidLivePhoto))
+            return
+        }
+        
+        let originalImagePath = screenshotItem.originalImagePath
+        
+        // 请求照片库权限
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            DispatchQueue.main.async {
+                switch status {
+                case .authorized, .limited:
+                    self.performLivePhotoSave(
+                        imagePath: originalImagePath,
+                        videoPath: livePhotoVideoPath,
+                        identifier: livePhotoIdentifier,
+                        completion: completion
+                    )
+                    
+                case .denied, .restricted:
+                    completion(.failure(ScreenshotError.permissionDenied("需要照片库访问权限来保存Live Photo")))
+                    
+                case .notDetermined:
+                    completion(.failure(ScreenshotError.permissionDenied("照片库权限未确定")))
+                    
+                @unknown default:
+                    completion(.failure(ScreenshotError.permissionDenied("未知的权限状态")))
+                }
+            }
+        }
+    }
+    
+    /// 执行Live Photo保存操作
+    private func performLivePhotoSave(
+        imagePath: URL,
+        videoPath: URL,
+        identifier: String,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        PHPhotoLibrary.shared().performChanges({
+            let creationRequest = PHAssetCreationRequest.forAsset()
+            
+            // 设置Live Photo创建选项
+            let imageOptions = PHAssetResourceCreationOptions()
+            imageOptions.uniformTypeIdentifier = "public.heic"
+            
+            let videoOptions = PHAssetResourceCreationOptions()
+            videoOptions.uniformTypeIdentifier = "com.apple.quicktime-movie"
+            
+            // 添加图片资源
+            creationRequest.addResource(
+                with: .photo,
+                fileURL: imagePath,
+                options: imageOptions
+            )
+            
+            // 添加视频资源
+            creationRequest.addResource(
+                with: .pairedVideo,
+                fileURL: videoPath,
+                options: videoOptions
+            )
+            
+        }) { success, error in
+            DispatchQueue.main.async {
+                if success {
+                    completion(.success(()))
+                } else {
+                    completion(.failure(error ?? ScreenshotError.saveFailed("Live Photo保存失败")))
+                }
+            }
+        }
+    }
+    
+    /// 批量保存Live Photo到相册
+    /// - Parameters:
+    ///   - livePhotos: Live Photo截图数组
+    ///   - progress: 进度回调 (已完成数量, 总数量)
+    ///   - completion: 完成回调 (成功数量, 失败数量)
+    func batchSaveLivePhotosToAlbum(
+        _ livePhotos: [ScreenshotItem],
+        progress: @escaping (Int, Int) -> Void,
+        completion: @escaping (Int, Int) -> Void
+    ) {
+        let validLivePhotos = livePhotos.filter { $0.mode == .livePhoto }
+        guard !validLivePhotos.isEmpty else {
+            completion(0, 0)
+            return
+        }
+        
+        var successCount = 0
+        var failureCount = 0
+        var completedCount = 0
+        
+        let totalCount = validLivePhotos.count
+        
+        for livePhoto in validLivePhotos {
+            saveLivePhotoToAlbum(livePhoto) { result in
+                completedCount += 1
+                
+                switch result {
+                case .success:
+                    successCount += 1
+                case .failure:
+                    failureCount += 1
+                }
+                
+                // 报告进度
+                progress(completedCount, totalCount)
+                
+                // 检查是否全部完成
+                if completedCount == totalCount {
+                    completion(successCount, failureCount)
+                }
+            }
+        }
     }
 }
 

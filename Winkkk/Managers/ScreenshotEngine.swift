@@ -315,10 +315,11 @@ enum ScreenshotError: LocalizedError {
     case generationFailed(String)
     case saveFailed(String)
     case insufficientStorage
-    case permissionDenied
+    case permissionDenied(String)
     case imageProcessingFailed
     case fileSaveFailed
     case directoryCreationFailed
+    case invalidLivePhoto
     
     var errorDescription: String? {
         switch self {
@@ -330,8 +331,10 @@ enum ScreenshotError: LocalizedError {
             return "保存截图失败: \(message)"
         case .insufficientStorage:
             return "存储空间不足"
-        case .permissionDenied:
-            return "权限被拒绝"
+        case .permissionDenied(let message):
+            return message
+        case .invalidLivePhoto:
+            return "无效的Live Photo数据"
         case .imageProcessingFailed:
             return "图片处理失败"
         case .fileSaveFailed:
