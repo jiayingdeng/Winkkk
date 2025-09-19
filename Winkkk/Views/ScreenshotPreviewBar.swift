@@ -80,6 +80,10 @@ class ScreenshotPreviewBar: UIView {
         // 🆕 使用透明背景，毛玻璃效果由统一容器提供
         backgroundColor = .clear
         
+        // 🎯 关键修复：提高整个预览栏的层级，确保在TimelineView之上
+        layer.zPosition = 1500  // 高于TimelineView但低于按钮
+        isUserInteractionEnabled = true
+        
         // 🔧 直接使用self作为容器，避免双重边界
         // 设置子组件
         setupHeaderView()
@@ -155,6 +159,11 @@ class ScreenshotPreviewBar: UIView {
     private func setupActionButtons() {
         actionButtonsContainer.backgroundColor = .clear
         
+        // 🎯 关键修复：提高按钮容器层级，确保在最顶层
+        actionButtonsContainer.layer.zPosition = 2000  // 最高层级
+        actionButtonsContainer.isUserInteractionEnabled = true
+        actionButtonsContainer.isExclusiveTouch = true  // 独占触摸，防止手势干扰
+        
         // 截图按钮
         setupCaptureButton()
         
@@ -202,6 +211,11 @@ class ScreenshotPreviewBar: UIView {
         captureButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         captureButton.titleLabel?.font = ThemeManager.buttonFont
         
+        // 🎯 关键修复：确保按钮可交互性和层级
+        captureButton.isUserInteractionEnabled = true
+        captureButton.isExclusiveTouch = true  // 独占触摸
+        captureButton.layer.zPosition = 2100  // 确保在最顶层
+        
         captureButton.addTarget(self, action: #selector(captureButtonTapped), for: .touchUpInside)
         addButtonTouchEffects(to: captureButton)
     }
@@ -213,6 +227,11 @@ class ScreenshotPreviewBar: UIView {
         previewButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         previewButton.titleLabel?.font = ThemeManager.buttonFont
         
+        // 🎯 关键修复：确保按钮可交互性和层级
+        previewButton.isUserInteractionEnabled = true
+        previewButton.isExclusiveTouch = true  // 独占触摸
+        previewButton.layer.zPosition = 2100  // 确保在最顶层
+        
         previewButton.addTarget(self, action: #selector(previewButtonTapped), for: .touchUpInside)
         addButtonTouchEffects(to: previewButton)
     }
@@ -223,6 +242,11 @@ class ScreenshotPreviewBar: UIView {
         enhanceButton.backgroundColor = ThemeManager.success
         enhanceButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         enhanceButton.titleLabel?.font = ThemeManager.buttonFont
+        
+        // 🎯 关键修复：确保按钮可交互性和层级
+        enhanceButton.isUserInteractionEnabled = true
+        enhanceButton.isExclusiveTouch = true  // 独占触摸
+        enhanceButton.layer.zPosition = 2100  // 确保在最顶层
         
         enhanceButton.addTarget(self, action: #selector(enhanceButtonTapped), for: .touchUpInside)
         addButtonTouchEffects(to: enhanceButton)
@@ -421,16 +445,19 @@ class ScreenshotPreviewBar: UIView {
     
     // MARK: - Actions
     @objc private func captureButtonTapped() {
+        print("🎯 ScreenshotPreviewBar: 截图按钮被点击！")
         HapticFeedbackManager.shared.buttonTap()
         delegate?.screenshotPreviewBar(self, didRequestCapture: screenshotManager.currentMode)
     }
     
     @objc private func previewButtonTapped() {
+        print("🎯 ScreenshotPreviewBar: 预览按钮被点击！")
         HapticFeedbackManager.shared.buttonTap()
         delegate?.screenshotPreviewBar(self, didRequestPreviewAll: screenshotManager.screenshots)
     }
     
     @objc private func enhanceButtonTapped() {
+        print("🎯 ScreenshotPreviewBar: 修复按钮被点击！")
         HapticFeedbackManager.shared.buttonTap()
         delegate?.screenshotPreviewBar(self, didRequestEnhanceAll: screenshotManager.screenshots)
     }
