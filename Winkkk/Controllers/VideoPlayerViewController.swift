@@ -518,7 +518,7 @@ class VideoPlayerViewController: UIViewController {
         }
     }
     
-    // 🎯 开始内容流动 (Wink编辑器模式)
+    // 🎯 开始内容流动 (Wink编辑器模式) + 双轨同步播放
     private func startFlowing() {
         guard videoDuration.seconds > 0 else { return }
         
@@ -527,6 +527,10 @@ class VideoPlayerViewController: UIViewController {
         let basePixelsPerSecond = totalTimelineWidth / CGFloat(videoDuration.seconds)
         let adjustedSpeed = basePixelsPerSecond * CGFloat(currentFlowSpeed.multiplier)
         
+        // 🆕 启动AVPlayer播放，设置播放速度与流动速度同步
+        player?.play()
+        player?.rate = Float(currentFlowSpeed.multiplier)
+        
         // 启动定时器，让内容流动
         flowTimer?.invalidate()
         flowTimer = Timer.scheduledTimer(withTimeInterval: 1.0/30.0, repeats: true) { [weak self] _ in
@@ -534,36 +538,66 @@ class VideoPlayerViewController: UIViewController {
         }
         
         isFlowing = true
-        print("🎯 开始内容流动 - 速度: \(currentFlowSpeed.displayName)")
+        print("🎯 开始双轨同步流动 - 时间轴速度: \(currentFlowSpeed.displayName), 视频播放速度: \(currentFlowSpeed.multiplier)x")
     }
     
-    // 🎯 停止内容流动
+    // 🎯 停止内容流动 + 双轨同步暂停
     private func stopFlowing() {
+        // 🆕 暂停AVPlayer播放
+        player?.pause()
+        
+        // 停止时间轴滚动定时器
         flowTimer?.invalidate()
         flowTimer = nil
         isFlowing = false
-        print("⏸️ 停止内容流动")
+        print("⏸️ 停止双轨同步流动 - 时间轴停止滚动，视频暂停播放")
     }
     
-    // 🎯 编辑器模式：暂停播放 = 停止流动
+    // 🎯 编辑器模式：暂停播放 = 停止流动 (双轨同步)
     private func pausePlayer() {
-        stopFlowing()
-        // 同时暂停视频播放
-        player?.pause()
+        stopFlowing()  // 已包含player?.pause()调用，无需重复
     }
     
-    // 🎯 更新流动位置
+    // 🎯 更新流动位置 (双轨同步：时间轴 + 视频播放)
     private func updateFlowPosition(speed: CGFloat) {
         let currentOffset = timelineView.timelineScrollView.contentOffset.x
         let newOffset = currentOffset + (speed / 30.0)  // 30fps
         let maxOffset = timelineView.timelineScrollView.contentSize.width - timelineView.timelineScrollView.bounds.width
         
         if newOffset >= maxOffset {
-            // 流动到末尾，停止
+            // 流动到末尾，停止双轨同步
             timelineView.timelineScrollView.setContentOffset(CGPoint(x: maxOffset, y: 0), animated: false)
-            stopFlowing()
+            stopFlowing()  // 自动停止时间轴滚动和视频播放
         } else {
+            // 更新时间轴位置
             timelineView.timelineScrollView.setContentOffset(CGPoint(x: newOffset, y: 0), animated: false)
+            
+            // 🆕 同步视频播放进度：确保视频播放位置与时间轴位置匹配
+            syncVideoPositionWithTimeline()
+        }
+    }
+    
+    // 🆕 双轨同步：确保视频播放位置与时间轴位置匹配
+    private func syncVideoPositionWithTimeline() {
+        guard isFlowing, videoDuration.seconds > 0 else { return }
+        
+        // 获取当前时间轴对应的时间位置
+        let currentCaptureTime = timelineView.getCurrentCaptureTime()
+        let targetTime = CMTime(seconds: currentCaptureTime, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        
+        // 获取当前视频播放时间
+        guard let currentPlayerTime = player?.currentTime() else { return }
+        
+        // 计算时间差，如果差异过大则进行同步调整
+        let timeDifference = abs(currentCaptureTime - currentPlayerTime.seconds)
+        
+        if timeDifference > 0.5 { // 如果差异超过0.5秒，进行同步调整
+            player?.seek(to: targetTime, toleranceBefore: CMTime.zero, toleranceAfter: CMTime.zero) { [weak self] completed in
+                if completed {
+                    // 恢复播放速度
+                    self?.player?.rate = Float(self?.currentFlowSpeed.multiplier ?? 1.0)
+                }
+            }
         }
     }
     
@@ -624,14 +658,21 @@ class VideoPlayerViewController: UIViewController {
         }
     }
     
-    // 🎯 执行视频帧跳转
+    // 🎯 执行视频帧跳转 (仅在预览模式下，播放状态时不干扰)
     private func performVideoSeek(to time: CMTime) {
+        // 🆕 双轨同步：如果正在播放流动，不执行手动跳转，避免干扰播放
+        guard !isFlowing else {
+            print("🎯 播放状态中，跳过手动帧跳转，保持播放连续性")
+            return
+        }
+        
         player?.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] completed in
             if completed {
                 DispatchQueue.main.async {
                     self?.currentTime = time
                     // 只更新当前播放时间，不更新截取时间标签
                     self?.currentTimeLabel.text = time.formattedString
+                    print("🎯 预览模式：已跳转到 \(time.formattedString)")
                 }
             }
         }
