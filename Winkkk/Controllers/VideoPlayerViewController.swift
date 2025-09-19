@@ -294,7 +294,7 @@ class VideoPlayerViewController: UIViewController {
             controlPanelBlurView.topAnchor.constraint(equalTo: unifiedControlPanelView.topAnchor),
             controlPanelBlurView.leadingAnchor.constraint(equalTo: unifiedControlPanelView.leadingAnchor),
             controlPanelBlurView.trailingAnchor.constraint(equalTo: unifiedControlPanelView.trailingAnchor),
-            controlPanelBlurView.heightAnchor.constraint(greaterThanOrEqualToConstant: 140),
+            controlPanelBlurView.heightAnchor.constraint(greaterThanOrEqualToConstant: 260),  // 🆕 增加高度以容纳截图预览栏
             
             // 🎯 时间轴 - 允许视觉溢出屏幕边界 (Wink风格)
             timelineView.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 20),
@@ -346,25 +346,21 @@ class VideoPlayerViewController: UIViewController {
         screenshotPreviewBar.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            // 🎯 统一容器内：模式切换器 - 无缝连接控制面板
+            // 🎯 控制面板内：截图预览栏 - 紧贴时间标签下方
+            screenshotPreviewBar.topAnchor.constraint(equalTo: currentTimeLabel.bottomAnchor, constant: 12),
+            screenshotPreviewBar.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 16),
+            screenshotPreviewBar.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -16),
+            screenshotPreviewBar.bottomAnchor.constraint(equalTo: controlPanelBlurView.bottomAnchor, constant: -16),
+            
+            // 🎯 统一容器内：模式切换器 - 紧接控制面板
             captureModeSwitcher.topAnchor.constraint(equalTo: controlPanelBlurView.bottomAnchor, constant: 0),
             captureModeSwitcher.centerXAnchor.constraint(equalTo: unifiedControlPanelView.centerXAnchor),
             captureModeSwitcher.heightAnchor.constraint(equalToConstant: 44),
-            captureModeSwitcher.widthAnchor.constraint(equalToConstant: 280),
-            
-            // 🎯 统一容器内：截图预览栏 - 添加适当内边距，避免双重边界
-            screenshotPreviewBar.topAnchor.constraint(equalTo: captureModeSwitcher.bottomAnchor, constant: 8),
-            screenshotPreviewBar.leadingAnchor.constraint(equalTo: unifiedControlPanelView.leadingAnchor, constant: 16),
-            screenshotPreviewBar.trailingAnchor.constraint(equalTo: unifiedControlPanelView.trailingAnchor, constant: -16)
+            captureModeSwitcher.widthAnchor.constraint(equalToConstant: 280)
         ])
         
-        // 🔧 关键修复：使用优先级约束避免冲突，添加底部边距
-        let bottomConstraint = screenshotPreviewBar.bottomAnchor.constraint(equalTo: unifiedControlPanelView.safeAreaLayoutGuide.bottomAnchor, constant: -8)
-        bottomConstraint.priority = UILayoutPriority(999)  // 高优先级但非必需
-        bottomConstraint.isActive = true
-        
-        // 最小高度约束保证可用性
-        let minHeightConstraint = screenshotPreviewBar.heightAnchor.constraint(greaterThanOrEqualToConstant: 120)
+        // 🆕 截图预览栏最小高度约束保证可用性
+        let minHeightConstraint = screenshotPreviewBar.heightAnchor.constraint(greaterThanOrEqualToConstant: 100)
         minHeightConstraint.priority = UILayoutPriority(1000)  // 必需约束
         minHeightConstraint.isActive = true
     }
@@ -445,8 +441,8 @@ class VideoPlayerViewController: UIViewController {
         screenshotPreviewBar.delegate = self
         screenshotPreviewBar.isHidden = false  // 🎯 固定三分屏：底部区域始终显示
         screenshotPreviewBar.alpha = 1.0
-        // 🆕 添加到统一容器中，而不是直接添加到view
-        unifiedControlPanelView.contentView.addSubview(screenshotPreviewBar)
+        // 🆕 添加到控制面板内部，实现功能聚合
+        controlPanelBlurView.contentView.addSubview(screenshotPreviewBar)
     }
     
     // setupBatchOperationPanel 已移除 - 功能集成到ScreenshotPreviewBar中
