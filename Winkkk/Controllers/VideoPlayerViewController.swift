@@ -688,6 +688,18 @@ class VideoPlayerViewController: UIViewController {
         // 🎯 编辑器模式：停止流动以便精确截图
         stopFlowing()
         
+        // 🎯 根据当前模式执行不同的截图操作
+        let currentMode = screenshotManager.currentMode
+        
+        switch currentMode {
+        case .stillImage:
+            captureStillImage()
+        case .livePhoto:
+            captureLivePhoto()
+        }
+    }
+    
+    private func captureStillImage() {
         // 🎯 Wink风格：使用竖线位置的截取时间，而非当前播放时间
         let captureTime = timelineView.getCurrentCaptureTime()
         let cmCaptureTime = CMTime(seconds: captureTime, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
@@ -701,6 +713,30 @@ class VideoPlayerViewController: UIViewController {
                     self?.handleScreenshotSuccess(image)
                 case .failure(let error):
                     self?.showError(error)
+                }
+            }
+        }
+    }
+    
+    private func captureLivePhoto() {
+        // 🎯 Live Photo模式：从竖线位置开始截取3秒片段
+        let captureTime = timelineView.getCurrentCaptureTime()
+        let cmCaptureTime = CMTime(seconds: captureTime, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        
+        print("🎬 准备Live Photo截图 - 开始时间: \(captureTime)秒, CMTime: \(cmCaptureTime)")
+        
+        // 显示Live Photo创建进度
+        showLivePhotoCreationProgress()
+        
+        screenshotEngine.captureLivePhoto(from: videoURL, startTime: cmCaptureTime) { [weak self] result in
+            DispatchQueue.main.async {
+                self?.hideLivePhotoCreationProgress()
+                
+                switch result {
+                case .success(let (image, livePhoto)):
+                    self?.handleLivePhotoSuccess(image: image, livePhoto: livePhoto, captureTime: captureTime)
+                case .failure(let error):
+                    self?.handleLivePhotoError(error)
                 }
             }
         }
@@ -1230,7 +1266,17 @@ extension VideoPlayerViewController: ScreenshotPreviewBarDelegate {
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestCapture mode: CaptureMode) {
         // 请求截图
         print("📷 请求截图: \(mode.displayName)")
-        // 这里可以直接触发截图功能
+        
+        // 🎯 停止流动以便精确截图
+        stopFlowing()
+        
+        // 🎯 根据模式执行不同的截图操作
+        switch mode {
+        case .stillImage:
+            captureStillImage()
+        case .livePhoto:
+            captureLivePhoto()
+        }
     }
     
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestPreviewAll screenshots: [ScreenshotItem]) {
@@ -1346,6 +1392,111 @@ extension VideoPlayerViewController {
             completion?()
         })
         present(alert, animated: true)
+    }
+}
+
+// MARK: - Live Photo Support
+extension VideoPlayerViewController {
+    
+    /// 处理Live Photo截图成功
+    private func handleLivePhotoSuccess(image: UIImage, livePhoto: PHLivePhoto, captureTime: Double) {
+        print("🎬 Live Photo创建成功！")
+        
+        // 🆕 创建Live Photo截图项目
+        let screenshot = ScreenshotItem(
+            image: image,
+            timestamp: captureTime,
+            mode: .livePhoto,
+            videoURL: videoURL,
+            livePhoto: livePhoto
+        )
+        
+        // 🎯 保存到截图管理器
+        screenshotManager.safeAddScreenshot(screenshot)
+        
+        // 🎯 显示成功动画
+        showScreenshotSuccessAnimation()
+        
+        // 🎯 触觉反馈
+        HapticFeedbackManager.shared.notificationSuccess()
+        
+        print("🎬 Live Photo截图已保存 - 时间戳: \(captureTime)")
+    }
+    
+    /// 处理Live Photo创建错误
+    private func handleLivePhotoError(_ error: Error) {
+        print("❌ Live Photo创建失败: \(error.localizedDescription)")
+        
+        // 显示错误提示
+        showAlert(
+            title: "Live Photo创建失败",
+            message: "无法创建Live Photo：\(error.localizedDescription)"
+        )
+        
+        // 触觉反馈
+        HapticFeedbackManager.shared.notificationError()
+    }
+    
+    /// 显示Live Photo创建进度
+    private func showLivePhotoCreationProgress() {
+        // 创建进度提示视图
+        let progressView = UIView()
+        progressView.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+        progressView.layer.cornerRadius = 12
+        progressView.translatesAutoresizingMaskIntoConstraints = false
+        progressView.tag = 999 // 用于后续移除
+        
+        let activityIndicator = UIActivityIndicatorView(style: .large)
+        activityIndicator.color = .white
+        activityIndicator.startAnimating()
+        activityIndicator.translatesAutoresizingMaskIntoConstraints = false
+        
+        let label = UILabel()
+        label.text = "正在创建Live Photo..."
+        label.textColor = .white
+        label.font = .systemFont(ofSize: 16, weight: .medium)
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
+        
+        progressView.addSubview(activityIndicator)
+        progressView.addSubview(label)
+        view.addSubview(progressView)
+        
+        NSLayoutConstraint.activate([
+            progressView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            progressView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            progressView.widthAnchor.constraint(equalToConstant: 200),
+            progressView.heightAnchor.constraint(equalToConstant: 100),
+            
+            activityIndicator.centerXAnchor.constraint(equalTo: progressView.centerXAnchor),
+            activityIndicator.topAnchor.constraint(equalTo: progressView.topAnchor, constant: 20),
+            
+            label.centerXAnchor.constraint(equalTo: progressView.centerXAnchor),
+            label.topAnchor.constraint(equalTo: activityIndicator.bottomAnchor, constant: 12),
+            label.leadingAnchor.constraint(equalTo: progressView.leadingAnchor, constant: 16),
+            label.trailingAnchor.constraint(equalTo: progressView.trailingAnchor, constant: -16)
+        ])
+        
+        // 添加出现动画
+        progressView.alpha = 0
+        progressView.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+        
+        UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5) {
+            progressView.alpha = 1
+            progressView.transform = .identity
+        }
+    }
+    
+    /// 隐藏Live Photo创建进度
+    private func hideLivePhotoCreationProgress() {
+        guard let progressView = view.viewWithTag(999) else { return }
+        
+        UIView.animate(withDuration: 0.25, animations: {
+            progressView.alpha = 0
+            progressView.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+        }) { _ in
+            progressView.removeFromSuperview()
+        }
     }
 }
 

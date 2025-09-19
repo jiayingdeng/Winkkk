@@ -91,6 +91,20 @@ class ScreenshotManager: ObservableObject {
         print("📸 添加截图: \(currentMode.displayName)模式，当前总数: \(screenshots.count)")
     }
     
+    /// 安全添加截图（无错误抛出版本）
+    /// - Parameter screenshot: 截图项目
+    /// - Returns: 是否成功添加
+    @discardableResult
+    func safeAddScreenshot(_ screenshot: ScreenshotItem) -> Bool {
+        do {
+            try addScreenshot(screenshot)
+            return true
+        } catch {
+            print("❌ 添加截图失败: \(error.localizedDescription)")
+            return false
+        }
+    }
+    
     /// 移除指定位置的截图
     /// - Parameter index: 截图索引
     func removeScreenshot(at index: Int) {

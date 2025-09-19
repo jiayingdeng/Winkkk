@@ -7,6 +7,8 @@
 //
 
 import UIKit
+import Photos
+import PhotosUI
 
 protocol ScreenshotDetailSheetDelegate: AnyObject {
     func screenshotDetailSheet(_ sheet: ScreenshotDetailSheet, didSelectScreenshot screenshot: ScreenshotItem, isSelected: Bool)
@@ -112,10 +114,10 @@ class ScreenshotDetailSheet: UIViewController {
         
         scrollView.addSubview(stackView)
         
-        // 添加截图图片视图
+        // 添加截图预览视图
         for screenshot in screenshots {
-            let imageView = createImageView(for: screenshot)
-            stackView.addArrangedSubview(imageView)
+            let previewView = createImageView(for: screenshot)
+            stackView.addArrangedSubview(previewView)
         }
     }
     
@@ -141,16 +143,92 @@ class ScreenshotDetailSheet: UIViewController {
         bottomActionBar.addSubview(processingCenterButton)
     }
     
-    private func createImageView(for screenshot: ScreenshotItem) -> UIImageView {
-        let imageView = UIImageView()
-        imageView.contentMode = .scaleAspectFit
-        imageView.backgroundColor = .black
-        imageView.image = screenshot.image
+    private func createImageView(for screenshot: ScreenshotItem) -> UIView {
+        let containerView = UIView()
+        containerView.backgroundColor = .black
         
         // 设置固定宽度为屏幕宽度
-        imageView.widthAnchor.constraint(equalToConstant: UIScreen.main.bounds.width).isActive = true
+        containerView.widthAnchor.constraint(equalToConstant: UIScreen.main.bounds.width).isActive = true
         
-        return imageView
+        // 检查是否是Live Photo
+        if screenshot.hasLivePhoto, let livePhoto = screenshot.livePhoto {
+            // 创建Live Photo视图
+            let livePhotoView = PHLivePhotoView()
+            livePhotoView.contentMode = .scaleAspectFit
+            livePhotoView.livePhoto = livePhoto
+            livePhotoView.translatesAutoresizingMaskIntoConstraints = false
+            
+            // 添加Live Photo标识
+            let livePhotoIndicator = createLivePhotoIndicator()
+            
+            containerView.addSubview(livePhotoView)
+            containerView.addSubview(livePhotoIndicator)
+            
+            NSLayoutConstraint.activate([
+                livePhotoView.topAnchor.constraint(equalTo: containerView.topAnchor),
+                livePhotoView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+                livePhotoView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+                livePhotoView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
+                
+                livePhotoIndicator.topAnchor.constraint(equalTo: containerView.safeAreaLayoutGuide.topAnchor, constant: 16),
+                livePhotoIndicator.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -16)
+            ])
+        } else {
+            // 创建普通图片视图
+            let imageView = UIImageView()
+            imageView.contentMode = .scaleAspectFit
+            imageView.image = screenshot.image
+            imageView.translatesAutoresizingMaskIntoConstraints = false
+            
+            containerView.addSubview(imageView)
+            
+            NSLayoutConstraint.activate([
+                imageView.topAnchor.constraint(equalTo: containerView.topAnchor),
+                imageView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+                imageView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+                imageView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
+            ])
+        }
+        
+        return containerView
+    }
+    
+    private func createLivePhotoIndicator() -> UIView {
+        let containerView = UIView()
+        containerView.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+        containerView.layer.cornerRadius = 16
+        containerView.translatesAutoresizingMaskIntoConstraints = false
+        
+        let iconLabel = UILabel()
+        iconLabel.text = "LIVE"
+        iconLabel.textColor = .white
+        iconLabel.font = .systemFont(ofSize: 12, weight: .semibold)
+        iconLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        let circleView = UIView()
+        circleView.backgroundColor = .clear
+        circleView.layer.borderColor = UIColor.white.cgColor
+        circleView.layer.borderWidth = 1.5
+        circleView.layer.cornerRadius = 6
+        circleView.translatesAutoresizingMaskIntoConstraints = false
+        
+        containerView.addSubview(iconLabel)
+        containerView.addSubview(circleView)
+        
+        NSLayoutConstraint.activate([
+            containerView.widthAnchor.constraint(equalToConstant: 60),
+            containerView.heightAnchor.constraint(equalToConstant: 32),
+            
+            iconLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 8),
+            iconLabel.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+            
+            circleView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -8),
+            circleView.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+            circleView.widthAnchor.constraint(equalToConstant: 12),
+            circleView.heightAnchor.constraint(equalToConstant: 12)
+        ])
+        
+        return containerView
     }
     
     private func setupConstraints() {
