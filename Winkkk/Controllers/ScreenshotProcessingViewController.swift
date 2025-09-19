@@ -237,6 +237,13 @@ class ScreenshotProcessingViewController: UIViewController {
         switch mode {
         case .stillImage:
             processingOptions = [
+                // 🌟 时间序列模式 - 特色功能，突出显示
+                ProcessingOption(
+                    title: "⏰ 时间序列模式",
+                    description: "将视频关键时刻融合成一张艺术图片",
+                    icon: "clock.arrow.circlepath",
+                    action: { [weak self] in self?.showTimeSequenceMode() }
+                ),
                 ProcessingOption(
                     title: "✨ 批量画质修复",
                     description: "AI智能修复图片质量",
@@ -249,30 +256,39 @@ class ScreenshotProcessingViewController: UIViewController {
                     icon: "square.grid.3x3",
                     action: { [weak self] in self?.showCollageCreation() }
                 ),
+                // 📏 批量调整尺寸 - 暂时不需要
+                /*
                 ProcessingOption(
                     title: "📏 批量调整尺寸",
                     description: "统一调整图片尺寸",
                     icon: "crop",
                     action: { [weak self] in self?.showBatchResize() }
                 ),
+                */
+                // 🏷️ 批量添加水印 - 暂时不需要
+                /*
                 ProcessingOption(
                     title: "🏷️ 批量添加水印",
                     description: "为所有图片添加水印",
                     icon: "text.badge.plus",
                     action: { [weak self] in self?.showBatchWatermark() }
                 ),
+                */
                 ProcessingOption(
                     title: "📤 批量分享",
                     description: "一键分享所有图片",
                     icon: "square.and.arrow.up",
                     action: { [weak self] in self?.showBatchShare() }
-                ),
+                )
+                // 💾 保存到相册 - 在上一步"完成"时已保存，此处重复
+                /*
                 ProcessingOption(
                     title: "💾 保存到相册",
                     description: "保存所有图片到系统相册",
                     icon: "photo.on.rectangle",
                     action: { [weak self] in self?.saveBatchToPhotos() }
                 )
+                */
             ]
             
         case .livePhoto:
@@ -417,6 +433,28 @@ extension ScreenshotProcessingViewController {
         showCollageOptionsAlert(images: images)
     }
     
+    // MARK: - 时间序列模式 (新增核心功能)
+    private func showTimeSequenceMode() {
+        print("⏰ 时间序列模式")
+        
+        // 检查是否有视频截图可用于时间序列处理
+        guard !screenshots.isEmpty else {
+            showAlert(title: "无法处理", message: "没有可用的截图进行时间序列处理")
+            return
+        }
+        
+        // 触觉反馈
+        HapticFeedbackManager.shared.buttonTap()
+        
+        // 跳转到时间序列处理页面
+        let timeSequenceVC = TimeSequenceViewController(screenshots: screenshots)
+        navigationController?.pushViewController(timeSequenceVC, animated: true)
+    }
+    
+    // showTimeSequenceInfoAlert 方法已移除 - 现在直接跳转到 TimeSequenceViewController
+    
+    // MARK: - 暂时注释的功能
+    /*
     private func showBatchResize() {
         print("📏 批量调整尺寸")
         // TODO: 实现批量尺寸调整功能
@@ -427,14 +465,15 @@ extension ScreenshotProcessingViewController {
         // TODO: 实现批量水印功能
     }
     
+    private func saveBatchToPhotos() {
+        print("💾 保存到相册")
+        // TODO: 实现批量保存到相册功能 (前面步骤已保存，此处重复)
+    }
+    */
+    
     private func showBatchShare() {
         print("📤 批量分享")
         // TODO: 实现批量分享功能
-    }
-    
-    private func saveBatchToPhotos() {
-        print("💾 保存到相册")
-        // TODO: 实现批量保存到相册功能
     }
     
     private func playLivePhotos() {
