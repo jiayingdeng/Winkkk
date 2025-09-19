@@ -361,8 +361,8 @@ class VideoPlayerViewController: UIViewController {
         ])
         
         // 🆕 截图预览栏最小高度约束保证可用性
-        let minHeightConstraint = screenshotPreviewBar.heightAnchor.constraint(greaterThanOrEqualToConstant: 100)
-        minHeightConstraint.priority = UILayoutPriority(1000)  // 必需约束
+        let minHeightConstraint = screenshotPreviewBar.heightAnchor.constraint(greaterThanOrEqualToConstant: 150)
+        minHeightConstraint.priority = UILayoutPriority(999)  // 高优先级但非必需，允许在空间不足时适当压缩
         minHeightConstraint.isActive = true
     }
     

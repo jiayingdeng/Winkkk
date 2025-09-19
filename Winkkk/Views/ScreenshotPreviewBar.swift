@@ -197,27 +197,39 @@ class ScreenshotPreviewBar: UIView {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         batchSelectionToolbar.translatesAutoresizingMaskIntoConstraints = false
         
+        // 🔧 关键修复：设置约束优先级，确保ScrollView不被压缩
+        let scrollViewHeightConstraint = scrollView.heightAnchor.constraint(equalToConstant: 60)
+        scrollViewHeightConstraint.priority = UILayoutPriority(1000)  // 最高优先级，绝对不能压缩
+        
+        let headerHeightConstraint = headerView.heightAnchor.constraint(equalToConstant: 30)
+        headerHeightConstraint.priority = UILayoutPriority(999)  // 高优先级
+        
+        let toolbarHeightConstraint = batchSelectionToolbar.heightAnchor.constraint(equalToConstant: 50)
+        toolbarHeightConstraint.priority = UILayoutPriority(998)  // 较高优先级
+        
+        // 底部约束使用较低优先级，允许在空间不足时调整
+        let bottomConstraint = batchSelectionToolbar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: 0)
+        bottomConstraint.priority = UILayoutPriority(997)  // 较低优先级，允许压缩间距
+        
         NSLayoutConstraint.activate([
-            // 🔧 直接使用self，减少内部间距，避免双重边界
-            
             // 头部视图
             headerView.topAnchor.constraint(equalTo: topAnchor, constant: 8),
             headerView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
             headerView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-            headerView.heightAnchor.constraint(equalToConstant: 30),
+            headerHeightConstraint,
             
-            // 滚动视图
+            // 滚动视图 - 最关键的约束，绝对不能被压缩
             scrollView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 8),
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
-            scrollView.heightAnchor.constraint(equalToConstant: 60),
+            scrollViewHeightConstraint,
             
             // 批量选择工具栏
             batchSelectionToolbar.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 8),
             batchSelectionToolbar.leadingAnchor.constraint(equalTo: leadingAnchor),
             batchSelectionToolbar.trailingAnchor.constraint(equalTo: trailingAnchor),
-            batchSelectionToolbar.heightAnchor.constraint(equalToConstant: 50),
-            batchSelectionToolbar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: 0)
+            toolbarHeightConstraint,
+            bottomConstraint
         ])
     }
     
