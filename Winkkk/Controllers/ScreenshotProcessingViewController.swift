@@ -410,7 +410,28 @@ extension ScreenshotProcessingViewController {
     
     private func showBatchImageEnhancement() {
         print("🎨 批量画质修复")
-        // TODO: 实现批量画质修复功能
+        
+        // 检查是否有图片可以处理
+        guard !screenshots.isEmpty else {
+            showAlert(title: "无法处理", message: "没有可用的图片进行画质修复")
+            return
+        }
+        
+        // 获取第一张图片作为主要处理对象
+        guard let firstImage = screenshots.first?.image else {
+            showAlert(title: "错误", message: "无法加载图片")
+            return
+        }
+        
+        // 触觉反馈
+        HapticFeedbackManager.shared.buttonTap()
+        
+        // 跳转到画质修复页面
+        let imageEnhanceVC = ImageEnhanceViewController(
+            originalImage: firstImage,
+            timestamp: Date().timeIntervalSince1970
+        )
+        navigationController?.pushViewController(imageEnhanceVC, animated: true)
     }
     
     private func showCollageCreation() {
@@ -429,8 +450,12 @@ extension ScreenshotProcessingViewController {
             return
         }
         
-        // 显示拼图选择对话框
-        showCollageOptionsAlert(images: images)
+        // 触觉反馈
+        HapticFeedbackManager.shared.buttonTap()
+        
+        // 跳转到拼图创建页面
+        let collageVC = CollageViewController(images: images)
+        navigationController?.pushViewController(collageVC, animated: true)
     }
     
     // MARK: - 时间序列模式 (新增核心功能)
@@ -473,7 +498,28 @@ extension ScreenshotProcessingViewController {
     
     private func showBatchShare() {
         print("📤 批量分享")
-        // TODO: 实现批量分享功能
+        
+        // 检查是否有图片可以分享
+        guard !screenshots.isEmpty else {
+            showAlert(title: "无法分享", message: "没有可用的图片进行分享")
+            return
+        }
+        
+        // 获取第一张图片作为主要分享对象
+        guard let firstImage = screenshots.first?.image else {
+            showAlert(title: "错误", message: "无法加载图片")
+            return
+        }
+        
+        // 触觉反馈
+        HapticFeedbackManager.shared.buttonTap()
+        
+        // 跳转到分享页面
+        let shareVC = ShareViewController(
+            image: firstImage,
+            originalImage: firstImage
+        )
+        navigationController?.pushViewController(shareVC, animated: true)
     }
     
     private func playLivePhotos() {
@@ -718,216 +764,6 @@ class ProcessingOptionCell: UITableViewCell {
     }
 }
 
-// MARK: - 🧩 拼图功能实现 (从UnifiedPreviewViewController迁移)
-extension ScreenshotProcessingViewController {
-    
-    private func showCollageOptionsAlert(images: [UIImage]) {
-        let alert = UIAlertController(
-            title: "选择拼图模式",
-            message: "请选择你希望的拼图布局",
-            preferredStyle: .actionSheet
-        )
-        
-        // 网格布局
-        alert.addAction(UIAlertAction(title: "🗺️ 网格布局", style: .default) { _ in
-            self.createGridCollage(images: images)
-        })
-        
-        // 横向排列
-        alert.addAction(UIAlertAction(title: "↔️ 横向排列", style: .default) { _ in
-            self.createHorizontalCollage(images: images)
-        })
-        
-        // 竖向排列
-        alert.addAction(UIAlertAction(title: "↕️ 竖向排列", style: .default) { _ in
-            self.createVerticalCollage(images: images)
-        })
-        
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        
-        // iPad适配
-        if let popover = alert.popoverPresentationController {
-            popover.sourceView = view
-            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
-        }
-        
-        present(alert, animated: true)
-    }
-    
-    private func createGridCollage(images: [UIImage]) {
-        print("🗺️ 创建网格拼图: \(images.count)张图片")
-        
-        // 计算网格布局
-        let imageCount = images.count
-        let gridSize = calculateGridSize(for: imageCount)
-        let collageSize = CGSize(width: 800, height: 800) // 固定拼图尺寸
-        
-        // 创建拼图图像
-        if let collageImage = createGridCollageImage(images: images, gridSize: gridSize, collageSize: collageSize) {
-            showCollagePreview(image: collageImage, type: "网格布局")
-        } else {
-            showAlert(title: "拼图失败", message: "无法创建网格拼图")
-        }
-    }
-    
-    private func createHorizontalCollage(images: [UIImage]) {
-        print("↔️ 创建横向拼图: \(images.count)张图片")
-        
-        let imageCount = images.count
-        let collageSize = CGSize(width: 800 * imageCount, height: 800) // 横向拼接，宽度成倍增加
-        
-        // 创建横向拼图
-        if let collageImage = createHorizontalCollageImage(images: images, collageSize: collageSize) {
-            showCollagePreview(image: collageImage, type: "横向排列")
-        } else {
-            showAlert(title: "拼图失败", message: "无法创建横向拼图")
-        }
-    }
-    
-    private func createVerticalCollage(images: [UIImage]) {
-        print("↕️ 创建竖向拼图: \(images.count)张图片")
-        
-        let imageCount = images.count
-        let collageSize = CGSize(width: 800, height: 800 * imageCount) // 竖向拼接，高度成倍增加
-        
-        // 创建竖向拼图
-        if let collageImage = createVerticalCollageImage(images: images, collageSize: collageSize) {
-            showCollagePreview(image: collageImage, type: "竖向排列")
-        } else {
-            showAlert(title: "拼图失败", message: "无法创建竖向拼图")
-        }
-    }
-    
-    // MARK: - 拼图辅助方法
-    
-    private func calculateGridSize(for count: Int) -> (rows: Int, cols: Int) {
-        switch count {
-        case 2: return (1, 2)
-        case 3: return (2, 2) // 3张图片用2x2网格，空一个位置
-        case 4: return (2, 2)
-        case 5, 6: return (2, 3)
-        case 7, 8, 9: return (3, 3)
-        default: return (2, 2)
-        }
-    }
-    
-    private func createGridCollageImage(images: [UIImage], gridSize: (rows: Int, cols: Int), collageSize: CGSize) -> UIImage? {
-        let renderer = UIGraphicsImageRenderer(size: collageSize)
-        
-        return renderer.image { context in
-            // 设置白色背景
-            UIColor.white.setFill()
-            context.fill(CGRect(origin: .zero, size: collageSize))
-            
-            let cellWidth = collageSize.width / CGFloat(gridSize.cols)
-            let cellHeight = collageSize.height / CGFloat(gridSize.rows)
-            let spacing: CGFloat = 4 // 图片间距
-            
-            for (index, image) in images.enumerated() {
-                let row = index / gridSize.cols
-                let col = index % gridSize.cols
-                
-                let x = CGFloat(col) * cellWidth + spacing
-                let y = CGFloat(row) * cellHeight + spacing
-                let width = cellWidth - spacing * 2
-                let height = cellHeight - spacing * 2
-                
-                let rect = CGRect(x: x, y: y, width: width, height: height)
-                image.draw(in: rect)
-            }
-        }
-    }
-    
-    private func createHorizontalCollageImage(images: [UIImage], collageSize: CGSize) -> UIImage? {
-        let renderer = UIGraphicsImageRenderer(size: collageSize)
-        
-        return renderer.image { context in
-            // 设置白色背景
-            UIColor.white.setFill()
-            context.fill(CGRect(origin: .zero, size: collageSize))
-            
-            let imageWidth = collageSize.width / CGFloat(images.count)
-            let spacing: CGFloat = 4
-            
-            for (index, image) in images.enumerated() {
-                let x = CGFloat(index) * imageWidth + spacing
-                let y: CGFloat = spacing
-                let width = imageWidth - spacing * 2
-                let height = collageSize.height - spacing * 2
-                
-                let rect = CGRect(x: x, y: y, width: width, height: height)
-                image.draw(in: rect)
-            }
-        }
-    }
-    
-    private func createVerticalCollageImage(images: [UIImage], collageSize: CGSize) -> UIImage? {
-        let renderer = UIGraphicsImageRenderer(size: collageSize)
-        
-        return renderer.image { context in
-            // 设置白色背景
-            UIColor.white.setFill()
-            context.fill(CGRect(origin: .zero, size: collageSize))
-            
-            let imageHeight = collageSize.height / CGFloat(images.count)
-            let spacing: CGFloat = 4
-            
-            for (index, image) in images.enumerated() {
-                let x: CGFloat = spacing
-                let y = CGFloat(index) * imageHeight + spacing
-                let width = collageSize.width - spacing * 2
-                let height = imageHeight - spacing * 2
-                
-                let rect = CGRect(x: x, y: y, width: width, height: height)
-                image.draw(in: rect)
-            }
-        }
-    }
-    
-    private func showCollagePreview(image: UIImage, type: String) {
-        let alert = UIAlertController(title: "拼图完成", message: "已创建\(type)拼图", preferredStyle: .alert)
-        
-        alert.addAction(UIAlertAction(title: "保存到相册", style: .default) { _ in
-            UIImageWriteToSavedPhotosAlbum(image, self, #selector(self.collageImage(_:didFinishSavingWithError:contextInfo:)), nil)
-        })
-        
-        alert.addAction(UIAlertAction(title: "分享", style: .default) { _ in
-            let activityVC = UIActivityViewController(activityItems: [image], applicationActivities: nil)
-            
-            // iPad适配
-            if let popover = activityVC.popoverPresentationController {
-                popover.sourceView = self.view
-                popover.sourceRect = CGRect(x: self.view.bounds.midX, y: self.view.bounds.midY, width: 0, height: 0)
-                popover.permittedArrowDirections = []
-            }
-            
-            self.present(activityVC, animated: true)
-        })
-        
-        alert.addAction(UIAlertAction(title: "预览", style: .default) { _ in
-            // 使用ScreenshotViewSheet预览拼图
-            let tempScreenshot = ScreenshotItem(context: PersistenceController.shared.container.viewContext)
-            // 这里需要临时创建一个ScreenshotItem来预览拼图
-            let viewSheet = ScreenshotViewSheet(screenshot: tempScreenshot)
-            viewSheet.modalPresentationStyle = .pageSheet
-            self.present(viewSheet, animated: true)
-        })
-        
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        
-        present(alert, animated: true)
-    }
-    
-    @objc private func collageImage(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
-        if let error = error {
-            HapticFeedbackManager.shared.notificationError()
-            showAlert(title: "保存失败", message: error.localizedDescription)
-        } else {
-            HapticFeedbackManager.shared.notificationSuccess()
-            showAlert(title: "拼图保存成功", message: "拼图已保存到相册")
-        }
-    }
-}
 
 // MARK: - ProcessingThumbnailCell
 class ProcessingThumbnailCell: UICollectionViewCell {
