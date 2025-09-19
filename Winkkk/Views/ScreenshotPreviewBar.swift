@@ -11,18 +11,27 @@ import Combine
 
 protocol ScreenshotPreviewBarDelegate: AnyObject {
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didTapScreenshot screenshot: ScreenshotItem, at index: Int)
-    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestCapture mode: CaptureMode)
-    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestPreviewAll screenshots: [ScreenshotItem])
-    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestEnhanceAll screenshots: [ScreenshotItem])
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestClearAll mode: CaptureMode)
     
     // 🆕 添加长按手势支持（可选方法，提供默认实现）
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didLongPressScreenshot screenshot: ScreenshotItem, at index: Int)
+    
+    // 🆕 新增：选择相关的委托方法
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didSelectScreenshots screenshots: [ScreenshotItem])
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestProcessingCenter screenshots: [ScreenshotItem])
 }
 
-// 🆕 为长按手势提供默认实现，使其成为可选方法
+// 🆕 为可选方法提供默认实现
 extension ScreenshotPreviewBarDelegate {
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didLongPressScreenshot screenshot: ScreenshotItem, at index: Int) {
+        // 默认空实现，委托方可以选择是否重写此方法
+    }
+    
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didSelectScreenshots screenshots: [ScreenshotItem]) {
+        // 默认空实现，委托方可以选择是否重写此方法
+    }
+    
+    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestProcessingCenter screenshots: [ScreenshotItem]) {
         // 默认空实现，委托方可以选择是否重写此方法
     }
 }
@@ -48,11 +57,7 @@ class ScreenshotPreviewBar: UIView {
     private let scrollView = UIScrollView()
     private let stackView = UIStackView()
     
-    // 操作按钮区域
-    private let actionButtonsContainer = UIView()
-    private let captureButton = UIButton()
-    private let previewButton = UIButton()
-    private let enhanceButton = UIButton()
+    // 📝 操作按钮区域已移除 - 使用点击预览替代
     
     // MARK: - Initialization
     override init(frame: CGRect) {
@@ -88,12 +93,10 @@ class ScreenshotPreviewBar: UIView {
         // 设置子组件
         setupHeaderView()
         setupScrollView()
-        setupActionButtons()
         
         // 直接添加到self
         addSubview(headerView)
         addSubview(scrollView)
-        addSubview(actionButtonsContainer)
     }
     
     private func setupHeaderView() {
@@ -156,111 +159,19 @@ class ScreenshotPreviewBar: UIView {
         ])
     }
     
-    private func setupActionButtons() {
-        actionButtonsContainer.backgroundColor = .clear
-        
-        // 🎯 关键修复：提高按钮容器层级，确保在最顶层
-        actionButtonsContainer.layer.zPosition = 2000  // 最高层级
-        actionButtonsContainer.isUserInteractionEnabled = true
-        actionButtonsContainer.isExclusiveTouch = true  // 独占触摸，防止手势干扰
-        
-        // 截图按钮
-        setupCaptureButton()
-        
-        // 预览按钮
-        setupPreviewButton()
-        
-        // 修复按钮
-        setupEnhanceButton()
-        
-        // 添加到容器
-        actionButtonsContainer.addSubview(captureButton)
-        actionButtonsContainer.addSubview(previewButton)
-        actionButtonsContainer.addSubview(enhanceButton)
-        
-        // 布局
-        captureButton.translatesAutoresizingMaskIntoConstraints = false
-        previewButton.translatesAutoresizingMaskIntoConstraints = false
-        enhanceButton.translatesAutoresizingMaskIntoConstraints = false
-        
-        NSLayoutConstraint.activate([
-            // 截图按钮（左侧）
-            captureButton.leadingAnchor.constraint(equalTo: actionButtonsContainer.leadingAnchor),
-            captureButton.centerYAnchor.constraint(equalTo: actionButtonsContainer.centerYAnchor),
-            captureButton.widthAnchor.constraint(equalToConstant: 80),
-            captureButton.heightAnchor.constraint(equalToConstant: 40),
-            
-            // 预览按钮（中间）
-            previewButton.centerXAnchor.constraint(equalTo: actionButtonsContainer.centerXAnchor),
-            previewButton.centerYAnchor.constraint(equalTo: actionButtonsContainer.centerYAnchor),
-            previewButton.widthAnchor.constraint(equalToConstant: 80),
-            previewButton.heightAnchor.constraint(equalToConstant: 40),
-            
-            // 修复按钮（右侧）
-            enhanceButton.trailingAnchor.constraint(equalTo: actionButtonsContainer.trailingAnchor),
-            enhanceButton.centerYAnchor.constraint(equalTo: actionButtonsContainer.centerYAnchor),
-            enhanceButton.widthAnchor.constraint(equalToConstant: 80),
-            enhanceButton.heightAnchor.constraint(equalToConstant: 40)
-        ])
-    }
+    // 📝 setupActionButtons 已移除 - 操作通过点击缩略图完成
     
-    private func setupCaptureButton() {
-        captureButton.setTitle("📷 截图", for: .normal)
-        captureButton.setTitleColor(.white, for: .normal)
-        captureButton.backgroundColor = ThemeManager.buttonPrimary
-        captureButton.layer.cornerRadius = ThemeManager.standardCornerRadius
-        captureButton.titleLabel?.font = ThemeManager.buttonFont
-        
-        // 🎯 关键修复：确保按钮可交互性和层级
-        captureButton.isUserInteractionEnabled = true
-        captureButton.isExclusiveTouch = true  // 独占触摸
-        captureButton.layer.zPosition = 2100  // 确保在最顶层
-        
-        captureButton.addTarget(self, action: #selector(captureButtonTapped), for: .touchUpInside)
-        addButtonTouchEffects(to: captureButton)
-    }
+    // 📝 setupCaptureButton 已移除
     
-    private func setupPreviewButton() {
-        previewButton.setTitle("👁 预览", for: .normal)
-        previewButton.setTitleColor(.white, for: .normal)
-        previewButton.backgroundColor = ThemeManager.cardBackground
-        previewButton.layer.cornerRadius = ThemeManager.standardCornerRadius
-        previewButton.titleLabel?.font = ThemeManager.buttonFont
-        
-        // 🎯 关键修复：确保按钮可交互性和层级
-        previewButton.isUserInteractionEnabled = true
-        previewButton.isExclusiveTouch = true  // 独占触摸
-        previewButton.layer.zPosition = 2100  // 确保在最顶层
-        
-        previewButton.addTarget(self, action: #selector(previewButtonTapped), for: .touchUpInside)
-        addButtonTouchEffects(to: previewButton)
-    }
+    // 📝 setupPreviewButton 已移除
     
-    private func setupEnhanceButton() {
-        enhanceButton.setTitle("✨ 修复", for: .normal)
-        enhanceButton.setTitleColor(.white, for: .normal)
-        enhanceButton.backgroundColor = ThemeManager.success
-        enhanceButton.layer.cornerRadius = ThemeManager.standardCornerRadius
-        enhanceButton.titleLabel?.font = ThemeManager.buttonFont
-        
-        // 🎯 关键修复：确保按钮可交互性和层级
-        enhanceButton.isUserInteractionEnabled = true
-        enhanceButton.isExclusiveTouch = true  // 独占触摸
-        enhanceButton.layer.zPosition = 2100  // 确保在最顶层
-        
-        enhanceButton.addTarget(self, action: #selector(enhanceButtonTapped), for: .touchUpInside)
-        addButtonTouchEffects(to: enhanceButton)
-    }
+    // 📝 setupEnhanceButton 已移除
     
-    private func addButtonTouchEffects(to button: UIButton) {
-        button.addTarget(self, action: #selector(buttonPressed(_:)), for: .touchDown)
-        button.addTarget(self, action: #selector(buttonReleased(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
-    }
+    // 📝 addButtonTouchEffects 已移除
     
     private func setupConstraints() {
         headerView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
-        actionButtonsContainer.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
             // 🔧 直接使用self，减少内部间距，避免双重边界
@@ -271,27 +182,13 @@ class ScreenshotPreviewBar: UIView {
             headerView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
             headerView.heightAnchor.constraint(equalToConstant: 30),
             
-            // 滚动视图
+            // 滚动视图 - 现在直接连接到底部
             scrollView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 8),
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
             scrollView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
             scrollView.heightAnchor.constraint(equalToConstant: 60),
-            
-            // 操作按钮容器 - 使用优先级约束避免冲突
-            actionButtonsContainer.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 8),
-            actionButtonsContainer.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 12),
-            actionButtonsContainer.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12)
+            scrollView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8)
         ])
-        
-        
-        // 🔧 使用优先级约束避免冲突
-        let bottomConstraint = actionButtonsContainer.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8)
-        bottomConstraint.priority = UILayoutPriority(999)
-        bottomConstraint.isActive = true
-        
-        let minHeightConstraint = actionButtonsContainer.heightAnchor.constraint(greaterThanOrEqualToConstant: 48)
-        minHeightConstraint.priority = UILayoutPriority(1000)
-        minHeightConstraint.isActive = true
     }
     
     // MARK: - Observers
@@ -356,9 +253,7 @@ class ScreenshotPreviewBar: UIView {
             hintLabel.text = "已截\(count)张: \(mode.displayName) (最多\(maxCount)张)"
         }
         
-        // 根据模式设置主题色
-        let themeColor = mode.themeColor
-        captureButton.backgroundColor = themeColor
+        // 📝 按钮主题色设置已移除
         
         // 接近上限时的警告色
         if count >= maxCount - 2 {
@@ -392,20 +287,6 @@ class ScreenshotPreviewBar: UIView {
     private func updateButtonStates() {
         let count = screenshotManager.screenshotCount
         let hasScreenshots = count > 0
-        let isAtLimit = screenshotManager.isAtMaxLimit
-        
-        // 截图按钮
-        captureButton.isEnabled = !isAtLimit
-        captureButton.alpha = isAtLimit ? 0.5 : 1.0
-        
-        // 预览按钮
-        previewButton.isEnabled = hasScreenshots
-        previewButton.alpha = hasScreenshots ? 1.0 : 0.5
-        
-        // 修复按钮（Live Photo模式下隐藏）
-        let shouldShowEnhance = hasScreenshots && screenshotManager.currentMode == .stillImage
-        enhanceButton.isHidden = !shouldShowEnhance
-        enhanceButton.alpha = shouldShowEnhance ? 1.0 : 0.5
         
         // 清空按钮
         clearButton.isEnabled = hasScreenshots
@@ -444,23 +325,11 @@ class ScreenshotPreviewBar: UIView {
     }
     
     // MARK: - Actions
-    @objc private func captureButtonTapped() {
-        print("🎯 ScreenshotPreviewBar: 截图按钮被点击！")
-        HapticFeedbackManager.shared.buttonTap()
-        delegate?.screenshotPreviewBar(self, didRequestCapture: screenshotManager.currentMode)
-    }
+    // 📝 captureButtonTapped 已移除
     
-    @objc private func previewButtonTapped() {
-        print("🎯 ScreenshotPreviewBar: 预览按钮被点击！")
-        HapticFeedbackManager.shared.buttonTap()
-        delegate?.screenshotPreviewBar(self, didRequestPreviewAll: screenshotManager.screenshots)
-    }
+    // 📝 previewButtonTapped 已移除
     
-    @objc private func enhanceButtonTapped() {
-        print("🎯 ScreenshotPreviewBar: 修复按钮被点击！")
-        HapticFeedbackManager.shared.buttonTap()
-        delegate?.screenshotPreviewBar(self, didRequestEnhanceAll: screenshotManager.screenshots)
-    }
+    // 📝 enhanceButtonTapped 已移除
     
     @objc private func clearButtonTapped() {
         HapticFeedbackManager.shared.lightImpact()
@@ -483,17 +352,7 @@ class ScreenshotPreviewBar: UIView {
         findParentViewController()?.present(alert, animated: true)
     }
     
-    @objc private func buttonPressed(_ button: UIButton) {
-        UIView.animate(withDuration: 0.1) {
-            button.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
-        }
-    }
-    
-    @objc private func buttonReleased(_ button: UIButton) {
-        UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5) {
-            button.transform = .identity
-        }
-    }
+    // 📝 buttonPressed/buttonReleased 已移除
     
     // MARK: - Notification Handlers
     @objc private func screenshotAdded(_ notification: Notification) {
