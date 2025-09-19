@@ -730,8 +730,8 @@ class VideoPlayerViewController: UIViewController {
         
         // 创建临时VideoItem用于Live Photo创建
         let tempVideoItem = VideoItem(context: PersistenceController.shared.container.viewContext)
-        tempVideoItem.url = videoURL
-        tempVideoItem.filename = videoURL.lastPathComponent
+        tempVideoItem.filePath = videoURL
+        tempVideoItem.fileName = videoURL.lastPathComponent
         tempVideoItem.createdDate = Date()
         
         screenshotEngine.captureLivePhoto(from: videoURL, at: cmCaptureTime, for: tempVideoItem) { [weak self] result in
