@@ -60,7 +60,7 @@ class VideoSegmentExtractor {
         let asset = AVAsset(url: videoURL)
         
         // 验证视频资源
-        guard await asset.load(.isReadable) else {
+        guard try await asset.load(.isReadable) else {
             throw ExtractionError.videoNotReadable
         }
         
@@ -118,7 +118,7 @@ class VideoSegmentExtractor {
         let asset = AVAsset(url: videoURL)
         
         // 验证视频资源
-        guard await asset.load(.isReadable) else {
+        guard try await asset.load(.isReadable) else {
             throw ExtractionError.videoNotReadable
         }
         
@@ -161,7 +161,7 @@ class VideoSegmentExtractor {
         
         let asset = AVAsset(url: videoURL)
         
-        guard await asset.load(.isReadable) else {
+        guard try await asset.load(.isReadable) else {
             throw ExtractionError.videoNotReadable
         }
         
@@ -196,7 +196,7 @@ class VideoSegmentExtractor {
         
         let asset = AVAsset(url: videoURL)
         
-        guard await asset.load(.isReadable) else {
+        guard try await asset.load(.isReadable) else {
             return (false, 0, "视频文件无法读取")
         }
         

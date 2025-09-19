@@ -151,12 +151,34 @@ class ScreenshotDetailSheet: UIViewController {
         containerView.widthAnchor.constraint(equalToConstant: UIScreen.main.bounds.width).isActive = true
         
         // 检查是否是Live Photo
-        if screenshot.hasLivePhoto, let livePhoto = screenshot.livePhoto {
+        if screenshot.isLivePhoto, 
+           let videoPath = screenshot.livePhotoVideoPath,
+           let identifier = screenshot.livePhotoIdentifier {
+            
             // 创建Live Photo视图
             let livePhotoView = PHLivePhotoView()
             livePhotoView.contentMode = .scaleAspectFit
-            livePhotoView.livePhoto = livePhoto
             livePhotoView.translatesAutoresizingMaskIntoConstraints = false
+            
+            // 异步加载Live Photo
+            Task {
+                do {
+                    let livePhoto = try await LivePhotoMaker.shared.createLivePhoto(
+                        videoURL: videoPath,
+                        imageURL: screenshot.displayImagePath
+                    )
+                    
+                    await MainActor.run {
+                        livePhotoView.livePhoto = livePhoto
+                    }
+                } catch {
+                    print("Failed to load Live Photo: \(error)")
+                    // 如果Live Photo加载失败，显示静态图片
+                    await MainActor.run {
+                        self.setupStaticImageView(in: containerView, with: screenshot)
+                    }
+                }
+            }
             
             // 添加Live Photo标识
             let livePhotoIndicator = createLivePhotoIndicator()
@@ -353,6 +375,32 @@ class ScreenshotDetailSheet: UIViewController {
     private func scrollToCurrentIndex(animated: Bool) {
         let offsetX = CGFloat(currentIndex) * scrollView.frame.width
         scrollView.setContentOffset(CGPoint(x: offsetX, y: 0), animated: animated)
+    }
+    
+    /// 设置静态图片视图的辅助方法
+    private func setupStaticImageView(in containerView: UIView, with screenshot: ScreenshotItem) {
+        // 清除现有子视图
+        containerView.subviews.forEach { $0.removeFromSuperview() }
+        
+        // 创建静态图片视图
+        let imageView = UIImageView()
+        imageView.contentMode = .scaleAspectFit
+        imageView.backgroundColor = .black
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        
+        // 加载图片
+        if let image = UIImage(contentsOfFile: screenshot.displayImagePath.path) {
+            imageView.image = image
+        }
+        
+        containerView.addSubview(imageView)
+        
+        NSLayoutConstraint.activate([
+            imageView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            imageView.topAnchor.constraint(equalTo: containerView.topAnchor),
+            imageView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
+        ])
     }
     
     // MARK: - Public Methods
