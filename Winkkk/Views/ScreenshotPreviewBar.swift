@@ -42,6 +42,7 @@ class ScreenshotPreviewBar: UIView {
     weak var delegate: ScreenshotPreviewBarDelegate?
     private let screenshotManager = ScreenshotManager.shared
     private var cancellables = Set<AnyCancellable>()
+    private var selectedScreenshots = Set<String>() // 📝 新增：跟踪选中状态
     
     // MARK: - UI Components
     // 🔧 移除containerView - 直接使用self作为容器，避免双重边界
@@ -303,7 +304,8 @@ class ScreenshotPreviewBar: UIView {
         
         thumbnailView.onTap = { [weak self] in
             guard let self = self else { return }
-            self.delegate?.screenshotPreviewBar(self, didTapScreenshot: screenshot, at: index)
+            // 🆕 弹出Sheet预览
+            self.presentScreenshotDetailSheet(for: screenshot, at: index)
         }
         
         thumbnailView.onLongPress = { [weak self] in
@@ -427,7 +429,7 @@ class ScreenshotPreviewBar: UIView {
     private func updateAllThumbnailSelectionStates() {
         // 更新所有缩略图的选择状态
         for (index, screenshot) in screenshotManager.screenshots.enumerated() {
-            let isSelected = selectedScreenshots.contains(screenshot)
+            let isSelected = selectedScreenshots.contains(screenshot.id)
             updateThumbnailSelectionState(for: screenshot, isSelected: isSelected)
         }
     }
@@ -441,5 +443,43 @@ class ScreenshotPreviewBar: UIView {
                 thumbnailView.setSelected(isSelected, animated: true)
             }
         }
+    }
+    
+    // MARK: - 🆕 Sheet Preview Methods
+    private func presentScreenshotDetailSheet(for screenshot: ScreenshotItem, at index: Int) {
+        let screenshots = screenshotManager.screenshots
+        let detailSheet = ScreenshotDetailSheet(screenshots: screenshots, currentIndex: index)
+        detailSheet.delegate = self
+        detailSheet.setSelectedScreenshots(selectedScreenshots)
+        
+        findParentViewController()?.present(detailSheet, animated: true)
+    }
+}
+
+// MARK: - 🆕 ScreenshotDetailSheetDelegate
+extension ScreenshotPreviewBar: ScreenshotDetailSheetDelegate {
+    func screenshotDetailSheet(_ sheet: ScreenshotDetailSheet, didSelectScreenshot screenshot: ScreenshotItem, isSelected: Bool) {
+        if isSelected {
+            selectedScreenshots.insert(screenshot.id)
+        } else {
+            selectedScreenshots.remove(screenshot.id)
+        }
+        
+        // 更新UI显示选中状态
+        updateSelectionDisplay()
+        
+        // 通知委托
+        let selected = screenshotManager.screenshots.filter { selectedScreenshots.contains($0.id) }
+        delegate?.screenshotPreviewBar(self, didSelectScreenshots: selected)
+    }
+    
+    func screenshotDetailSheet(_ sheet: ScreenshotDetailSheet, didRequestProcessingCenter selectedScreenshots: [ScreenshotItem]) {
+        // 委托给上层处理
+        delegate?.screenshotPreviewBar(self, didRequestProcessingCenter: selectedScreenshots)
+    }
+    
+    private func updateSelectionDisplay() {
+        // 更新预览栏的选中状态显示
+        // 这里可以添加选中数量的显示等
     }
 }
