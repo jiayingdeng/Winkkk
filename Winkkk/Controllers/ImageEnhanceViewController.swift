@@ -483,6 +483,7 @@ class ImageEnhanceViewController: UIViewController {
     @objc private func resetButtonTapped() {
         enhancedImage = nil
         comparisonView.setEnhancedImage(nil)
+        comparisonView.resetToCenter()  // 重置滑块到中间位置
         
         saveButton.isEnabled = false
         saveButton.alpha = 0.6
