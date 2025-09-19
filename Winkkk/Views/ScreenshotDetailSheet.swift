@@ -62,6 +62,11 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         scrollToCurrentIndex(animated: false)
+        
+        // 🎯 备用方案：在视图完全显示后尝试自动播放Live Photo
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            self.tryAutoPlayLivePhotos()
+        }
     }
     
     // MARK: - UI Setup
@@ -182,15 +187,31 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
                         livePhotoView.livePhoto = livePhoto
                         print("📸 Live Photo已加载到视图")
                         
-                        // 🎯 关键修复：Live Photo加载完成后自动开始播放
-                        // 延迟一小段时间确保视图已经完全布局完成
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                            // 检查Live Photo是否成功加载
-                            if livePhotoView.livePhoto != nil {
-                                livePhotoView.startPlayback(with: .full)
-                                print("🎥 Live Photo自动播放已启动")
+                        // 🎯 关键修复：在视图完全准备好后自动播放
+                        // 使用多层延迟确保所有条件都满足
+                        DispatchQueue.main.async {
+                            print("🔍 检查Live Photo自动播放条件...")
+                            print("   - 视图是否在层次结构中: \(livePhotoView.superview != nil)")
+                            print("   - Live Photo是否已加载: \(livePhotoView.livePhoto != nil)")
+                            print("   - 视图是否可见: \(livePhotoView.window != nil)")
+                            
+                            // 检查所有必要条件
+                            if livePhotoView.superview != nil && 
+                               livePhotoView.livePhoto != nil {
+                                
+                                // 延迟执行自动播放，确保sheet动画完成
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                    // 再次检查条件（防止用户快速关闭sheet）
+                                    if livePhotoView.superview != nil && 
+                                       livePhotoView.livePhoto != nil {
+                                        livePhotoView.startPlayback(with: .full)
+                                        print("🎥 Live Photo自动播放已启动")
+                                    } else {
+                                        print("❌ Live Photo播放条件已不满足")
+                                    }
+                                }
                             } else {
-                                print("❌ Live Photo未能正确加载，无法自动播放")
+                                print("❌ Live Photo视图或数据未准备好")
                             }
                         }
                     }
@@ -401,6 +422,30 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     }
     
     // MARK: - Cleanup Methods
+    
+    // MARK: - Live Photo Auto Play
+    
+    /// 尝试自动播放当前可见的Live Photo
+    private func tryAutoPlayLivePhotos() {
+        print("🎯 尝试自动播放Live Photo...")
+        
+        // 遍历所有子视图寻找Live Photo视图
+        for subview in stackView.arrangedSubviews {
+            if let containerView = subview as? UIView {
+                for childView in containerView.subviews {
+                    if let livePhotoView = childView as? PHLivePhotoView,
+                       livePhotoView.livePhoto != nil {
+                        print("🔍 找到Live Photo视图，尝试播放...")
+                        livePhotoView.startPlayback(with: .full)
+                        print("🎥 Live Photo自动播放已触发")
+                        // 只播放第一个找到的Live Photo
+                        return
+                    }
+                }
+            }
+        }
+        print("❌ 未找到可播放的Live Photo视图")
+    }
     
     // MARK: - PHLivePhotoViewDelegate
     func livePhotoView(_ livePhotoView: PHLivePhotoView, willBeginPlaybackWith playbackStyle: PHLivePhotoViewPlaybackStyle) {
