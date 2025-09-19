@@ -288,7 +288,7 @@ class VideoPlayerViewController: UIViewController {
             unifiedControlPanelView.topAnchor.constraint(equalTo: playerContainerView.bottomAnchor, constant: 8),
             unifiedControlPanelView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             unifiedControlPanelView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            unifiedControlPanelView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
+            unifiedControlPanelView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
             // 🎯 控制面板内容区域 - 在统一容器内部，使用弹性高度
             controlPanelBlurView.topAnchor.constraint(equalTo: unifiedControlPanelView.topAnchor),
@@ -359,7 +359,7 @@ class VideoPlayerViewController: UIViewController {
         ])
         
         // 🔧 关键修复：使用优先级约束避免冲突，添加底部边距
-        let bottomConstraint = screenshotPreviewBar.bottomAnchor.constraint(equalTo: unifiedControlPanelView.bottomAnchor, constant: -16)
+        let bottomConstraint = screenshotPreviewBar.bottomAnchor.constraint(equalTo: unifiedControlPanelView.safeAreaLayoutGuide.bottomAnchor, constant: -8)
         bottomConstraint.priority = UILayoutPriority(999)  // 高优先级但非必需
         bottomConstraint.isActive = true
         

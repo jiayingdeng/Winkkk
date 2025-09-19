@@ -217,7 +217,7 @@ class ScreenshotPreviewBar: UIView {
             batchSelectionToolbar.leadingAnchor.constraint(equalTo: leadingAnchor),
             batchSelectionToolbar.trailingAnchor.constraint(equalTo: trailingAnchor),
             batchSelectionToolbar.heightAnchor.constraint(equalToConstant: 50),
-            batchSelectionToolbar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -8)
+            batchSelectionToolbar.bottomAnchor.constraint(equalTo: bottomAnchor, constant: 0)
         ])
     }
     

@@ -68,7 +68,7 @@ class BlurEffectView: UIVisualEffectView {
         
         // 添加微妙的边框
         layer.borderColor = ThemeManager.primaryGradientStart.withAlphaComponent(0.3).cgColor
-        layer.borderWidth = 0.5
+        layer.borderWidth = 0  // 🎯 移除边框线，消除分割线效果
         layer.cornerRadius = ThemeManager.standardCornerRadius
         layer.masksToBounds = shouldAddShadow ? false : true
         
