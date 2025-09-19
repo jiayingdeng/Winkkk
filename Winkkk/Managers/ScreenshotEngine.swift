@@ -417,7 +417,7 @@ extension ScreenshotEngine {
     ///   - time: 捕获时间点（Live Photo的中心时间）
     ///   - videoItem: 关联的视频项目
     ///   - completion: 完成回调
-    func captureLivePhoto(from videoURL: URL, at time: CMTime, for videoItem: VideoItem, completion: @escaping (Result<ScreenshotItem, ScreenshotError>) -> Void) {
+    func captureLivePhoto(from videoURL: URL, at time: CMTime, for videoItem: VideoItem?, completion: @escaping (Result<ScreenshotItem, ScreenshotError>) -> Void) {
         
         Task {
             do {
@@ -511,7 +511,7 @@ extension ScreenshotEngine {
         identifier: String,
         timestamp: Double,
         coverImage: UIImage,
-        videoItem: VideoItem
+        videoItem: VideoItem?
     ) async throws -> ScreenshotItem {
         
         return try await withCheckedThrowingContinuation { continuation in
@@ -526,7 +526,9 @@ extension ScreenshotEngine {
                     screenshotItem.createdDate = Date()
                     screenshotItem.enhanceLevel = 0
                     screenshotItem.isEnhanced = false
-                    screenshotItem.videoSource = videoItem
+                    if let videoItem = videoItem {
+                        screenshotItem.videoSource = videoItem
+                    }
                     
                     // Live Photo特有属性
                     screenshotItem.setAsLivePhoto(

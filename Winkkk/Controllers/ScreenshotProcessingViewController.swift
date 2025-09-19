@@ -888,12 +888,6 @@ extension ScreenshotProcessingViewController {
             showAlert(title: "拼图保存成功", message: "拼图已保存到相册")
         }
     }
-    
-    private func showAlert(title: String, message: String) {
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "确定", style: .default))
-        present(alert, animated: true)
-    }
 }
 
 // MARK: - ProcessingThumbnailCell

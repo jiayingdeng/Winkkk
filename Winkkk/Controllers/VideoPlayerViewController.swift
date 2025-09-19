@@ -728,14 +728,8 @@ class VideoPlayerViewController: UIViewController {
         // 显示Live Photo创建进度
         showLivePhotoCreationProgress()
         
-        // 使用当前videoItem而不是创建临时的
-        guard let currentVideoItem = videoItem else {
-            hideLivePhotoCreationProgress()
-            showAlert(title: "错误", message: "无法获取视频项目信息")
-            return
-        }
-        
-        screenshotEngine.captureLivePhoto(from: videoURL, at: cmCaptureTime, for: currentVideoItem) { [weak self] result in
+        // Live Photo创建不需要关联VideoItem，直接使用视频URL
+        screenshotEngine.captureLivePhoto(from: videoURL, at: cmCaptureTime, for: nil) { [weak self] result in
             DispatchQueue.main.async {
                 self?.hideLivePhotoCreationProgress()
                 
