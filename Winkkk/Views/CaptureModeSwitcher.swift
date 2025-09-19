@@ -310,10 +310,7 @@ class CaptureModeSwitcher: UIView {
     }
     
     @objc private func buttonPressed(_ button: UIButton) {
-        UIView.animate(withDuration: 0.1) {
-            button.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
-        }
-        
+        AnimationManager.shared.animateButtonPress(button)
         HapticFeedbackManager.shared.lightImpact()
     }
     

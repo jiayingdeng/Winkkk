@@ -456,6 +456,92 @@ let newStyle = WatermarkStyle(position: .bottomRight)
 - 小步提交，便于回滚
 - 使用TODO注释标记待完成代码
 
+### 18. 数据模型属性不匹配错误 (Property name mismatch)
+
+**错误类型**: `Value of type 'XXX' has no member 'YYY'`
+
+**产生原因**:
+- 代码中使用的属性名与实际数据模型定义不一致
+- 重构过程中属性名更改但代码未同步更新
+- 使用了计算属性但期望存储属性
+
+**解决方案**:
+```swift
+// ❌ 错误 - 使用不存在的属性名
+screenshot.thumbnailImage  // ScreenshotItem没有thumbnailImage属性
+screenshot.isLivePhoto     // ScreenshotItem没有isLivePhoto属性
+
+// ✅ 正确 - 使用实际存在的属性
+screenshot.image          // 计算属性，返回UIImage?
+screenshot.mode == .livePhoto  // 使用captureMode判断是否为Live Photo
+```
+
+### 19. 主题管理器属性缺失错误 (Theme property not found)
+
+**错误类型**: `Type 'XXX' has no member 'YYY'`
+
+**产生原因**:
+- 主题管理器中未定义所需的颜色属性
+- 属性命名不一致
+- 静态属性访问方式错误
+
+**解决方案**:
+```swift
+// ❌ 错误 - 使用不存在的主题属性
+ThemeManager.backgroundSecondary  // 不存在
+ThemeManager.accent              // 不存在
+
+// ✅ 正确 - 使用实际存在的属性
+ThemeManager.cardBackground      // 卡片背景色
+ThemeManager.buttonPrimary       // 主要按钮色
+```
+
+### 20. 枚举类型作用域错误 (Enum type scope issue)
+
+**错误类型**: `Cannot find type 'XXX' in scope`
+
+**产生原因**:
+- 枚举类型定义在其他文件中但未正确import
+- 枚举名称拼写错误
+- 枚举在不同模块中有同名类型
+
+**解决方案**:
+```swift
+// ❌ 错误 - 使用错误的枚举名
+updateAppearance(for: status as ScreenshotStatus)  // ScreenshotStatus不存在
+
+// ✅ 正确 - 使用正确的枚举名
+updateAppearance(for: status as ProcessingStatus)  // ProcessingStatus已定义
+```
+
+### 21. UUID类型转换错误 (UUID type conversion error)
+
+**错误类型**: `Cannot convert value of type 'String' to expected argument type 'UUID'`
+
+**产生原因**:
+- 将String类型的ID传递给期望UUID的方法
+- 混淆了String类型的ID和UUID类型的ID
+- 数据模型中ID类型与使用代码不匹配
+
+**解决方案**:
+```swift
+// ❌ 错误 - String不能直接转换为UUID
+let stringId: String = "some-id"
+ScreenshotManager.shared.removeScreenshot(withId: stringId)  // 期望UUID
+
+// ✅ 解决方案1 - 使用实际的UUID
+let screenshot: ScreenshotItem = ...
+ScreenshotManager.shared.removeScreenshot(withId: screenshot.id)  // screenshot.id是UUID
+
+// ✅ 解决方案2 - 如果必须从String创建UUID
+if let uuid = UUID(uuidString: stringId) {
+    ScreenshotManager.shared.removeScreenshot(withId: uuid)
+}
+
+// ✅ 解决方案3 - 修改方法签名接受ScreenshotItem
+ScreenshotManager.shared.removeScreenshot(screenshot)
+```
+
 ## 📚 参考资源
 
 - [Swift Language Guide](https://docs.swift.org/swift-book/)

@@ -566,6 +566,14 @@ class TimelineView: UIView {
         let clampedOffset = max(scrollRange.min, min(scrollRange.max, scrollOffsetX))
         
         scrollView.setContentOffset(CGPoint(x: clampedOffset, y: 0), animated: true)
+        
+        // 🔧 修复任务9: 在时间轴滚动后更新Live Photo范围指示器
+        if isLivePhotoMode {
+            // 延迟一点更新，确保scrollView的内容偏移已经生效
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                self?.updateLivePhotoRangePosition()
+            }
+        }
     }
     
     // MARK: - Public Methods
@@ -1280,6 +1288,11 @@ extension TimelineView: UIScrollViewDelegate {
         
         // 🎯 新增：滚动时刷新时间刻度
         generateTimeScale()
+        
+        // 🔧 修复任务9: 滚动时更新Live Photo范围指示器位置
+        if isLivePhotoMode {
+            updateLivePhotoRangePosition()
+        }
     }
     
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {

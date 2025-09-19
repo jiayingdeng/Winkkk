@@ -21,21 +21,18 @@ protocol UnifiedBottomControlPanelDelegate: AnyObject {
     func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didEndSeeking time: Double)
     
     // 截图功能
-    func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didTapCapture mode: UnifiedBottomControlPanel.CaptureMode)
+    func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didTapCapture mode: CaptureMode)
     func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didTapClearScreenshots: Void)
     func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didSelectScreenshot item: ScreenshotItem)
+    // 🔧 修复任务5: 删除截图代理方法
+    func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didRequestDeleteScreenshot item: ScreenshotItem)
     
     // 增强功能
     func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didTapEnhance screenshots: [ScreenshotItem])
 }
 
-// MARK: - 截图模式枚举
-extension UnifiedBottomControlPanel {
-    enum CaptureMode {
-        case stillImage
-        case livePhoto
-    }
-}
+// MARK: - 使用全局 CaptureMode 枚举
+// 移除内部 CaptureMode 定义，统一使用全局 CaptureMode
 
 // MARK: - 主类定义
 class UnifiedBottomControlPanel: UIView {
@@ -112,7 +109,7 @@ class UnifiedBottomControlPanel: UIView {
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.backgroundColor = .clear
         collectionView.showsHorizontalScrollIndicator = false
-        collectionView.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "ScreenshotThumbnailCell")
+        collectionView.register(ScreenshotThumbnailCollectionViewCell.self, forCellWithReuseIdentifier: "ScreenshotThumbnailCell")
         return collectionView
     }()
     
@@ -147,6 +144,12 @@ class UnifiedBottomControlPanel: UIView {
         return button
     }()
     
+    // 🔧 修复任务6: 添加模式切换器
+    private let captureModeSwitcher: CaptureModeSwitcher = {
+        let switcher = CaptureModeSwitcher()
+        return switcher
+    }()
+    
     // 增强按钮
     private let enhanceButton: UIButton = {
         let button = UIButton()
@@ -161,7 +164,7 @@ class UnifiedBottomControlPanel: UIView {
     
     // MARK: - 数据
     private var screenshots: [ScreenshotItem] = []
-    private var currentCaptureMode: UnifiedBottomControlPanel.CaptureMode = .stillImage
+    private var currentCaptureMode: CaptureMode = .stillImage
     private var isPlaying: Bool = false {
         didSet {
             // 🎯 同步时间轴的播放状态 - 参考技术报告的状态管理
@@ -175,6 +178,11 @@ class UnifiedBottomControlPanel: UIView {
         setupLayout()
         setupActions()
         setupObservers()
+        
+        // 🔧 修复任务8: 初始化时同步模式状态
+        captureModeSwitcher.setCurrentMode(screenshotManager.currentMode)
+        currentCaptureMode = screenshotManager.currentMode
+        
         updateUI()
     }
     
@@ -183,6 +191,11 @@ class UnifiedBottomControlPanel: UIView {
         setupLayout()
         setupActions()
         setupObservers()
+        
+        // 🔧 修复任务8: 初始化时同步模式状态
+        captureModeSwitcher.setCurrentMode(screenshotManager.currentMode)
+        currentCaptureMode = screenshotManager.currentMode
+        
         updateUI()
     }
     
@@ -242,8 +255,8 @@ class UnifiedBottomControlPanel: UIView {
         screenshotsCollectionView.dataSource = self
         screenshotsCollectionView.delegate = self
         
-        // 注册cell（临时使用UICollectionViewCell）
-        screenshotsCollectionView.register(UICollectionViewCell.self, forCellWithReuseIdentifier: "ScreenshotThumbnailCell")
+        // 🔧 修复任务5: 注册自定义截图Cell
+        screenshotsCollectionView.register(ScreenshotThumbnailCollectionViewCell.self, forCellWithReuseIdentifier: "ScreenshotThumbnailCell")
     }
     
     private func setupScreenshotsConstraints() {
@@ -278,8 +291,26 @@ class UnifiedBottomControlPanel: UIView {
         
         screenshotManager.$currentMode
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in
-                self?.updateUI()
+            .sink { [weak self] newMode in
+                guard let self = self else { return }
+                
+                // 🔧 修复任务8: 同步模式切换器的状态
+                self.captureModeSwitcher.setCurrentMode(newMode)
+                
+                // 更新本地模式状态
+                switch newMode {
+                case .stillImage:
+                    self.currentCaptureMode = .stillImage
+                case .livePhoto:
+                    self.currentCaptureMode = .livePhoto
+                }
+                
+                // 更新UI
+                self.updateCaptureButtonForMode()
+                self.updateEnhanceButtonVisibility()
+                self.updateUI()
+                
+                print("🔄 ScreenshotManager模式变更: \(newMode.displayName)")
             }
             .store(in: &cancellables)
         
@@ -358,10 +389,23 @@ class UnifiedBottomControlPanel: UIView {
             button.translatesAutoresizingMaskIntoConstraints = false
         }
         
+        // 🔧 修复任务6: 配置模式切换器
+        captureModeSwitcher.translatesAutoresizingMaskIntoConstraints = false
+        captureModeSwitcher.delegate = self
+        captureModeSwitcher.setTimelineView(timelineView)
+        
         // 添加到水平堆栈
         mainControlsStackView.addArrangedSubview(playPauseButton)
+        // 🔧 修复任务6: 在截图按钮前添加模式切换器
+        mainControlsStackView.addArrangedSubview(captureModeSwitcher)
         mainControlsStackView.addArrangedSubview(captureButton)
         mainControlsStackView.addArrangedSubview(enhanceButton)
+        
+        // 🔧 修复任务6: 设置模式切换器约束
+        NSLayoutConstraint.activate([
+            captureModeSwitcher.heightAnchor.constraint(equalToConstant: 44),
+            captureModeSwitcher.widthAnchor.constraint(greaterThanOrEqualToConstant: 200)
+        ])
     }
     
     // MARK: - 时间轴宽度约束属性
@@ -518,10 +562,9 @@ class UnifiedBottomControlPanel: UIView {
         captureButton.isEnabled = !isAtLimit
         captureButton.alpha = isAtLimit ? 0.5 : 1.0
         
-        // 修复按钮状态（Live Photo模式下隐藏）
-        let shouldShowEnhance = hasScreenshots && screenshotManager.currentMode == .stillImage
-        enhanceButton.isHidden = !shouldShowEnhance
-        enhanceButton.alpha = shouldShowEnhance ? 1.0 : 0.5
+        // 🔧 修复任务10: 统一增强按钮的可见性逻辑
+        // 使用专门的方法来处理增强按钮状态，避免与updateEnhanceButtonVisibility冲突
+        updateEnhanceButtonVisibility()
         
         // 清空按钮状态
         clearButton.isEnabled = hasScreenshots
@@ -612,15 +655,11 @@ class UnifiedBottomControlPanel: UIView {
     
     // MARK: - 按钮触摸效果
     @objc private func buttonPressed(_ button: UIButton) {
-        UIView.animate(withDuration: 0.1) {
-            button.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
-        }
+        AnimationManager.shared.animateButtonPress(button)
     }
     
     @objc private func buttonReleased(_ button: UIButton) {
-        UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5) {
-            button.transform = .identity
-        }
+        AnimationManager.shared.animateButtonRelease(button)
     }
     
     // MARK: - 公共方法
@@ -633,7 +672,23 @@ class UnifiedBottomControlPanel: UIView {
         updatePlayPauseButtonState()
     }
     
-    func setCaptureMode(_ mode: UnifiedBottomControlPanel.CaptureMode) {
+    // MARK: - 状态同步方法 (VideoPlayerViewController接口)
+    
+    /// 更新播放状态 - 供VideoPlayerViewController调用
+    func updatePlaybackState(isPlaying: Bool) {
+        self.isPlaying = isPlaying
+        updatePlayPauseButtonState()
+        print("🎯 UnifiedBottomControlPanel - 播放状态更新: \(isPlaying)")
+    }
+    
+    /// 更新截图列表 - 供VideoPlayerViewController调用
+    func updateScreenshots(_ screenshots: [ScreenshotItem]) {
+        // 直接触发UI更新，因为我们监听ScreenshotManager的变化
+        updateUI()
+        print("🎯 UnifiedBottomControlPanel - 截图列表更新: \(screenshots.count)张")
+    }
+    
+    func setCaptureMode(_ mode: CaptureMode) {
         self.currentCaptureMode = mode
         updateUI()
     }
@@ -747,31 +802,38 @@ extension UnifiedBottomControlPanel: UICollectionViewDataSource {
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "ScreenshotThumbnailCell", for: indexPath)
+        // 🔧 修复任务5: 使用自定义截图Cell，支持删除功能
+        guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "ScreenshotThumbnailCell", for: indexPath) as? ScreenshotThumbnailCollectionViewCell else {
+            return UICollectionViewCell()
+        }
         
-        // 临时配置 - 基础样式
         let screenshot = screenshotManager.screenshots[indexPath.item]
-        cell.backgroundColor = ThemeManager.cardBackground
-        cell.layer.cornerRadius = 8
-        cell.layer.masksToBounds = true
         
-        // 清除之前的子视图
-        cell.contentView.subviews.forEach { $0.removeFromSuperview() }
+        // 配置Cell
+        cell.configure(with: screenshot)
         
-        // 添加缩略图
-        let imageView = UIImageView()
-        imageView.image = screenshot.image
-        imageView.contentMode = .scaleAspectFill
-        imageView.clipsToBounds = true
-        cell.contentView.addSubview(imageView)
+        // 🔧 修复任务5: 连接删除回调到ScreenshotManager
+        cell.onDeleteTap = { [weak self] in
+            guard let self = self else { return }
+            
+            print("🗑️ 删除截图请求: \(screenshot.id)")
+            
+            // 通过代理通知删除
+            self.delegate?.bottomControlPanel(self, didRequestDeleteScreenshot: screenshot)
+            
+            // 或者直接删除（如果有直接访问权限）
+            self.screenshotManager.removeScreenshot(screenshot)
+        }
         
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            imageView.topAnchor.constraint(equalTo: cell.contentView.topAnchor),
-            imageView.leadingAnchor.constraint(equalTo: cell.contentView.leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: cell.contentView.trailingAnchor),
-            imageView.bottomAnchor.constraint(equalTo: cell.contentView.bottomAnchor)
-        ])
+        // 配置其他回调
+        cell.onTap = { [weak self] in
+            self?.delegate?.bottomControlPanel(self!, didSelectScreenshot: screenshot)
+        }
+        
+        cell.onLongPress = { [weak self] in
+            // TODO: 实现长按选择功能
+            print("📱 长按截图: \(screenshot.id)")
+        }
         
         return cell
     }
@@ -850,5 +912,67 @@ extension UnifiedBottomControlPanel: TimelineViewDelegate {
         updatePlayPauseButtonState()
         delegate?.bottomControlPanel(self, didTapPlayPause: false)
         print("🎯 Timeline requested pause")
+    }
+}
+
+// MARK: - 🔧 修复任务6: CaptureModeSwitcherDelegate
+extension UnifiedBottomControlPanel: CaptureModeSwitcherDelegate {
+    func captureModeSwitcher(_ switcher: CaptureModeSwitcher, didRequestSwitchTo mode: CaptureMode) {
+        print("🔄 模式切换请求: \(mode.displayName)")
+        // 这里可以添加预切换逻辑，如UI预览等
+    }
+    
+    func captureModeSwitcher(_ switcher: CaptureModeSwitcher, didConfirmSwitchTo mode: CaptureMode) {
+        print("✅ 模式切换确认: \(mode.displayName)")
+        
+        // 🔧 修复任务8: 确保ScreenshotManager同步
+        // 注意：这里不需要再次调用ScreenshotManager.switchMode()，
+        // 因为CaptureModeSwitcher内部已经处理了ScreenshotManager的切换
+        
+        // 更新当前模式（这会通过Observer自动同步）
+        switch mode {
+        case .stillImage:
+            currentCaptureMode = .stillImage
+        case .livePhoto:
+            currentCaptureMode = .livePhoto
+        }
+        
+        // 触觉反馈
+        HapticFeedbackManager.shared.selectionChanged()
+        
+        // 更新UI（这些也会通过Observer自动调用，但手动调用确保及时性）
+        updateCaptureButtonForMode()
+        updateEnhanceButtonVisibility()
+        
+        // 通知外部代理
+        // 这里可以通过现有的代理方法通知VideoPlayerViewController
+        print("🎯 统一面板 - 模式已切换到: \(mode.displayName)")
+    }
+    
+    private func updateCaptureButtonForMode() {
+        switch currentCaptureMode {
+        case .stillImage:
+            captureButton.setImage(UIImage(systemName: "camera.fill"), for: .normal)
+            captureButton.setTitle("截图", for: .normal)
+        case .livePhoto:
+            captureButton.setImage(UIImage(systemName: "livephoto"), for: .normal)
+            captureButton.setTitle("Live Photo", for: .normal)
+        }
+    }
+    
+    private func updateEnhanceButtonVisibility() {
+        // 🔧 修复任务10: 完善增强按钮可见性逻辑
+        let hasScreenshots = !screenshotManager.screenshots.isEmpty
+        let isStillImageMode = (screenshotManager.currentMode == .stillImage)
+        
+        // 增强按钮只在普通截图模式且有截图时显示
+        let shouldShowEnhance = hasScreenshots && isStillImageMode
+        
+        UIView.animate(withDuration: 0.3) {
+            self.enhanceButton.alpha = shouldShowEnhance ? 1.0 : 0.3
+            self.enhanceButton.isEnabled = shouldShowEnhance
+        }
+        
+        print("🔧 增强按钮状态更新: 显示=\(shouldShowEnhance), 截图数=\(screenshotManager.screenshots.count), 模式=\(screenshotManager.currentMode.displayName)")
     }
 }

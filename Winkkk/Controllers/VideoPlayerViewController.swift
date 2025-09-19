@@ -193,17 +193,17 @@ class VideoPlayerViewController: UIViewController {
     }
     
     private func setupControlPanel() {
-        // 🆕 设置统一毛玻璃容器
-        unifiedControlPanelView.layer.cornerRadius = ThemeManager.largeCornerRadius
-        unifiedControlPanelView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        unifiedControlPanelView.clipsToBounds = false
-        view.addSubview(unifiedControlPanelView)
+        // 🚨 旧UI系统已移除 - 使用UnifiedBottomControlPanel替代
+        // unifiedControlPanelView.layer.cornerRadius = ThemeManager.largeCornerRadius
+        // unifiedControlPanelView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        // unifiedControlPanelView.clipsToBounds = false
+        // view.addSubview(unifiedControlPanelView)  // 🚨 已移除：防止与新UI冲突
         
-        // 控制面板内容容器 - 透明背景
-        controlPanelBlurView.backgroundColor = .clear
-        controlPanelBlurView.layer.cornerRadius = 0
-        controlPanelBlurView.clipsToBounds = false
-        unifiedControlPanelView.contentView.addSubview(controlPanelBlurView)
+        // 🚨 控制面板内容容器已移除 - 功能已迁移到UnifiedBottomControlPanel
+        // controlPanelBlurView.backgroundColor = .clear
+        // controlPanelBlurView.layer.cornerRadius = 0
+        // controlPanelBlurView.clipsToBounds = false
+        // unifiedControlPanelView.contentView.addSubview(controlPanelBlurView)  // 🚨 已移除：防止与新UI冲突
         
         // 播放/暂停按钮
         setupPlayPauseButton()
@@ -214,12 +214,12 @@ class VideoPlayerViewController: UIViewController {
         // 时间标签
         setupTimeLabels()
         
-        // 添加到控制面板 - 🔧 时间轴放在最下层，避免遮挡按钮
-        controlPanelBlurView.contentView.addSubview(timelineView)
-        controlPanelBlurView.contentView.addSubview(currentTimeLabel)
-        controlPanelBlurView.contentView.addSubview(totalTimeLabel)
-        controlPanelBlurView.contentView.addSubview(playPauseButton)
-        controlPanelBlurView.contentView.addSubview(screenshotButton)
+        // 🚨 旧控制组件已移除 - 功能已迁移到UnifiedBottomControlPanel
+        // controlPanelBlurView.contentView.addSubview(timelineView)
+        // controlPanelBlurView.contentView.addSubview(currentTimeLabel)
+        // controlPanelBlurView.contentView.addSubview(totalTimeLabel)
+        // controlPanelBlurView.contentView.addSubview(playPauseButton)
+        // controlPanelBlurView.contentView.addSubview(screenshotButton)
     }
     
     private func setupPlayPauseButton() {
@@ -436,6 +436,10 @@ class VideoPlayerViewController: UIViewController {
                     
                     // 设置时间轴
                     self.timelineView.setDuration(duration.seconds)
+                    
+                    // 🔧 修复任务1: 确保视频信息加载后配置新控制面板时间轴
+                    self.bottomControlPanel?.setupVideo(url: self.videoURL, duration: duration)
+                    print("📹 视频信息加载后配置完成: 时长=\(duration.seconds)秒")
                 }
             }
         }
@@ -446,19 +450,19 @@ class VideoPlayerViewController: UIViewController {
         timelineView.setVideoURL(videoURL)
     }
     
-    // MARK: - 🆕 多图截取系统设置
+    // MARK: - 🚨 多图截取系统设置 (已迁移到UnifiedBottomControlPanel)
     private func setupCaptureModeSwitcher() {
         captureModeSwitcher.delegate = self
         captureModeSwitcher.backgroundColor = .clear  // 🆕 透明背景
-        unifiedControlPanelView.contentView.addSubview(captureModeSwitcher)
+        // unifiedControlPanelView.contentView.addSubview(captureModeSwitcher)  // 🚨 已移除：功能已迁移到UnifiedBottomControlPanel
     }
     
     private func setupScreenshotPreviewBar() {
         screenshotPreviewBar.delegate = self
-        screenshotPreviewBar.isHidden = false  // 🎯 固定三分屏：底部区域始终显示
-        screenshotPreviewBar.alpha = 1.0
-        // 🆕 添加到统一容器中，而不是直接添加到view
-        unifiedControlPanelView.contentView.addSubview(screenshotPreviewBar)
+        screenshotPreviewBar.isHidden = true   // 🚨 已隐藏：功能已迁移到UnifiedBottomControlPanel
+        screenshotPreviewBar.alpha = 0.0
+        // 🚨 已移除：功能已迁移到UnifiedBottomControlPanel
+        // unifiedControlPanelView.contentView.addSubview(screenshotPreviewBar)
     }
     
     // setupBatchOperationPanel 已移除 - 功能集成到ScreenshotPreviewBar中
@@ -521,6 +525,16 @@ class VideoPlayerViewController: UIViewController {
         // 🆕 初始化新组件状态
         panel.updatePlaybackState(isPlaying: isFlowing)
         panel.updateScreenshots(screenshotManager.screenshots)
+        
+        // 🔧 修复任务1: 配置视频URL和时长，启用时间轴缩略图
+        if videoDuration.seconds > 0 {
+            panel.setupVideo(url: videoURL, duration: videoDuration)
+            print("📹 视频配置完成: URL=\(videoURL.lastPathComponent), 时长=\(videoDuration.seconds)秒")
+        }
+        
+        // 🔧 修复任务2: 设置播放头约束，启用时间轴缩放功能
+        panel.setupPlayheadConstraints(to: view)
+        print("🎯 播放头约束设置完成，时间轴缩放功能已启用")
         
         print("✅ 统一控制面板启用完成")
     }
@@ -751,13 +765,14 @@ class VideoPlayerViewController: UIViewController {
     }
     
     private func showScreenshotSuccessAnimation() {
-        // 简单的成功动画
-        UIView.animate(withDuration: 0.2, animations: {
-            self.screenshotButton.transform = CGAffineTransform(scaleX: 1.2, y: 1.2)
-        }) { _ in
-            UIView.animate(withDuration: 0.2) {
-                self.screenshotButton.transform = .identity
-            }
+        // 🎯 使用心形成功动画
+        let center = screenshotButton.center
+        AnimationManager.shared.showHeartSuccessAnimation(in: view, at: center)
+        
+        // 保留按钮的轻微反馈动画
+        AnimationManager.shared.animateButtonPress(screenshotButton)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            AnimationManager.shared.animateButtonRelease(self.screenshotButton)
         }
     }
     
@@ -944,15 +959,11 @@ class VideoPlayerViewController: UIViewController {
         if button == screenshotButton {
             print("🔧 截图按钮被按下")
         }
-        UIView.animate(withDuration: 0.1) {
-            button.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
-        }
+        AnimationManager.shared.animateButtonPress(button)
     }
     
     @objc private func buttonReleased(_ button: UIButton) {
-        UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5) {
-            button.transform = .identity
-        }
+        AnimationManager.shared.animateButtonRelease(button)
     }
     
     @objc private func playerDidFinishPlaying() {
@@ -1065,7 +1076,7 @@ extension VideoPlayerViewController: TimelineViewDelegate {
     }
 }
 
-// MARK: - 🆕 CaptureModeSwitcherDelegate
+// MARK: - 🚨 CaptureModeSwitcherDelegate (已弃用 - 功能已迁移到UnifiedBottomControlPanel)
 extension VideoPlayerViewController: CaptureModeSwitcherDelegate {
     
     func captureModeSwitcher(_ switcher: CaptureModeSwitcher, didRequestSwitchTo mode: CaptureMode) {
@@ -1142,7 +1153,7 @@ extension VideoPlayerViewController: UnifiedBottomControlPanelDelegate {
         print("🎯 统一面板 - 结束拖拽: \(time)")
     }
     
-    func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didTapCapture mode: UnifiedBottomControlPanel.CaptureMode) {
+    func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didTapCapture mode: CaptureMode) {
         // 转换模式并复用现有截图逻辑
         let captureMode: CaptureMode = (mode == .stillImage) ? .stillImage : .livePhoto
         
@@ -1175,6 +1186,33 @@ extension VideoPlayerViewController: UnifiedBottomControlPanelDelegate {
         print("🎯 统一面板 - 选择截图: \(item.id)")
     }
     
+    // 🔧 修复任务5: 删除单个截图代理方法
+    func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didRequestDeleteScreenshot item: ScreenshotItem) {
+        print("🗑️ 统一面板 - 删除截图请求: \(item.id)")
+        
+        // 显示确认对话框
+        let alert = UIAlertController(
+            title: "删除截图",
+            message: "确定要删除这张截图吗？",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "删除", style: .destructive) { [weak self] _ in
+            guard let self = self else { return }
+            
+            // 执行删除
+            self.screenshotManager.removeScreenshot(item)
+            
+            // 触觉反馈
+            HapticFeedbackManager.shared.notificationSuccess()
+            
+            print("✅ 截图已删除: \(item.id)")
+        })
+        
+        present(alert, animated: true)
+    }
+    
     func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didTapEnhance screenshots: [ScreenshotItem]) {
         // 🆕 复用现有批量增强逻辑
         guard !screenshots.isEmpty else { return }
@@ -1191,6 +1229,7 @@ extension VideoPlayerViewController: UnifiedBottomControlPanelDelegate {
     }
 }
 
+// MARK: - 🚨 ScreenshotPreviewBarDelegate (已弃用 - 功能已迁移到UnifiedBottomControlPanel)
 extension VideoPlayerViewController: ScreenshotPreviewBarDelegate {
     
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didTapScreenshot screenshot: ScreenshotItem, at index: Int) {
