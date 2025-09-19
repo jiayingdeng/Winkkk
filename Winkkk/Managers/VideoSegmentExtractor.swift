@@ -70,7 +70,7 @@ class VideoSegmentExtractor {
         let timeRange = CMTimeRange(start: startTime, duration: duration)
         guard timeRange.isValid && CMTimeRangeContainsTimeRange(
             CMTimeRange(start: .zero, duration: videoDuration),
-            timeRange
+            otherRange: timeRange
         ) else {
             throw ExtractionError.invalidTimeRange
         }

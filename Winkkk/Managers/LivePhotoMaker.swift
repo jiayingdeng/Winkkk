@@ -17,6 +17,11 @@ import UniformTypeIdentifiers
 /// 负责将视频片段和封面图片组装成iOS原生支持的Live Photo格式
 class LivePhotoMaker {
     
+    // MARK: - Singleton
+    static let shared = LivePhotoMaker()
+    
+    private init() {}
+    
     // MARK: - Error Types
     enum LivePhotoError: LocalizedError {
         case invalidVideoURL
