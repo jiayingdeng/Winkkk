@@ -22,7 +22,6 @@ class ImageComparisonView: UIView {
     private let enhancedLabel = UILabel()
     
     // 滑动控制
-    private let sliderView = UIView()
     private let sliderHandle = UIView()
     
     // 手势
@@ -72,8 +71,8 @@ class ImageComparisonView: UIView {
         // 标签
         setupLabels()
         
-        // 滑块
-        setupSlider()
+        // 拖拽手柄
+        setupSliderHandle()
         
         setupConstraints()
     }
@@ -101,23 +100,25 @@ class ImageComparisonView: UIView {
         addSubview(enhancedLabel)
     }
     
-    private func setupSlider() {
-        // 滑块背景
-        sliderView.backgroundColor = UIColor.white.withAlphaComponent(0.8)
-        sliderView.layer.cornerRadius = 2
-        addSubview(sliderView)
-        
-        // 滑块手柄
+    private func setupSliderHandle() {
+        // 拖拽手柄
         sliderHandle.backgroundColor = ThemeManager.buttonPrimary
         sliderHandle.layer.cornerRadius = 12
         
+        // 阴影设置 - 确保阴影不会被裁剪
+        sliderHandle.layer.masksToBounds = false
+        sliderHandle.layer.shadowColor = UIColor.black.cgColor
+        sliderHandle.layer.shadowOffset = CGSize(width: 0, height: 2)
+        sliderHandle.layer.shadowRadius = 4
+        sliderHandle.layer.shadowOpacity = 0.3
+        
+        addSubview(sliderHandle)
+        
         // 添加图标
-        let dragIcon = UIImageView(image: UIImage(systemName: "line.3.horizontal"))
+        let dragIcon = UIImageView(image: UIImage(systemName: "arrow.left.and.right"))
         dragIcon.tintColor = .white
         dragIcon.contentMode = .scaleAspectFit
         sliderHandle.addSubview(dragIcon)
-        
-        sliderView.addSubview(sliderHandle)
         
         dragIcon.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
@@ -134,7 +135,6 @@ class ImageComparisonView: UIView {
         dividerView.translatesAutoresizingMaskIntoConstraints = false
         originalLabel.translatesAutoresizingMaskIntoConstraints = false
         enhancedLabel.translatesAutoresizingMaskIntoConstraints = false
-        sliderView.translatesAutoresizingMaskIntoConstraints = false
         sliderHandle.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
@@ -150,7 +150,7 @@ class ImageComparisonView: UIView {
             enhancedImageView.trailingAnchor.constraint(equalTo: trailingAnchor),
             enhancedImageView.bottomAnchor.constraint(equalTo: bottomAnchor),
             
-            // 分割线
+            // 分割线 - 垂直约束
             dividerView.topAnchor.constraint(equalTo: topAnchor),
             dividerView.bottomAnchor.constraint(equalTo: bottomAnchor),
             dividerView.widthAnchor.constraint(equalToConstant: 2),
@@ -167,18 +167,13 @@ class ImageComparisonView: UIView {
             enhancedLabel.widthAnchor.constraint(equalToConstant: 60),
             enhancedLabel.heightAnchor.constraint(equalToConstant: 24),
             
-            // 滑块
-            sliderView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            sliderView.leadingAnchor.constraint(equalTo: leadingAnchor),
-            sliderView.trailingAnchor.constraint(equalTo: trailingAnchor),
-            sliderView.heightAnchor.constraint(equalToConstant: 4),
-            
-            // 滑块手柄
-            sliderHandle.centerYAnchor.constraint(equalTo: sliderView.centerYAnchor),
+            // 拖拽手柄 - 垂直约束
+            sliderHandle.centerYAnchor.constraint(equalTo: centerYAnchor),
             sliderHandle.widthAnchor.constraint(equalToConstant: 24),
             sliderHandle.heightAnchor.constraint(equalToConstant: 40)
         ])
         
+        // 水平约束将在 updateDividerPosition() 中设置
         updateDividerPosition()
     }
     
@@ -230,11 +225,20 @@ class ImageComparisonView: UIView {
             
         case .changed:
             dividerPosition = newPosition
+            // 在拖拽过程中实时更新阴影，但使用主队列确保顺序
+            DispatchQueue.main.async {
+                self.updateSliderHandleShadow()
+            }
             
         case .ended, .cancelled:
             // 恢复滑块手柄大小
             UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.6, initialSpringVelocity: 0.5) {
                 self.sliderHandle.transform = .identity
+            } completion: { _ in
+                // 动画结束后确保阴影位置正确，延迟执行确保动画完全结束
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    self.updateSliderHandleShadow()
+                }
             }
             
         default:
@@ -250,6 +254,9 @@ class ImageComparisonView: UIView {
         
         UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5) {
             self.dividerPosition = newPosition
+        } completion: { _ in
+            // 点击动画结束后更新阴影
+            self.updateSliderHandleShadow()
         }
         
         // 触觉反馈
@@ -261,30 +268,45 @@ class ImageComparisonView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         updateDividerPosition()
+        
+        // 布局变化后更新阴影
+        DispatchQueue.main.async {
+            self.updateSliderHandleShadow()
+        }
     }
+    
+    // 约束引用，避免重复创建
+    private var dividerCenterXConstraint: NSLayoutConstraint?
+    private var sliderHandleCenterXConstraint: NSLayoutConstraint?
     
     private func updateDividerPosition() {
         guard bounds.width > 0 else { return }
         
         let dividerX = bounds.width * dividerPosition
         
-        // 更新分割线约束
-        dividerView.constraints.forEach { constraint in
-            if constraint.firstAttribute == .centerX {
-                removeConstraint(constraint)
-            }
+        // 更新分割线约束 - 使用约束引用避免重复创建
+        if let existingConstraint = dividerCenterXConstraint {
+            existingConstraint.constant = dividerX
+        } else {
+            dividerCenterXConstraint = dividerView.centerXAnchor.constraint(equalTo: leadingAnchor, constant: dividerX)
+            dividerCenterXConstraint?.isActive = true
         }
         
-        dividerView.centerXAnchor.constraint(equalTo: leadingAnchor, constant: dividerX).isActive = true
-        
-        // 更新滑块手柄位置
-        sliderHandle.constraints.forEach { constraint in
-            if constraint.firstAttribute == .centerX {
-                sliderView.removeConstraint(constraint)
-            }
+        // 更新拖拽手柄位置 - 使用约束引用避免重复创建
+        if let existingConstraint = sliderHandleCenterXConstraint {
+            existingConstraint.constant = dividerX
+        } else {
+            sliderHandleCenterXConstraint = sliderHandle.centerXAnchor.constraint(equalTo: leadingAnchor, constant: dividerX)
+            sliderHandleCenterXConstraint?.isActive = true
         }
         
-        sliderHandle.centerXAnchor.constraint(equalTo: sliderView.leadingAnchor, constant: dividerX).isActive = true
+        // 强制布局更新确保约束生效
+        layoutIfNeeded()
+        
+        // 延迟更新阴影路径，确保手柄位置已更新
+        DispatchQueue.main.async {
+            self.updateSliderHandleShadow()
+        }
         
         // 更新蒙版
         updateImageMasks()
@@ -308,6 +330,28 @@ class ImageComparisonView: UIView {
         enhancedImageView.layer.mask = enhancedMaskLayer
     }
     
+    private func updateSliderHandleShadow() {
+        // 确保手柄已完成布局
+        guard sliderHandle.bounds.width > 0 && sliderHandle.bounds.height > 0 else {
+            // 如果手柄尚未布局完成，延迟执行
+            DispatchQueue.main.async {
+                self.updateSliderHandleShadow()
+            }
+            return
+        }
+        
+        // 更新阴影路径确保阴影准确跟随手柄
+        let shadowPath = UIBezierPath(roundedRect: sliderHandle.bounds, cornerRadius: 12)
+        sliderHandle.layer.shadowPath = shadowPath.cgPath
+        
+        // 确保阴影属性正确设置
+        sliderHandle.layer.shadowColor = UIColor.black.cgColor
+        sliderHandle.layer.shadowOffset = CGSize(width: 0, height: 2)
+        sliderHandle.layer.shadowRadius = 4
+        sliderHandle.layer.shadowOpacity = 0.3
+        sliderHandle.layer.masksToBounds = false
+    }
+    
     // MARK: - Animations
     private func animateSliderIntroduction() {
         // 滑块从中心滑到适当位置
@@ -323,7 +367,10 @@ class ImageComparisonView: UIView {
             UIView.addKeyframe(withRelativeStartTime: 0.5, relativeDuration: 0.5) {
                 self.sliderHandle.transform = .identity
             }
-        })
+        }) { _ in
+            // 动画结束后更新阴影
+            self.updateSliderHandleShadow()
+        }
         
         // 自动演示滑动效果
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
@@ -337,6 +384,9 @@ class ImageComparisonView: UIView {
         }) { _ in
             UIView.animate(withDuration: 1.5, delay: 0.5, options: .curveEaseInOut) {
                 self.dividerPosition = 0.5
+            } completion: { _ in
+                // 演示动画结束后更新阴影
+                self.updateSliderHandleShadow()
             }
         }
     }

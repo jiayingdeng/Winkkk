@@ -978,8 +978,9 @@ class BatchEnhanceCell: UICollectionViewCell {
         enhancedImageView.alpha = 0
         containerView.addSubview(enhancedImageView)
         
-        // 分割线
+        // 分割线（仅在修复完成时显示）
         dividerView.backgroundColor = UIColor.white.withAlphaComponent(0.3)
+        dividerView.isHidden = true // 初始隐藏，仅在有修复后图片时显示
         containerView.addSubview(dividerView)
         
         // 标签
@@ -1080,7 +1081,7 @@ class BatchEnhanceCell: UICollectionViewCell {
             enhancedImageView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
             enhancedImageView.widthAnchor.constraint(equalTo: containerView.widthAnchor, multiplier: 0.5),
             
-            // 分割线
+            // 分割线（仅在显示对比时显示）
             dividerView.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
             dividerView.topAnchor.constraint(equalTo: containerView.topAnchor),
             dividerView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
@@ -1212,6 +1213,8 @@ class BatchEnhanceCell: UICollectionViewCell {
             UIView.animate(withDuration: 0.5) {
                 self.enhancedImageView.alpha = 1
                 self.enhancedLabel.alpha = 1
+                // 修复完成时显示分割线，用于对比显示
+                self.dividerView.isHidden = false
             }
         }
     }
@@ -1228,6 +1231,8 @@ class BatchEnhanceCell: UICollectionViewCell {
         
         enhancedImageView.alpha = 0
         enhancedLabel.alpha = 0
+        // 失败时隐藏分割线
+        dividerView.isHidden = true
     }
     
     override func prepareForReuse() {
@@ -1240,5 +1245,7 @@ class BatchEnhanceCell: UICollectionViewCell {
         overlayView.isHidden = true
         progressView.isHidden = true
         progressView.progress = 0
+        // 重用时隐藏分割线
+        dividerView.isHidden = true
     }
 }
