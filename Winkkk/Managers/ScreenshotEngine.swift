@@ -16,7 +16,7 @@ class ScreenshotEngine {
     // MARK: - Properties
     private let persistenceController = PersistenceController.shared
     private let videoSegmentExtractor = VideoSegmentExtractor()
-    private let livePhotoMaker = LivePhotoMaker()
+    private let livePhotoMaker = LivePhotoMaker.shared
     
     // MARK: - Public Methods
     
