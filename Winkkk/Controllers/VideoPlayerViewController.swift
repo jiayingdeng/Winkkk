@@ -728,13 +728,19 @@ class VideoPlayerViewController: UIViewController {
         // 显示Live Photo创建进度
         showLivePhotoCreationProgress()
         
-        screenshotEngine.captureLivePhoto(from: videoURL, startTime: cmCaptureTime) { [weak self] result in
+        // 创建临时VideoItem用于Live Photo创建
+        let tempVideoItem = VideoItem(context: PersistenceController.shared.container.viewContext)
+        tempVideoItem.url = videoURL
+        tempVideoItem.filename = videoURL.lastPathComponent
+        tempVideoItem.createdDate = Date()
+        
+        screenshotEngine.captureLivePhoto(from: videoURL, at: cmCaptureTime, for: tempVideoItem) { [weak self] result in
             DispatchQueue.main.async {
                 self?.hideLivePhotoCreationProgress()
                 
                 switch result {
-                case .success(let (image, livePhoto)):
-                    self?.handleLivePhotoSuccess(image: image, livePhoto: livePhoto, captureTime: captureTime)
+                case .success(let screenshotItem):
+                    self?.handleLivePhotoSuccess(screenshotItem: screenshotItem, captureTime: captureTime)
                 case .failure(let error):
                     self?.handleLivePhotoError(error)
                 }
@@ -1399,20 +1405,11 @@ extension VideoPlayerViewController {
 extension VideoPlayerViewController {
     
     /// 处理Live Photo截图成功
-    private func handleLivePhotoSuccess(image: UIImage, livePhoto: PHLivePhoto, captureTime: Double) {
+    private func handleLivePhotoSuccess(screenshotItem: ScreenshotItem, captureTime: Double) {
         print("🎬 Live Photo创建成功！")
         
-        // 🆕 创建Live Photo截图项目
-        let screenshot = ScreenshotItem(
-            image: image,
-            timestamp: captureTime,
-            mode: .livePhoto,
-            videoURL: videoURL,
-            livePhoto: livePhoto
-        )
-        
         // 🎯 保存到截图管理器
-        screenshotManager.safeAddScreenshot(screenshot)
+        screenshotManager.safeAddScreenshot(screenshotItem)
         
         // 🎯 显示成功动画
         showScreenshotSuccessAnimation()
