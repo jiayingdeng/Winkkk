@@ -83,6 +83,8 @@ class VideoPlayerViewController: UIViewController {
     private var isFlowing = false {  // 从isPlaying改为isFlowing
         didSet {
             updatePlayPauseButton()
+            // 🆕 同步状态到新组件
+            bottomControlPanel?.updatePlaybackState(isPlaying: isFlowing)
         }
     }
 
@@ -157,12 +159,12 @@ class VideoPlayerViewController: UIViewController {
         playerContainerView.layer.masksToBounds = true
         view.addSubview(playerContainerView)
         
-        // 控制面板
-        setupControlPanel()
+        // 控制面板 - 注释：已替换为UnifiedBottomControlPanel
+        // setupControlPanel()
         
-        // 🆕 多图截取系统组件
-        setupCaptureModeSwitcher()
-        setupScreenshotPreviewBar()
+        // 🆕 多图截取系统组件 - 注释：已集成到UnifiedBottomControlPanel
+        // setupCaptureModeSwitcher()
+        // setupScreenshotPreviewBar()
         
         // 🆕 批量操作功能已集成到ScreenshotPreviewBar中
         
@@ -297,61 +299,58 @@ class VideoPlayerViewController: UIViewController {
             playerContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
             playerContainerView.heightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.heightAnchor, multiplier: 0.533),
             
-            // 🎯 统一毛玻璃容器 - 包含控制面板+模式切换器+截图预览栏
-            unifiedControlPanelView.topAnchor.constraint(equalTo: playerContainerView.bottomAnchor, constant: 8),
-            unifiedControlPanelView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            unifiedControlPanelView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            unifiedControlPanelView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
+            // 🎯 统一毛玻璃容器 - 注释：已替换为UnifiedBottomControlPanel
+            // unifiedControlPanelView.topAnchor.constraint(equalTo: playerContainerView.bottomAnchor, constant: 8),
+            // unifiedControlPanelView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            // unifiedControlPanelView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            // unifiedControlPanelView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
             
-            // 🎯 控制面板内容区域 - 在统一容器内部，使用弹性高度
-            controlPanelBlurView.topAnchor.constraint(equalTo: unifiedControlPanelView.topAnchor),
-            controlPanelBlurView.leadingAnchor.constraint(equalTo: unifiedControlPanelView.leadingAnchor),
-            controlPanelBlurView.trailingAnchor.constraint(equalTo: unifiedControlPanelView.trailingAnchor),
-            controlPanelBlurView.heightAnchor.constraint(greaterThanOrEqualToConstant: 140),
+            // 🎯 控制面板内容区域 - 注释：已替换为UnifiedBottomControlPanel
+            // controlPanelBlurView.topAnchor.constraint(equalTo: unifiedControlPanelView.topAnchor),
+            // controlPanelBlurView.leadingAnchor.constraint(equalTo: unifiedControlPanelView.leadingAnchor),
+            // controlPanelBlurView.trailingAnchor.constraint(equalTo: unifiedControlPanelView.trailingAnchor),
+            // controlPanelBlurView.heightAnchor.constraint(greaterThanOrEqualToConstant: 140),
             
-            // 🎯 时间轴 - 允许视觉溢出屏幕边界 (Wink风格)
-            timelineView.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 20),
-            timelineView.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
-            timelineView.heightAnchor.constraint(equalToConstant: 110),
+            // 🎯 时间轴 - 注释：已集成到UnifiedBottomControlPanel
+            // timelineView.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 20),
+            // timelineView.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
+            // timelineView.heightAnchor.constraint(equalToConstant: 110),
             
-            // 时间标签
-            currentTimeLabel.topAnchor.constraint(equalTo: timelineView.bottomAnchor, constant: 8),
-            currentTimeLabel.leadingAnchor.constraint(equalTo: timelineView.leadingAnchor),
-            currentTimeLabel.widthAnchor.constraint(equalToConstant: 50),
+            // 时间标签 - 注释：已集成到UnifiedBottomControlPanel
+            // currentTimeLabel.topAnchor.constraint(equalTo: timelineView.bottomAnchor, constant: 8),
+            // currentTimeLabel.leadingAnchor.constraint(equalTo: timelineView.leadingAnchor),
+            // currentTimeLabel.widthAnchor.constraint(equalToConstant: 50),
             
-            totalTimeLabel.topAnchor.constraint(equalTo: timelineView.bottomAnchor, constant: 8),
-            totalTimeLabel.trailingAnchor.constraint(equalTo: timelineView.trailingAnchor),
-            totalTimeLabel.widthAnchor.constraint(equalToConstant: 50),
+            // totalTimeLabel.topAnchor.constraint(equalTo: timelineView.bottomAnchor, constant: 8),
+            // totalTimeLabel.trailingAnchor.constraint(equalTo: timelineView.trailingAnchor),
+            // totalTimeLabel.widthAnchor.constraint(equalToConstant: 50),
             
-            // 🎯 修复：播放和截图按钮与时间轴在同一水平区域，但固定在屏幕边界内
-            // 播放按钮 - 位于屏幕左侧，与时间轴同一水平线
-            playPauseButton.centerYAnchor.constraint(equalTo: timelineView.centerYAnchor),
-            playPauseButton.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 20),
-            playPauseButton.widthAnchor.constraint(equalToConstant: 50),
-            playPauseButton.heightAnchor.constraint(equalToConstant: 50),
+            // 🎯 播放和截图按钮 - 注释：已集成到UnifiedBottomControlPanel
+            // playPauseButton.centerYAnchor.constraint(equalTo: timelineView.centerYAnchor),
+            // playPauseButton.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 20),
+            // playPauseButton.widthAnchor.constraint(equalToConstant: 50),
+            // playPauseButton.heightAnchor.constraint(equalToConstant: 50),
             
-            // 截图按钮 - 位于屏幕右侧，与时间轴同一水平线
-            screenshotButton.centerYAnchor.constraint(equalTo: timelineView.centerYAnchor),
-            screenshotButton.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -20),
-            screenshotButton.widthAnchor.constraint(equalToConstant: 80),
-            screenshotButton.heightAnchor.constraint(equalToConstant: 40)
+            // screenshotButton.centerYAnchor.constraint(equalTo: timelineView.centerYAnchor),
+            // screenshotButton.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -20),
+            // screenshotButton.widthAnchor.constraint(equalToConstant: 80),
+            // screenshotButton.heightAnchor.constraint(equalToConstant: 40)
         ])
         
         // 🎯 初始化动态约束 - 三分屏布局不需要动态高度约束，使用比例约束
         // controlPanelHeightConstraint 现在由比例约束替代
         
-        // 🎯 初始化时间轴动态宽度约束 (实现15%溢出效果)
-        let screenWidth = UIScreen.main.bounds.width
-        let overflowWidth = screenWidth + (screenWidth * 0.15)  // 屏幕宽度 + 15%溢出
-        timelineWidthConstraint = timelineView.widthAnchor.constraint(equalToConstant: overflowWidth)
-        timelineWidthConstraint?.isActive = true
+        // 🎯 时间轴动态约束 - 注释：已集成到UnifiedBottomControlPanel
+        // let screenWidth = UIScreen.main.bounds.width
+        // let overflowWidth = screenWidth + (screenWidth * 0.15)  // 屏幕宽度 + 15%溢出
+        // timelineWidthConstraint = timelineView.widthAnchor.constraint(equalToConstant: overflowWidth)
+        // timelineWidthConstraint?.isActive = true
         
-        // 🎯 关键修复：将playheadIndicator约束到屏幕中心而不是TimelineView中心
-        // 这是解决所有时间轴问题的核心
-        timelineView.playheadIndicatorView.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
+        // 🎯 playheadIndicator约束 - 注释：已集成到UnifiedBottomControlPanel
+        // timelineView.playheadIndicatorView.centerXAnchor.constraint(equalTo: view.centerXAnchor).isActive = true
         
-        // 🆕 新组件约束
-        setupNewComponentsConstraints()
+        // 🆕 新组件约束 - 注释：已集成到UnifiedBottomControlPanel
+        // setupNewComponentsConstraints()
     }
     
     private func setupNewComponentsConstraints() {
@@ -492,9 +491,9 @@ class VideoPlayerViewController: UIViewController {
             .store(in: &cancellables)
     }
     
-    // MARK: - Unified Control Panel Setup (临时并存)
+    // MARK: - Unified Control Panel Setup (启用新组件)
     private func setupUnifiedControlPanel() {
-        print("🔧 设置统一控制面板（临时并存模式）")
+        print("🔧 设置统一控制面板（启用新组件）")
         
         // 创建新组件
         bottomControlPanel = UnifiedBottomControlPanel()
@@ -503,39 +502,37 @@ class VideoPlayerViewController: UIViewController {
         // 设置代理
         panel.delegate = self
         
-        // 临时隐藏新组件，稍后会切换显示
-        panel.isHidden = true
-        panel.alpha = 0.0
+        // 🆕 启用新组件 - 替换旧的控制面板
+        panel.isHidden = false
+        panel.alpha = 1.0
         
         // 添加到视图
         view.addSubview(panel)
         
-        // 设置约束 - 与现有控制面板相同的位置
+        // 设置约束 - 占据底部区域
         panel.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
+            panel.topAnchor.constraint(equalTo: playerContainerView.bottomAnchor, constant: 8),
             panel.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             panel.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            panel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            panel.heightAnchor.constraint(equalToConstant: 200) // 固定高度
+            panel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8)
         ])
         
-        print("✅ 统一控制面板设置完成")
+        // 🆕 初始化新组件状态
+        panel.updatePlaybackState(isPlaying: isFlowing)
+        panel.updateScreenshots(screenshotManager.screenshots)
+        
+        print("✅ 统一控制面板启用完成")
     }
     
     private func updatePreviewBarVisibility(screenshots: [ScreenshotItem]) {
-        // 🎯 固定三分屏设计：底部区域始终显示，不管是否有截图
-        // 更新预览栏数据
-        screenshotPreviewBar.updateWithScreenshots(screenshots)
-        
-        // 确保预览栏始终可见
-        screenshotPreviewBar.isHidden = false
-        screenshotPreviewBar.alpha = 1.0
-        screenshotPreviewBar.transform = .identity
+        // 🆕 使用新的统一控制面板更新截图
+        bottomControlPanel?.updateScreenshots(screenshots)
         
         if !screenshots.isEmpty {
-            print("📸 截图已添加到预览栏 (固定三分屏底部区域)")
+            print("📸 截图已更新到统一控制面板")
         } else {
-            print("📸 预览栏已清空，但底部区域保持显示 (固定三分屏)")
+            print("📸 统一控制面板截图已清空")
         }
     }
     
@@ -1127,17 +1124,21 @@ extension VideoPlayerViewController: UnifiedBottomControlPanelDelegate {
     }
     
     func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didSeekToTime time: Double) {
-        // 时间轴拖拽逻辑（阶段4实现）
+        // 🆕 实现时间轴拖拽逻辑 - 复用现有的时间跳转功能
+        let captureTime = CMTime(seconds: time * videoDuration.seconds, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        updateVideoPreview(to: captureTime)
+        updateCaptureTimeLabel(captureTime)
         print("🎯 统一面板 - 时间跳转: \(time)")
     }
     
     func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didStartSeeking time: Double) {
-        // 开始拖拽时间轴（阶段4实现）
+        // 🆕 开始拖拽时停止流动
+        stopFlowing()
         print("🎯 统一面板 - 开始拖拽: \(time)")
     }
     
     func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didEndSeeking time: Double) {
-        // 结束拖拽时间轴（阶段4实现）
+        // 🆕 结束拖拽逻辑
         print("🎯 统一面板 - 结束拖拽: \(time)")
     }
     
@@ -1163,14 +1164,29 @@ extension VideoPlayerViewController: UnifiedBottomControlPanelDelegate {
     }
     
     func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didSelectScreenshot item: ScreenshotItem) {
-        // 复用现有截图选择逻辑
-        // TODO: 在阶段4中实现截图详情查看
+        // 🆕 复用现有截图选择逻辑
+        if isInSelectionMode {
+            toggleScreenshotSelection(item)
+        } else {
+            // 单击截图的处理逻辑
+            showOperationHint()
+        }
+        HapticFeedbackManager.shared.lightImpact()
         print("🎯 统一面板 - 选择截图: \(item.id)")
     }
     
     func bottomControlPanel(_ panel: UnifiedBottomControlPanel, didTapEnhance screenshots: [ScreenshotItem]) {
-        // 复用现有增强逻辑
-        // TODO: 在阶段4中实现批量增强
+        // 🆕 复用现有批量增强逻辑
+        guard !screenshots.isEmpty else { return }
+        
+        let processingVC = ScreenshotProcessingViewController(
+            screenshots: screenshots,
+            mode: screenshotManager.currentMode
+        )
+        let navController = UINavigationController(rootViewController: processingVC)
+        navController.modalPresentationStyle = .fullScreen
+        present(navController, animated: true)
+        
         print("🎯 统一面板 - 增强截图: \(screenshots.count)张")
     }
 }
