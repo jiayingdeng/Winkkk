@@ -172,7 +172,7 @@ class CollageViewController: UIViewController {
         generateButton.titleLabel?.font = ThemeManager.buttonFont
         generateButton.setTitleColor(.white, for: .normal)
         generateButton.backgroundColor = ThemeManager.buttonPrimary
-        generateButton.layer.cornerRadius = ThemeManager.buttonCornerRadius
+        generateButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         generateButton.addTarget(self, action: #selector(generateCollage), for: .touchUpInside)
         controlPanelView.addSubview(generateButton)
         
@@ -198,7 +198,7 @@ class CollageViewController: UIViewController {
         resetButton.titleLabel?.font = ThemeManager.buttonFont
         resetButton.setTitleColor(.white, for: .normal)
         resetButton.backgroundColor = UIColor.white.withAlphaComponent(0.2)
-        resetButton.layer.cornerRadius = ThemeManager.buttonCornerRadius
+        resetButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         resetButton.addTarget(self, action: #selector(resetCollage), for: .touchUpInside)
         resetButton.isEnabled = false
         resetButton.alpha = 0.5
@@ -209,7 +209,7 @@ class CollageViewController: UIViewController {
         saveButton.titleLabel?.font = ThemeManager.buttonFont
         saveButton.setTitleColor(.white, for: .normal)
         saveButton.backgroundColor = ThemeManager.buttonSecondary
-        saveButton.layer.cornerRadius = ThemeManager.buttonCornerRadius
+        saveButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         saveButton.addTarget(self, action: #selector(saveCollage), for: .touchUpInside)
         saveButton.isEnabled = false
         saveButton.alpha = 0.5
@@ -220,7 +220,7 @@ class CollageViewController: UIViewController {
         shareButton.titleLabel?.font = ThemeManager.buttonFont
         shareButton.setTitleColor(.white, for: .normal)
         shareButton.backgroundColor = ThemeManager.buttonPrimary
-        shareButton.layer.cornerRadius = ThemeManager.buttonCornerRadius
+        shareButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         shareButton.addTarget(self, action: #selector(shareCollage), for: .touchUpInside)
         shareButton.isEnabled = false
         shareButton.alpha = 0.5

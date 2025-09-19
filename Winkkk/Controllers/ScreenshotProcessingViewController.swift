@@ -417,21 +417,32 @@ extension ScreenshotProcessingViewController {
             return
         }
         
-        // 获取第一张图片作为主要处理对象
-        guard let firstImage = screenshots.first?.image else {
-            showAlert(title: "错误", message: "无法加载图片")
-            return
+        // 如果只有一张图片，直接跳转到单图修复界面
+        if screenshots.count == 1 {
+            guard let firstImage = screenshots.first?.image else {
+                showAlert(title: "错误", message: "无法加载图片")
+                return
+            }
+            
+            // 触觉反馈
+            HapticFeedbackManager.shared.buttonTap()
+            
+            // 跳转到单图画质修复页面
+            let imageEnhanceVC = ImageEnhanceViewController(
+                image: firstImage,
+                timestamp: Date().timeIntervalSince1970
+            )
+            navigationController?.pushViewController(imageEnhanceVC, animated: true)
+            
+        } else {
+            // 多张图片，跳转到批量修复界面
+            // 触觉反馈
+            HapticFeedbackManager.shared.buttonTap()
+            
+            // 跳转到批量画质修复页面
+            let batchEnhanceVC = BatchImageEnhanceViewController(screenshots: screenshots)
+            navigationController?.pushViewController(batchEnhanceVC, animated: true)
         }
-        
-        // 触觉反馈
-        HapticFeedbackManager.shared.buttonTap()
-        
-        // 跳转到画质修复页面
-        let imageEnhanceVC = ImageEnhanceViewController(
-            originalImage: firstImage,
-            timestamp: Date().timeIntervalSince1970
-        )
-        navigationController?.pushViewController(imageEnhanceVC, animated: true)
     }
     
     private func showCollageCreation() {

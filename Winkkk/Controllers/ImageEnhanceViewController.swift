@@ -73,6 +73,25 @@ class ImageEnhanceViewController: UIViewController {
         fatalError("init(coder:) has not been implemented")
     }
     
+    // MARK: - Public Methods
+    /// 设置已修复的图片（用于从批量修复界面进入时预设图片）
+    func setEnhancedImage(_ image: UIImage) {
+        self.enhancedImage = image
+        
+        // 如果视图已加载，立即更新显示
+        if isViewLoaded {
+            comparisonView.setEnhancedImage(image)
+            
+            // 启用保存和分享按钮
+            saveButton.isEnabled = true
+            saveButton.alpha = 1.0
+            shareButton.isEnabled = true
+            shareButton.alpha = 1.0
+            
+            statusLabel.text = "修复完成！可以保存或分享"
+        }
+    }
+    
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
