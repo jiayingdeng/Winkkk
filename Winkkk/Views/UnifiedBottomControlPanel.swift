@@ -165,7 +165,7 @@ class UnifiedBottomControlPanel: UIView {
     private var isPlaying: Bool = false {
         didSet {
             // 🎯 同步时间轴的播放状态 - 参考技术报告的状态管理
-            timelineView.setPlaying(isPlaying)
+            timelineView.setPlaybackState(isPlaying)
         }
     }
     
@@ -724,7 +724,7 @@ class UnifiedBottomControlPanel: UIView {
         print("✅ Live Photo模式测试 - 已启用")
         
         // 3. 测试播放状态同步
-        timelineView.setPlaying(true)
+        timelineView.setPlaybackState(true)
         print("✅ 播放状态同步测试 - 已设置播放状态")
         
         // 4. 测试时间轴约束
