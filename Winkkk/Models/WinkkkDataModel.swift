@@ -175,12 +175,43 @@ extension PersistenceController {
         processingStatusAttribute.isOptional = false
         processingStatusAttribute.defaultValue = ProcessingStatus.original.rawValue
         
+        // Live Photo相关属性
+        let livePhotoVideoPathAttribute = NSAttributeDescription()
+        livePhotoVideoPathAttribute.name = "livePhotoVideoPath"
+        livePhotoVideoPathAttribute.attributeType = .URIAttributeType
+        livePhotoVideoPathAttribute.isOptional = true
+        
+        let livePhotoIdentifierAttribute = NSAttributeDescription()
+        livePhotoIdentifierAttribute.name = "livePhotoIdentifier"
+        livePhotoIdentifierAttribute.attributeType = .stringAttributeType
+        livePhotoIdentifierAttribute.isOptional = true
+        
+        let livePhotoDurationAttribute = NSAttributeDescription()
+        livePhotoDurationAttribute.name = "livePhotoDuration"
+        livePhotoDurationAttribute.attributeType = .doubleAttributeType
+        livePhotoDurationAttribute.isOptional = false
+        livePhotoDurationAttribute.defaultValue = 0.0
+        
+        let keyPhotoOffsetAttribute = NSAttributeDescription()
+        keyPhotoOffsetAttribute.name = "keyPhotoOffset"
+        keyPhotoOffsetAttribute.attributeType = .doubleAttributeType
+        keyPhotoOffsetAttribute.isOptional = false
+        keyPhotoOffsetAttribute.defaultValue = 0.0
+        
+        let isLivePhotoAttribute = NSAttributeDescription()
+        isLivePhotoAttribute.name = "isLivePhoto"
+        isLivePhotoAttribute.attributeType = .booleanAttributeType
+        isLivePhotoAttribute.isOptional = false
+        isLivePhotoAttribute.defaultValue = false
+        
         screenshotEntity.properties = [
             screenshotIdAttribute, originalImagePathAttribute, enhancedImagePathAttribute,
             timestampAttribute, enhanceLevelAttribute, screenshotCreatedDateAttribute,
             isEnhancedAttribute, screenshotWidthAttribute, screenshotHeightAttribute,
             originalFileSizeAttribute, enhancedFileSizeAttribute,
-            captureModeAttribute, selectionOrderAttribute, isSelectedAttribute, processingStatusAttribute
+            captureModeAttribute, selectionOrderAttribute, isSelectedAttribute, processingStatusAttribute,
+            livePhotoVideoPathAttribute, livePhotoIdentifierAttribute, livePhotoDurationAttribute,
+            keyPhotoOffsetAttribute, isLivePhotoAttribute
         ]
         
         // 创建关系

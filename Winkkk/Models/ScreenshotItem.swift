@@ -74,6 +74,25 @@ extension ScreenshotItem {
     @NSManaged public var processingStatus: String
 }
 
+// MARK: - Live Photo支持属性
+extension ScreenshotItem {
+    
+    /// Live Photo视频文件路径
+    @NSManaged public var livePhotoVideoPath: URL?
+    
+    /// Live Photo配对标识符
+    @NSManaged public var livePhotoIdentifier: String?
+    
+    /// Live Photo持续时间（秒）
+    @NSManaged public var livePhotoDuration: Double
+    
+    /// 封面帧偏移时间（相对于Live Photo开始时间，秒）
+    @NSManaged public var keyPhotoOffset: Double
+    
+    /// 是否为Live Photo
+    @NSManaged public var isLivePhoto: Bool
+}
+
 // MARK: - Computed Properties
 extension ScreenshotItem {
     
@@ -197,6 +216,25 @@ extension ScreenshotItem {
     var image: UIImage? {
         let imagePath = displayImagePath
         return UIImage(contentsOfFile: imagePath.path)
+    }
+    
+    /// 设置为Live Photo
+    func setAsLivePhoto(videoPath: URL, identifier: String, duration: Double = 3.0, keyPhotoOffset: Double = 1.5) {
+        isLivePhoto = true
+        livePhotoVideoPath = videoPath
+        livePhotoIdentifier = identifier
+        livePhotoDuration = duration
+        keyPhotoOffset = keyPhotoOffset
+        captureMode = CaptureMode.livePhoto.rawValue
+    }
+    
+    /// 清除Live Photo数据
+    func clearLivePhotoData() {
+        isLivePhoto = false
+        livePhotoVideoPath = nil
+        livePhotoIdentifier = nil
+        livePhotoDuration = 0
+        keyPhotoOffset = 0
     }
 }
 

@@ -1,0 +1,336 @@
+//
+//  LivePhotoMaker.swift
+//  Winkkk
+//
+//  Created by Winkkk on 2024/12/20.
+//  Live Photo组装器 - 将视频片段和封面图组装成Live Photo
+//
+
+import Photos
+import PhotosUI
+import AVFoundation
+import UIKit
+import MobileCoreServices
+import UniformTypeIdentifiers
+
+/// Live Photo组装器
+/// 负责将视频片段和封面图片组装成iOS原生支持的Live Photo格式
+class LivePhotoMaker {
+    
+    // MARK: - Error Types
+    enum LivePhotoError: LocalizedError {
+        case invalidVideoURL
+        case invalidImageURL
+        case metadataWriteFailed(String)
+        case livePhotoCreationFailed(String)
+        case fileSystemError(String)
+        case unsupportedFormat
+        
+        var errorDescription: String? {
+            switch self {
+            case .invalidVideoURL:
+                return "无效的视频URL"
+            case .invalidImageURL:
+                return "无效的图片URL"
+            case .metadataWriteFailed(let reason):
+                return "元数据写入失败: \(reason)"
+            case .livePhotoCreationFailed(let reason):
+                return "Live Photo创建失败: \(reason)"
+            case .fileSystemError(let reason):
+                return "文件系统错误: \(reason)"
+            case .unsupportedFormat:
+                return "不支持的文件格式"
+            }
+        }
+    }
+    
+    // MARK: - Properties
+    private let fileManager = FileManager.default
+    
+    // MARK: - Public Methods
+    
+    /// 将视频片段和封面图组装成Live Photo
+    /// - Parameters:
+    ///   - videoURL: 视频片段URL
+    ///   - imageURL: 封面图片URL
+    ///   - identifier: Live Photo配对标识符
+    /// - Returns: 创建的PHLivePhoto对象
+    func createLivePhoto(
+        videoURL: URL,
+        imageURL: URL,
+        identifier: String? = nil
+    ) async throws -> PHLivePhoto {
+        
+        // 验证输入文件
+        guard fileManager.fileExists(atPath: videoURL.path) else {
+            throw LivePhotoError.invalidVideoURL
+        }
+        
+        guard fileManager.fileExists(atPath: imageURL.path) else {
+            throw LivePhotoError.invalidImageURL
+        }
+        
+        // 生成配对标识符
+        let pairingIdentifier = identifier ?? UUID().uuidString
+        
+        // 创建临时目录用于处理
+        let tempDir = createTempDirectory()
+        defer { cleanupTempDirectory(tempDir) }
+        
+        // 处理视频文件
+        let processedVideoURL = tempDir.appendingPathComponent("livephoto_video.mov")
+        try await processVideoForLivePhoto(
+            inputURL: videoURL,
+            outputURL: processedVideoURL,
+            identifier: pairingIdentifier
+        )
+        
+        // 处理图片文件
+        let processedImageURL = tempDir.appendingPathComponent("livephoto_image.heic")
+        try await processImageForLivePhoto(
+            inputURL: imageURL,
+            outputURL: processedImageURL,
+            identifier: pairingIdentifier
+        )
+        
+        // 创建Live Photo
+        return try await createPHLivePhoto(
+            videoURL: processedVideoURL,
+            imageURL: processedImageURL
+        )
+    }
+    
+    /// 保存Live Photo文件到指定目录
+    /// - Parameters:
+    ///   - videoURL: 视频URL
+    ///   - imageURL: 图片URL
+    ///   - identifier: 配对标识符
+    ///   - destinationDir: 目标目录
+    /// - Returns: 保存的文件URLs (视频, 图片)
+    func saveLivePhotoFiles(
+        videoURL: URL,
+        imageURL: URL,
+        identifier: String,
+        to destinationDir: URL
+    ) async throws -> (videoURL: URL, imageURL: URL) {
+        
+        // 确保目标目录存在
+        try fileManager.createDirectory(at: destinationDir, withIntermediateDirectories: true)
+        
+        let fileName = LivePhotoConfig.generateFileName()
+        let finalVideoURL = destinationDir.appendingPathComponent("\(fileName).\(LivePhotoConfig.videoExtension)")
+        let finalImageURL = destinationDir.appendingPathComponent("\(fileName).\(LivePhotoConfig.imageExtension)")
+        
+        // 处理并保存视频
+        try await processVideoForLivePhoto(
+            inputURL: videoURL,
+            outputURL: finalVideoURL,
+            identifier: identifier
+        )
+        
+        // 处理并保存图片
+        try await processImageForLivePhoto(
+            inputURL: imageURL,
+            outputURL: finalImageURL,
+            identifier: identifier
+        )
+        
+        return (finalVideoURL, finalImageURL)
+    }
+    
+    // MARK: - Private Methods
+    
+    /// 处理视频文件，添加Live Photo元数据
+    private func processVideoForLivePhoto(
+        inputURL: URL,
+        outputURL: URL,
+        identifier: String
+    ) async throws {
+        
+        let asset = AVAsset(url: inputURL)
+        
+        guard let exportSession = AVAssetExportSession(
+            asset: asset,
+            presetName: AVAssetExportPresetHighestQuality
+        ) else {
+            throw LivePhotoError.livePhotoCreationFailed("无法创建视频导出会话")
+        }
+        
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = .mov
+        exportSession.shouldOptimizeForNetworkUse = true
+        
+        // 添加Live Photo元数据
+        let metadataItem = createLivePhotoMetadataItem(identifier: identifier)
+        exportSession.metadata = [metadataItem]
+        
+        await exportSession.export()
+        
+        switch exportSession.status {
+        case .completed:
+            break
+        case .failed:
+            let error = exportSession.error?.localizedDescription ?? "未知错误"
+            throw LivePhotoError.livePhotoCreationFailed("视频处理失败: \(error)")
+        case .cancelled:
+            throw LivePhotoError.livePhotoCreationFailed("视频处理被取消")
+        default:
+            throw LivePhotoError.livePhotoCreationFailed("视频处理状态异常")
+        }
+    }
+    
+    /// 处理图片文件，添加Live Photo元数据
+    private func processImageForLivePhoto(
+        inputURL: URL,
+        outputURL: URL,
+        identifier: String
+    ) async throws {
+        
+        guard let image = UIImage(contentsOfFile: inputURL.path) else {
+            throw LivePhotoError.invalidImageURL
+        }
+        
+        // 创建HEIC数据
+        guard let heicData = image.heicData() else {
+            throw LivePhotoError.unsupportedFormat
+        }
+        
+        // 添加Live Photo元数据到HEIC
+        let dataWithMetadata = try addLivePhotoMetadataToImage(
+            imageData: heicData,
+            identifier: identifier
+        )
+        
+        // 写入文件
+        do {
+            try dataWithMetadata.write(to: outputURL)
+        } catch {
+            throw LivePhotoError.fileSystemError("图片保存失败: \(error.localizedDescription)")
+        }
+    }
+    
+    /// 创建Live Photo元数据项
+    private func createLivePhotoMetadataItem(identifier: String) -> AVMetadataItem {
+        let metadataItem = AVMutableMetadataItem()
+        metadataItem.keySpace = .quickTimeMetadata
+        metadataItem.key = "com.apple.quicktime.content.identifier" as NSString
+        metadataItem.value = identifier as NSString
+        metadataItem.dataType = kCMMetadataBaseDataType_UTF8 as String
+        return metadataItem
+    }
+    
+    /// 为图片数据添加Live Photo元数据
+    private func addLivePhotoMetadataToImage(
+        imageData: Data,
+        identifier: String
+    ) throws -> Data {
+        
+        guard let source = CGImageSourceCreateWithData(imageData as CFData, nil) else {
+            throw LivePhotoError.metadataWriteFailed("无法创建图片源")
+        }
+        
+        let mutableData = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            mutableData,
+            UTType.heic.identifier as CFString,
+            1,
+            nil
+        ) else {
+            throw LivePhotoError.metadataWriteFailed("无法创建图片目标")
+        }
+        
+        // 复制原始图片
+        guard let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else {
+            throw LivePhotoError.metadataWriteFailed("无法读取图片")
+        }
+        
+        // 创建元数据
+        let metadata = NSMutableDictionary()
+        
+        // 添加Live Photo标识符
+        let makerAppleDict = NSMutableDictionary()
+        makerAppleDict["17"] = identifier // Live Photo identifier key
+        metadata[kCGImagePropertyMakerAppleDictionary] = makerAppleDict
+        
+        // 添加EXIF数据
+        let exifDict = NSMutableDictionary()
+        exifDict[kCGImagePropertyExifUserComment] = "Live Photo"
+        metadata[kCGImagePropertyExifDictionary] = exifDict
+        
+        // 写入图片和元数据
+        CGImageDestinationAddImage(destination, cgImage, metadata)
+        
+        guard CGImageDestinationFinalize(destination) else {
+            throw LivePhotoError.metadataWriteFailed("图片元数据写入失败")
+        }
+        
+        return mutableData as Data
+    }
+    
+    /// 创建PHLivePhoto对象
+    private func createPHLivePhoto(
+        videoURL: URL,
+        imageURL: URL
+    ) async throws -> PHLivePhoto {
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            PHLivePhoto.request(
+                withResourceFileURLs: [videoURL, imageURL],
+                placeholderImage: nil,
+                targetSize: .zero,
+                contentMode: .aspectFit
+            ) { livePhoto, info in
+                if let livePhoto = livePhoto {
+                    continuation.resume(returning: livePhoto)
+                } else {
+                    let error = info[PHLivePhotoInfoErrorKey] as? Error
+                    let errorMessage = error?.localizedDescription ?? "Live Photo创建失败"
+                    continuation.resume(throwing: LivePhotoError.livePhotoCreationFailed(errorMessage))
+                }
+            }
+        }
+    }
+    
+    /// 创建临时目录
+    private func createTempDirectory() -> URL {
+        let tempDir = fileManager.temporaryDirectory.appendingPathComponent("LivePhoto_\(UUID().uuidString)")
+        try? fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        return tempDir
+    }
+    
+    /// 清理临时目录
+    private func cleanupTempDirectory(_ url: URL) {
+        try? fileManager.removeItem(at: url)
+    }
+}
+
+// MARK: - UIImage Extension for HEIC Support
+extension UIImage {
+    
+    /// 将图片转换为HEIC格式数据
+    func heicData(quality: CGFloat = 0.8) -> Data? {
+        guard let cgImage = self.cgImage else { return nil }
+        
+        let mutableData = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            mutableData,
+            UTType.heic.identifier as CFString,
+            1,
+            nil
+        ) else {
+            return nil
+        }
+        
+        let options: [CFString: Any] = [
+            kCGImageDestinationLossyCompressionQuality: quality
+        ]
+        
+        CGImageDestinationAddImage(destination, cgImage, options as CFDictionary)
+        
+        guard CGImageDestinationFinalize(destination) else {
+            return nil
+        }
+        
+        return mutableData as Data
+    }
+}

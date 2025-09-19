@@ -9,11 +9,14 @@
 import AVFoundation
 import UIKit
 import CoreData
+import Photos
 
 class ScreenshotEngine {
     
     // MARK: - Properties
     private let persistenceController = PersistenceController.shared
+    private let videoSegmentExtractor = VideoSegmentExtractor()
+    private let livePhotoMaker = LivePhotoMaker()
     
     // MARK: - Public Methods
     
@@ -400,6 +403,169 @@ extension ScreenshotEngine {
                     completion(.failure(.generationFailed("Unknown error")))
                 }
             }
+        }
+    }
+    
+    // MARK: - Live Photo Support
+    
+    /// 从视频中捕获Live Photo
+    /// - Parameters:
+    ///   - videoURL: 视频文件URL
+    ///   - time: 捕获时间点（Live Photo的中心时间）
+    ///   - videoItem: 关联的视频项目
+    ///   - completion: 完成回调
+    func captureLivePhoto(from videoURL: URL, at time: CMTime, for videoItem: VideoItem, completion: @escaping (Result<ScreenshotItem, ScreenshotError>) -> Void) {
+        
+        Task {
+            do {
+                // 验证视频是否适合创建Live Photo
+                let validation = try await videoSegmentExtractor.validateVideoForLivePhoto(at: videoURL)
+                guard validation.isValid else {
+                    DispatchQueue.main.async {
+                        completion(.failure(.generationFailed(validation.reason ?? "视频不适合创建Live Photo")))
+                    }
+                    return
+                }
+                
+                // 计算Live Photo的时间范围
+                let startTime = max(CMTime.zero, time - CMTime(seconds: LivePhotoConfig.keyPhotoOffset, preferredTimescale: 600))
+                let duration = CMTime(seconds: LivePhotoConfig.duration, preferredTimescale: 600)
+                
+                // 创建临时文件URL
+                let tempVideoURL = VideoSegmentExtractor.generateTempURL(for: "livephoto_segment")
+                let tempImageURL = VideoSegmentExtractor.generateTempURL(for: "livephoto_cover").appendingPathExtension("jpg")
+                
+                // 提取视频片段
+                let segmentURL = try await videoSegmentExtractor.extractSegment(
+                    from: videoURL,
+                    startTime: startTime,
+                    duration: duration,
+                    to: tempVideoURL
+                )
+                
+                // 生成封面帧（Live Photo中心时间）
+                let coverTime = CMTime(seconds: LivePhotoConfig.keyPhotoOffset, preferredTimescale: 600)
+                let coverImage = try await videoSegmentExtractor.generateCoverFrame(
+                    from: segmentURL,
+                    at: coverTime
+                )
+                
+                // 保存封面图片
+                guard let imageData = coverImage.jpegData(compressionQuality: 0.9) else {
+                    throw ScreenshotError.generationFailed("封面图片保存失败")
+                }
+                try imageData.write(to: tempImageURL)
+                
+                // 生成配对标识符
+                let identifier = UUID().uuidString
+                
+                // 创建最终存储目录
+                let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
+                let livePhotoDir = documentsDir.appendingPathComponent("LivePhotos")
+                
+                // 保存Live Photo文件
+                let (finalVideoURL, finalImageURL) = try await livePhotoMaker.saveLivePhotoFiles(
+                    videoURL: segmentURL,
+                    imageURL: tempImageURL,
+                    identifier: identifier,
+                    to: livePhotoDir
+                )
+                
+                // 清理临时文件
+                VideoSegmentExtractor.cleanupTempFile(at: tempVideoURL)
+                VideoSegmentExtractor.cleanupTempFile(at: tempImageURL)
+                
+                // 保存到数据库
+                let screenshotItem = try await self.saveLivePhotoToDatabase(
+                    imageURL: finalImageURL,
+                    videoURL: finalVideoURL,
+                    identifier: identifier,
+                    timestamp: time.seconds,
+                    coverImage: coverImage,
+                    videoItem: videoItem
+                )
+                
+                DispatchQueue.main.async {
+                    completion(.success(screenshotItem))
+                }
+                
+            } catch {
+                DispatchQueue.main.async {
+                    if let screenshotError = error as? ScreenshotError {
+                        completion(.failure(screenshotError))
+                    } else {
+                        completion(.failure(.generationFailed(error.localizedDescription)))
+                    }
+                }
+            }
+        }
+    }
+    
+    /// 保存Live Photo到数据库
+    private func saveLivePhotoToDatabase(
+        imageURL: URL,
+        videoURL: URL,
+        identifier: String,
+        timestamp: Double,
+        coverImage: UIImage,
+        videoItem: VideoItem
+    ) async throws -> ScreenshotItem {
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            let context = persistenceController.container.viewContext
+            
+            context.perform {
+                do {
+                    let screenshotItem = ScreenshotItem(context: context)
+                    screenshotItem.id = UUID()
+                    screenshotItem.originalImagePath = imageURL
+                    screenshotItem.timestamp = timestamp
+                    screenshotItem.createdDate = Date()
+                    screenshotItem.enhanceLevel = 0
+                    screenshotItem.isEnhanced = false
+                    screenshotItem.videoSource = videoItem
+                    
+                    // Live Photo特有属性
+                    screenshotItem.setAsLivePhoto(
+                        videoPath: videoURL,
+                        identifier: identifier,
+                        duration: LivePhotoConfig.duration,
+                        keyPhotoOffset: LivePhotoConfig.keyPhotoOffset
+                    )
+                    
+                    // 设置图片尺寸和文件大小
+                    screenshotItem.width = Int32(coverImage.size.width)
+                    screenshotItem.height = Int32(coverImage.size.height)
+                    
+                    if let imageData = try? Data(contentsOf: imageURL) {
+                        screenshotItem.originalFileSize = Int64(imageData.count)
+                    }
+                    
+                    // 设置会话状态
+                    screenshotItem.mode = .livePhoto
+                    screenshotItem.status = .original
+                    screenshotItem.isSelected = false
+                    screenshotItem.selectionOrder = 0
+                    
+                    try context.save()
+                    continuation.resume(returning: screenshotItem)
+                    
+                } catch {
+                    continuation.resume(throwing: ScreenshotError.saveFailed(error.localizedDescription))
+                }
+            }
+        }
+    }
+    
+    /// 验证视频是否支持Live Photo创建
+    /// - Parameter videoURL: 视频URL
+    /// - Returns: 验证结果
+    func validateForLivePhoto(videoURL: URL) async -> (isValid: Bool, reason: String?) {
+        do {
+            let result = try await videoSegmentExtractor.validateVideoForLivePhoto(at: videoURL)
+            return (result.isValid, result.reason)
+        } catch {
+            return (false, error.localizedDescription)
         }
     }
 }
