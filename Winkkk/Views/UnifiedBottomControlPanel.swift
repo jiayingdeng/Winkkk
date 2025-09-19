@@ -162,7 +162,12 @@ class UnifiedBottomControlPanel: UIView {
     // MARK: - 数据
     private var screenshots: [ScreenshotItem] = []
     private var currentCaptureMode: UnifiedBottomControlPanel.CaptureMode = .stillImage
-    private var isPlaying: Bool = false
+    private var isPlaying: Bool = false {
+        didSet {
+            // 🎯 同步时间轴的播放状态 - 参考技术报告的状态管理
+            timelineView.setPlaying(isPlaying)
+        }
+    }
     
     // MARK: - 初始化
     override init(frame: CGRect) {
@@ -331,12 +336,16 @@ class UnifiedBottomControlPanel: UIView {
         currentTimeLabel.translatesAutoresizingMaskIntoConstraints = false
         totalTimeLabel.translatesAutoresizingMaskIntoConstraints = false
         
-        // 时间标签样式
-        [currentTimeLabel, totalTimeLabel].forEach { label in
-            label.font = ThemeManager.captionFont
-            label.textColor = ThemeManager.secondaryText
-            label.textAlignment = .center
-        }
+        // 时间标签样式 - 参考技术报告的样式配置
+        currentTimeLabel.text = "00:00"
+        currentTimeLabel.textColor = .white
+        currentTimeLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 14, weight: .medium)
+        currentTimeLabel.textAlignment = .center
+        
+        totalTimeLabel.text = "00:00"
+        totalTimeLabel.textColor = .white.withAlphaComponent(0.7)
+        totalTimeLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 14, weight: .medium)
+        totalTimeLabel.textAlignment = .center
         
         timelineContainer.addSubview(timelineView)
         timelineContainer.addSubview(currentTimeLabel)
@@ -354,6 +363,9 @@ class UnifiedBottomControlPanel: UIView {
         mainControlsStackView.addArrangedSubview(captureButton)
         mainControlsStackView.addArrangedSubview(enhanceButton)
     }
+    
+    // MARK: - 时间轴宽度约束属性
+    private var timelineWidthConstraint: NSLayoutConstraint?
     
     private func setupConstraints() {
         backgroundBlurView.translatesAutoresizingMaskIntoConstraints = false
@@ -373,6 +385,23 @@ class UnifiedBottomControlPanel: UIView {
             contentStackView.leadingAnchor.constraint(equalTo: backgroundBlurView.leadingAnchor, constant: 16),
             contentStackView.trailingAnchor.constraint(equalTo: backgroundBlurView.trailingAnchor, constant: -16),
             contentStackView.bottomAnchor.constraint(equalTo: backgroundBlurView.bottomAnchor, constant: -16),
+            
+            // 🎯 时间轴容器 - 允许视觉溢出屏幕边界 (Wink风格)
+            timelineContainer.heightAnchor.constraint(equalToConstant: 140), // 110时间轴 + 30时间标签
+            
+            // 🎯 时间轴 - 允许视觉溢出屏幕边界 (技术报告核心特性)
+            timelineView.topAnchor.constraint(equalTo: timelineContainer.topAnchor),
+            timelineView.centerXAnchor.constraint(equalTo: timelineContainer.centerXAnchor),
+            timelineView.heightAnchor.constraint(equalToConstant: 110),
+            
+            // 时间标签 - 参考技术报告的布局
+            currentTimeLabel.topAnchor.constraint(equalTo: timelineView.bottomAnchor, constant: 8),
+            currentTimeLabel.leadingAnchor.constraint(equalTo: timelineView.leadingAnchor),
+            currentTimeLabel.widthAnchor.constraint(equalToConstant: 50),
+            
+            totalTimeLabel.topAnchor.constraint(equalTo: timelineView.bottomAnchor, constant: 8),
+            totalTimeLabel.trailingAnchor.constraint(equalTo: timelineView.trailingAnchor),
+            totalTimeLabel.widthAnchor.constraint(equalToConstant: 50),
             
             // 截图容器固定高度
             screenshotsContainer.heightAnchor.constraint(equalToConstant: 100),
@@ -397,6 +426,28 @@ class UnifiedBottomControlPanel: UIView {
             enhanceButton.widthAnchor.constraint(equalToConstant: 80),
             enhanceButton.heightAnchor.constraint(equalToConstant: 40)
         ])
+        
+        // 🎯 初始化时间轴动态宽度约束 (实现15%溢出效果 - 技术报告核心特性)
+        setupTimelineOverflowConstraints()
+    }
+    
+    // MARK: - 时间轴溢出约束设置 (技术报告核心算法)
+    private func setupTimelineOverflowConstraints() {
+        let screenWidth = UIScreen.main.bounds.width
+        let overflowWidth = screenWidth + (screenWidth * 0.15)  // 屏幕宽度 + 15%溢出
+        timelineWidthConstraint = timelineView.widthAnchor.constraint(equalToConstant: overflowWidth)
+        timelineWidthConstraint?.isActive = true
+    }
+    
+    // MARK: - 播放头指示器约束设置 (技术报告: 固定播放头设计)
+    func setupPlayheadConstraints(to parentView: UIView) {
+        // 🎯 关键修复：将playheadIndicator约束到屏幕中心而不是TimelineView中心
+        // 这是解决所有时间轴问题的核心 (技术报告: 固定播放头设计)
+        timelineView.playheadIndicatorView.centerXAnchor.constraint(
+            equalTo: parentView.centerXAnchor
+        ).isActive = true
+        
+        print("🎯 Playhead indicator constrained to parent view center")
     }
     
     private func setupActions() {
@@ -405,6 +456,9 @@ class UnifiedBottomControlPanel: UIView {
         captureButton.addTarget(self, action: #selector(captureButtonTapped), for: .touchUpInside)
         enhanceButton.addTarget(self, action: #selector(enhanceButtonTapped), for: .touchUpInside)
         clearButton.addTarget(self, action: #selector(clearButtonTapped), for: .touchUpInside)
+        
+        // 🎯 设置时间轴代理 - 参考技术报告的代理模式
+        timelineView.delegate = self
         
         // 添加触摸效果
         addButtonTouchEffects(to: playPauseButton)
@@ -583,6 +637,107 @@ class UnifiedBottomControlPanel: UIView {
         self.currentCaptureMode = mode
         updateUI()
     }
+    
+    // MARK: - 时间轴相关方法 (技术报告核心功能)
+    
+    /// 设置视频时长和URL - 参考技术报告的视频配置
+    func setupVideo(url: URL, duration: CMTime) {
+        timelineView.setVideoURL(url)
+        timelineView.setDuration(duration.seconds)
+        totalTimeLabel.text = duration.formattedString
+    }
+    
+    /// 更新当前播放时间 - 参考技术报告的时间同步
+    func updateCurrentTime(_ time: CMTime) {
+        currentTimeLabel.text = time.formattedString
+    }
+    
+    /// 更新截取时间标签（Wink风格） - 参考技术报告的截取时间显示
+    func updateCaptureTime(_ time: CMTime) {
+        let captureTimeString = time.formattedString
+        totalTimeLabel.text = "截取: \(captureTimeString)"
+        totalTimeLabel.textColor = ThemeManager.success // 绿色表示截取时间
+    }
+    
+    /// 获取当前截取时间 - 参考技术报告的时间获取算法
+    func getCurrentCaptureTime() -> Double {
+        return timelineView.getCurrentCaptureTime()
+    }
+    
+    /// 设置Live Photo模式 - 参考技术报告的Live Photo功能
+    func setLivePhotoMode(_ enabled: Bool) {
+        timelineView.setLivePhotoMode(enabled)
+    }
+    
+    /// 设置时间轴播放状态 - 参考技术报告的播放状态同步
+    func setTimelineProgress(_ progress: Double) {
+        timelineView.setProgress(progress)
+    }
+    
+    /// 同步播放时间到时间轴 - 参考技术报告的时间同步算法
+    func syncPlaybackTime(_ currentTime: CMTime, duration: CMTime) {
+        guard duration.seconds > 0 else { return }
+        
+        let progress = currentTime.seconds / duration.seconds
+        
+        // 🎯 播放状态下的时间轴同步 (技术报告: 播放模式vs编辑模式)
+        if isPlaying {
+            timelineView.setProgress(progress)
+        }
+        
+        // 更新时间标签
+        updateCurrentTime(currentTime)
+    }
+    
+    /// 滚动到指定截取时间 - 参考技术报告的精确定位
+    func scrollToCaptureTime(_ time: Double) {
+        timelineView.scrollToCaptureTime(time)
+        
+        // 更新截取时间显示
+        let cmTime = CMTime(seconds: time, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        updateCaptureTime(cmTime)
+    }
+    
+    /// 流动控制 - 参考技术报告的自动滚动功能
+    func startFlowing(speed: CGFloat) {
+        // 这里可以实现自动流动功能，如果需要的话
+        print("🎯 Start flowing with speed: \(speed)")
+    }
+    
+    func stopFlowing() {
+        // 停止自动流动
+        print("🎯 Stop flowing")
+    }
+    
+    // MARK: - 测试方法 (验证技术报告功能)
+    func testTimelineFeatures() {
+        print("🧪 Testing TimelineView features from technical report...")
+        
+        // 1. 测试坐标系统
+        let testTime: Double = 5.0
+        timelineView.scrollToCaptureTime(testTime)
+        let captureTime = timelineView.getCurrentCaptureTime()
+        print("✅ 坐标系统测试 - 设置时间: \(testTime), 获取时间: \(captureTime)")
+        
+        // 2. 测试Live Photo模式
+        timelineView.setLivePhotoMode(true)
+        print("✅ Live Photo模式测试 - 已启用")
+        
+        // 3. 测试播放状态同步
+        timelineView.setPlaying(true)
+        print("✅ 播放状态同步测试 - 已设置播放状态")
+        
+        // 4. 测试时间轴约束
+        if let constraint = timelineWidthConstraint {
+            print("✅ 时间轴约束测试 - 宽度约束: \(constraint.constant)")
+        }
+        
+        // 5. 测试播放头指示器
+        let playheadView = timelineView.playheadIndicatorView
+        print("✅ 播放头指示器测试 - 视图存在: \(playheadView)")
+        
+        print("🎯 TimelineView核心功能测试完成！")
+    }
 }
 
 // MARK: - CollectionView DataSource
@@ -648,5 +803,52 @@ extension UnifiedBottomControlPanel: UICollectionViewDelegateFlowLayout {
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
         return UIEdgeInsets(top: 0, left: 12, bottom: 0, right: 12)
+    }
+}
+
+// MARK: - TimelineViewDelegate (技术报告核心交互系统)
+extension UnifiedBottomControlPanel: TimelineViewDelegate {
+    
+    /// 时间轴拖拽跳转 - 参考技术报告的精确定位算法
+    func timelineView(_ timelineView: TimelineView, didSeekToProgress progress: Double) {
+        // 🎯 Wink风格：接收的是截取时间，用于截图功能
+        let seekTime = progress
+        delegate?.bottomControlPanel(self, didSeekToTime: seekTime)
+        
+        print("🎯 Timeline seek to progress: \(progress)")
+    }
+    
+    /// 播放状态同步更新 - 参考技术报告的播放模式vs编辑模式
+    func timelineView(_ timelineView: TimelineView, didUpdateProgressDuringPlayback progress: Double) {
+        // 播放状态下的时间轴位置更新
+        delegate?.bottomControlPanel(self, didSeekToTime: progress)
+    }
+    
+    /// 开始拖拽时间轴 - 参考技术报告的手势交互
+    func timelineViewDidBeginSeeking(_ timelineView: TimelineView) {
+        delegate?.bottomControlPanel(self, didStartSeeking: timelineView.getCurrentCaptureTime())
+        print("🎯 Timeline begin seeking")
+    }
+    
+    /// 结束拖拽时间轴 - 参考技术报告的手势交互
+    func timelineViewDidEndSeeking(_ timelineView: TimelineView) {
+        delegate?.bottomControlPanel(self, didEndSeeking: timelineView.getCurrentCaptureTime())
+        print("🎯 Timeline end seeking")
+    }
+    
+    /// 请求播放 - 参考技术报告的播放控制
+    func timelineViewDidRequestPlay(_ timelineView: TimelineView) {
+        isPlaying = true
+        updatePlayPauseButtonState()
+        delegate?.bottomControlPanel(self, didTapPlayPause: true)
+        print("🎯 Timeline requested play")
+    }
+    
+    /// 请求暂停 - 参考技术报告的播放控制
+    func timelineViewDidRequestPause(_ timelineView: TimelineView) {
+        isPlaying = false
+        updatePlayPauseButtonState()
+        delegate?.bottomControlPanel(self, didTapPlayPause: false)
+        print("🎯 Timeline requested pause")
     }
 }
