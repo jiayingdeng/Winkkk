@@ -153,12 +153,46 @@ class LivePhotoMaker {
         identifier: String
     ) async throws {
         
+        print("🎬 Live Photo视频处理诊断...")
+        print("   输入URL: \(inputURL)")
+        print("   输出URL: \(outputURL)")
+        
+        // 验证输入文件
+        guard fileManager.fileExists(atPath: inputURL.path) else {
+            print("   ❌ 输入文件不存在")
+            throw LivePhotoError.invalidVideoURL
+        }
+        
+        // 删除可能存在的输出文件
+        if fileManager.fileExists(atPath: outputURL.path) {
+            print("   检测到已存在的输出文件，正在删除...")
+            do {
+                try fileManager.removeItem(at: outputURL)
+                print("   ✅ 已删除存在的输出文件")
+            } catch {
+                print("   ⚠️ 删除已存在文件失败: \(error)")
+            }
+        }
+        
+        // 确保输出目录存在
+        let outputDir = outputURL.deletingLastPathComponent()
+        if !fileManager.fileExists(atPath: outputDir.path) {
+            do {
+                try fileManager.createDirectory(at: outputDir, withIntermediateDirectories: true)
+                print("   ✅ 输出目录创建成功")
+            } catch {
+                print("   ❌ 输出目录创建失败: \(error)")
+                throw LivePhotoError.fileSystemError("无法创建输出目录: \(error.localizedDescription)")
+            }
+        }
+        
         let asset = AVAsset(url: inputURL)
         
         guard let exportSession = AVAssetExportSession(
             asset: asset,
             presetName: AVAssetExportPresetMediumQuality  // 🚀 使用中等质量提升速度
         ) else {
+            print("   ❌ 无法创建视频导出会话")
             throw LivePhotoError.livePhotoCreationFailed("无法创建视频导出会话")
         }
         

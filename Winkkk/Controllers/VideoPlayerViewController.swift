@@ -725,6 +725,13 @@ class VideoPlayerViewController: UIViewController {
         
         print("🎬 准备Live Photo截图 - 开始时间: \(captureTime)秒, CMTime: \(cmCaptureTime)")
         
+        // 🚀 重要修复：暂停播放以避免资源冲突
+        let wasPlaying = isFlowing
+        if wasPlaying {
+            print("⏸️ 暂停播放以避免Live Photo创建时的资源冲突")
+            pausePlayer()
+        }
+        
         // 显示Live Photo创建进度
         showLivePhotoCreationProgress()
         

@@ -57,12 +57,53 @@ class VideoSegmentExtractor {
         to outputURL: URL
     ) async throws -> URL {
         
+        print("🔍 开始视频片段提取诊断...")
+        print("   输入视频URL: \(videoURL)")
+        print("   输入视频路径: \(videoURL.path)")
+        print("   输出URL: \(outputURL)")
+        print("   输出路径: \(outputURL.path)")
+        
+        // 验证输入文件存在性
+        let fileManager = FileManager.default
+        let inputExists = fileManager.fileExists(atPath: videoURL.path)
+        print("   输入文件存在: \(inputExists)")
+        
+        if inputExists {
+            do {
+                let attributes = try fileManager.attributesOfItem(atPath: videoURL.path)
+                let fileSize = attributes[.size] as? Int64 ?? 0
+                print("   输入文件大小: \(fileSize) bytes")
+            } catch {
+                print("   无法获取输入文件属性: \(error)")
+            }
+        }
+        
+        // 验证输出目录
+        let outputDir = outputURL.deletingLastPathComponent()
+        let outputDirExists = fileManager.fileExists(atPath: outputDir.path)
+        print("   输出目录存在: \(outputDirExists)")
+        print("   输出目录路径: \(outputDir.path)")
+        
+        // 创建输出目录（如果不存在）
+        if !outputDirExists {
+            do {
+                try fileManager.createDirectory(at: outputDir, withIntermediateDirectories: true)
+                print("   ✅ 输出目录创建成功")
+            } catch {
+                print("   ❌ 输出目录创建失败: \(error)")
+                throw ExtractionError.exportFailed("无法创建输出目录: \(error.localizedDescription)")
+            }
+        }
+        
         let asset = AVAsset(url: videoURL)
         
         // 验证视频资源
+        print("   开始验证视频资源可读性...")
         guard try await asset.load(.isReadable) else {
+            print("   ❌ 视频资源不可读")
             throw ExtractionError.videoNotReadable
         }
+        print("   ✅ 视频资源验证通过")
         
         let videoDuration = try await asset.load(.duration)
         
@@ -76,20 +117,43 @@ class VideoSegmentExtractor {
         }
         
         // 创建导出会话 - 使用中等质量以提升速度
+        print("   开始创建导出会话...")
         guard let exportSession = AVAssetExportSession(
             asset: asset,
             presetName: AVAssetExportPresetMediumQuality
         ) else {
+            print("   ❌ 无法创建导出会话")
             throw ExtractionError.exportFailed("无法创建导出会话")
         }
+        print("   ✅ 导出会话创建成功")
         
         // 配置导出设置
+        print("   配置导出设置...")
+        
+        // 🚀 重要修复：删除可能存在的输出文件
+        if fileManager.fileExists(atPath: outputURL.path) {
+            print("   检测到已存在的输出文件，正在删除...")
+            do {
+                try fileManager.removeItem(at: outputURL)
+                print("   ✅ 已删除存在的输出文件")
+            } catch {
+                print("   ⚠️ 删除已存在文件失败: \(error)")
+                // 不抛出错误，继续尝试导出
+            }
+        }
+        
         exportSession.outputURL = outputURL
         exportSession.outputFileType = .mov
         exportSession.timeRange = timeRange
         
         // 视频质量优化设置
         exportSession.shouldOptimizeForNetworkUse = true
+        
+        print("   导出配置:")
+        print("     输出URL: \(outputURL)")
+        print("     文件类型: \(exportSession.outputFileType?.rawValue ?? "unknown")")
+        print("     时间范围: \(timeRange.start.seconds)s - \(timeRange.end.seconds)s")
+        print("     网络优化: \(exportSession.shouldOptimizeForNetworkUse)")
         
         // 🚀 添加超时机制的导出
         let exportResult = await withCheckedContinuation { continuation in
@@ -109,19 +173,46 @@ class VideoSegmentExtractor {
             throw ExtractionError.exportFailed("视频片段提取超时（30秒）")
         }
         
+        print("   检查导出结果...")
         switch exportSession.status {
         case .completed:
-            print("✅ 视频片段提取成功: \(outputURL.lastPathComponent)")
+            print("   ✅ 视频片段提取成功: \(outputURL.lastPathComponent)")
+            
+            // 验证输出文件是否真的存在
+            let outputExists = fileManager.fileExists(atPath: outputURL.path)
+            print("   输出文件存在: \(outputExists)")
+            
+            if outputExists {
+                do {
+                    let attributes = try fileManager.attributesOfItem(atPath: outputURL.path)
+                    let fileSize = attributes[.size] as? Int64 ?? 0
+                    print("   输出文件大小: \(fileSize) bytes")
+                } catch {
+                    print("   无法获取输出文件属性: \(error)")
+                }
+            }
+            
             return outputURL
+            
         case .failed:
             let error = exportSession.error?.localizedDescription ?? "未知错误"
-            print("❌ 视频片段提取失败: \(error)")
+            print("   ❌ 视频片段提取失败: \(error)")
+            
+            // 打印更详细的错误信息
+            if let nsError = exportSession.error as NSError? {
+                print("   错误域: \(nsError.domain)")
+                print("   错误代码: \(nsError.code)")
+                print("   用户信息: \(nsError.userInfo)")
+            }
+            
             throw ExtractionError.exportFailed(error)
+            
         case .cancelled:
-            print("⏹️ 视频片段提取被取消")
+            print("   ⏹️ 视频片段提取被取消")
             throw ExtractionError.exportFailed("导出被取消或超时")
+            
         default:
-            print("⚠️ 视频片段提取状态异常: \(exportSession.status.rawValue)")
+            print("   ⚠️ 视频片段提取状态异常: \(exportSession.status.rawValue)")
             throw ExtractionError.exportFailed("导出状态异常: \(exportSession.status.rawValue)")
         }
     }
@@ -243,9 +334,24 @@ extension VideoSegmentExtractor {
     /// - Parameter fileName: 文件名（不含扩展名）
     /// - Returns: 临时文件URL
     static func generateTempURL(for fileName: String) -> URL {
-        let tempDir = FileManager.default.temporaryDirectory
+        let fileManager = FileManager.default
+        let tempDir = fileManager.temporaryDirectory.appendingPathComponent("Winkkk_VideoProcessing")
+        
+        // 确保临时目录存在
+        do {
+            try fileManager.createDirectory(at: tempDir, withIntermediateDirectories: true, attributes: nil)
+        } catch {
+            print("⚠️ 创建临时目录失败，使用系统默认临时目录: \(error)")
+            // 回退到系统默认临时目录
+            let fileName = "\(fileName)_\(UUID().uuidString.prefix(8)).mov"
+            return fileManager.temporaryDirectory.appendingPathComponent(fileName)
+        }
+        
         let fileName = "\(fileName)_\(UUID().uuidString.prefix(8)).mov"
-        return tempDir.appendingPathComponent(fileName)
+        let tempURL = tempDir.appendingPathComponent(fileName)
+        
+        print("🔧 生成临时文件URL: \(tempURL.path)")
+        return tempURL
     }
     
     /// 清理临时文件
