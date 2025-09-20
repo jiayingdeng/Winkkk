@@ -562,10 +562,28 @@ extension MainCameraViewController {
     }
     
     private func editVideo(url: URL) {
-        let playerVC = VideoPlayerViewController(videoURL: url)
-        let navController = UINavigationController(rootViewController: playerVC)
-        navController.modalPresentationStyle = .fullScreen
-        present(navController, animated: true)
+        // 根据当前模式决定跳转到哪个界面
+        if TimeSequenceModeManager.shared.isTimeSequenceMode,
+           let sceneType = TimeSequenceModeManager.shared.selectedSceneType {
+            // 时间序列模式：跳转到时间序列处理界面
+            let timeSequenceVC = TimeSequenceViewController(videoURL: url, sceneType: sceneType)
+            let navController = UINavigationController(rootViewController: timeSequenceVC)
+            navController.modalPresentationStyle = .fullScreen
+            present(navController, animated: true)
+            
+            // 重置时间序列模式状态
+            TimeSequenceModeManager.shared.reset()
+            
+            // 重置模式切换按钮
+            modeSwitcherButton.setTitle("普通录像", for: .normal)
+            modeSwitcherButton.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.8)
+        } else {
+            // 普通模式：跳转到视频播放器
+            let playerVC = VideoPlayerViewController(videoURL: url)
+            let navController = UINavigationController(rootViewController: playerVC)
+            navController.modalPresentationStyle = .fullScreen
+            present(navController, animated: true)
+        }
     }
     
     private func saveVideoToAppGallery(url: URL) {
@@ -758,6 +776,22 @@ extension MainCameraViewController: CameraManagerDelegate {
     }
 }
 
+// MARK: - SceneSelectionViewControllerDelegate
+extension MainCameraViewController: SceneSelectionViewControllerDelegate {
+    func sceneSelectionViewController(_ controller: SceneSelectionViewController, didSelectScene sceneType: SceneType) {
+        // 关闭场景选择界面
+        controller.dismiss(animated: true) {
+            // 启动时间序列录像模式
+            self.startTimeSequenceRecording(with: sceneType)
+        }
+    }
+    
+    func sceneSelectionViewControllerDidCancel(_ controller: SceneSelectionViewController) {
+        // 取消场景选择
+        controller.dismiss(animated: true)
+    }
+}
+
 // MARK: - Mode Switcher Actions
 extension MainCameraViewController {
     
@@ -777,19 +811,23 @@ extension MainCameraViewController {
             return
         }
         
-        // 显示时间序列模式选择界面
+        // 显示录像模式选择界面
         let alert = UIAlertController(
-            title: "时间序列模式",
-            message: "选择操作",
+            title: "📹 选择录像模式",
+            message: "选择您要使用的录像模式",
             preferredStyle: .actionSheet
         )
         
-        alert.addAction(UIAlertAction(title: "开始录制", style: .default) { _ in
-            self.startTimeSequenceRecording()
+        // 普通录像模式
+        alert.addAction(UIAlertAction(title: "📹 普通录像", style: .default) { _ in
+            self.switchToNormalMode()
         })
-        alert.addAction(UIAlertAction(title: "模式信息", style: .default) { _ in
-            self.showModeInfo()
+        
+        // 时间序列录像模式
+        alert.addAction(UIAlertAction(title: "⏰ 时间序列录像", style: .default) { _ in
+            self.showTimeSequenceModeOptions()
         })
+        
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         
         if alert.preferredStyle == .actionSheet,
@@ -801,19 +839,89 @@ extension MainCameraViewController {
         present(alert, animated: true)
     }
     
-    private func startTimeSequenceRecording() {
-        // 跳转到时间序列录制界面（使用空截图数组作为默认值）
-        let timeSequenceVC = TimeSequenceViewController(screenshots: [])
-        let navController = UINavigationController(rootViewController: timeSequenceVC)
-        navController.modalPresentationStyle = .fullScreen
+    private func switchToNormalMode() {
+        // 切换到普通录像模式
+        modeSwitcherButton.setTitle("普通录像", for: .normal)
+        modeSwitcherButton.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.8)
+        
+        // 更新界面状态
+        let alert = UIAlertController(
+            title: "✅ 模式切换成功",
+            message: "已切换到普通录像模式",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
+    }
+    
+    private func showTimeSequenceModeOptions() {
+        // 显示时间序列模式说明弹窗
+        let alert = UIAlertController(
+            title: "⏰ 时间序列录像模式",
+            message: """
+            💡 这个模式专门用于：
+            • 记录变化过程
+            • 创建艺术效果图
+            • 需要固定拍摄位置
+            
+            🎯 适合场景：
+            • 面包发酵 • 植物生长
+            • 化妆过程 • 手工制作
+            """,
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "了解更多", style: .default) { _ in
+            self.showModeInfo()
+        })
+        alert.addAction(UIAlertAction(title: "切换模式", style: .default) { _ in
+            self.showSceneSelection()
+        })
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        present(alert, animated: true)
+    }
+    
+    private func showSceneSelection() {
+        // 进入场景选择界面
+        let sceneSelectionVC = SceneSelectionViewController()
+        sceneSelectionVC.delegate = self
+        let navController = UINavigationController(rootViewController: sceneSelectionVC)
+        navController.modalPresentationStyle = .pageSheet
+        
+        if #available(iOS 15.0, *) {
+            if let sheet = navController.sheetPresentationController {
+                sheet.detents = [.large()]
+                sheet.prefersGrabberVisible = true
+            }
+        }
+        
         present(navController, animated: true)
+    }
+    
+    private func startTimeSequenceRecording(with sceneType: SceneType) {
+        // 切换到时间序列模式
+        modeSwitcherButton.setTitle("时间序列模式", for: .normal)
+        modeSwitcherButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
+        
+        // 切换到时间序列模式
+        TimeSequenceModeManager.shared.switchToTimeSequenceMode(with: sceneType)
+        
+        // 显示模式切换成功提示
+        let alert = UIAlertController(
+            title: "✅ 模式切换成功",
+            message: "已切换到时间序列录像模式\n场景：\(sceneType.displayName)",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "开始录像", style: .default))
+        present(alert, animated: true)
     }
     
     private func showModeInfo() {
         // 显示模式信息
         let alert = UIAlertController(
-            title: "时间序列模式",
-            message: "时间序列模式可以帮助您录制连续的视频片段，用于制作延时摄影等效果。",
+            title: "⏰ 时间序列模式",
+            message: "时间序列模式可以将视频的关键时刻融合成一张艺术图片，适用于记录变化过程、延时摄影等场景。",
             preferredStyle: .alert
         )
         alert.addAction(UIAlertAction(title: "了解", style: .default))

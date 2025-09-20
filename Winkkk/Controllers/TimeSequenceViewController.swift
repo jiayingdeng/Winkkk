@@ -79,6 +79,18 @@ class TimeSequenceViewController: UIViewController {
         self.timeSequenceProcessor?.delegate = self
     }
     
+    /// 从录像界面跳转的初始化方法 - 直接传入视频URL和场景类型
+    init(videoURL: URL, sceneType: SceneType) {
+        self.screenshots = []
+        self.sceneType = sceneType
+        self.selectedVideoURL = videoURL
+        super.init(nibName: nil, bundle: nil)
+        
+        // 创建专用的时间序列处理器
+        self.timeSequenceProcessor = TimeSequenceProcessor(sceneType: sceneType)
+        self.timeSequenceProcessor?.delegate = self
+    }
+    
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
