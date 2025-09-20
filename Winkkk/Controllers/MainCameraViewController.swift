@@ -23,6 +23,9 @@ class MainCameraViewController: UIViewController {
     private let galleryButton = UIButton()
     private let settingsButton = UIButton()
     
+    // 时间序列模式切换按钮
+    private let modeSwitcherButton = UIButton(type: .system)
+    
     // 录制状态指示
     private let recordingIndicatorView = UIView()
     private let recordingTimeLabel = UILabel()
@@ -97,6 +100,9 @@ class MainCameraViewController: UIViewController {
         
         // 底部控制面板
         setupControlPanel()
+        
+        // 设置模式切换器
+        setupModeSwitcher()
     }
     
     private func setupRecordingIndicator() {
@@ -127,6 +133,9 @@ class MainCameraViewController: UIViewController {
         // 设置按钮
         setupSettingsButton()
         
+        // 设置模式切换器
+        setupModeSwitcher()
+        
         // 确保控制面板可以交互
         controlPanelBlurView.isUserInteractionEnabled = true
         controlPanelBlurView.contentView.isUserInteractionEnabled = true
@@ -135,6 +144,8 @@ class MainCameraViewController: UIViewController {
         controlPanelBlurView.contentView.addSubview(galleryButton)
         controlPanelBlurView.contentView.addSubview(recordButton)
         controlPanelBlurView.contentView.addSubview(settingsButton)
+        
+        // 模式切换器已在 setupModeSwitcher() 中添加
         
         print("🔧 控制面板配置完成，contentView交互: \(controlPanelBlurView.contentView.isUserInteractionEnabled)")
     }
@@ -205,6 +216,25 @@ class MainCameraViewController: UIViewController {
         settingsButton.addTarget(self, action: #selector(buttonReleased(_:)), for: [.touchUpInside, .touchUpOutside])
     }
     
+    private func setupModeSwitcher() {
+        modeSwitcherButton.setTitle("时间序列模式", for: .normal)
+        modeSwitcherButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
+        modeSwitcherButton.layer.cornerRadius = 22
+        modeSwitcherButton.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        modeSwitcherButton.setTitleColor(.white, for: .normal)
+        modeSwitcherButton.addTarget(self, action: #selector(modeSwitcherButtonTapped), for: .touchUpInside)
+        
+        view.addSubview(modeSwitcherButton)
+        
+        modeSwitcherButton.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            modeSwitcherButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
+            modeSwitcherButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            modeSwitcherButton.heightAnchor.constraint(equalToConstant: 44),
+            modeSwitcherButton.widthAnchor.constraint(equalToConstant: 180)
+        ])
+    }
+    
     private func setupConstraints() {
         // 渐变背景
         gradientBackgroundView.translatesAutoresizingMaskIntoConstraints = false
@@ -221,6 +251,8 @@ class MainCameraViewController: UIViewController {
         galleryButton.translatesAutoresizingMaskIntoConstraints = false
         recordButton.translatesAutoresizingMaskIntoConstraints = false
         settingsButton.translatesAutoresizingMaskIntoConstraints = false
+        
+        // 模式切换器已在setupModeSwitcher中设置
         
         NSLayoutConstraint.activate([
             // 渐变背景
@@ -264,7 +296,9 @@ class MainCameraViewController: UIViewController {
             settingsButton.centerYAnchor.constraint(equalTo: recordButton.centerYAnchor),
             settingsButton.leadingAnchor.constraint(equalTo: recordButton.trailingAnchor, constant: 60),
             settingsButton.widthAnchor.constraint(equalToConstant: 50),
-            settingsButton.heightAnchor.constraint(equalToConstant: 50)
+            settingsButton.heightAnchor.constraint(equalToConstant: 50),
+            
+            // 模式切换器约束已在 setupModeSwitcher() 中设置
         ])
     }
     
@@ -723,4 +757,73 @@ extension MainCameraViewController: CameraManagerDelegate {
         }
     }
 }
+
+// MARK: - Mode Switcher Actions
+extension MainCameraViewController {
+    
+    @objc private func modeSwitcherButtonTapped() {
+        // 触觉反馈
+        hapticManager.buttonTap()
+        
+        // 检查是否正在录制
+        guard !isRecording else {
+            let alert = UIAlertController(
+                title: "无法切换模式",
+                message: "请先停止当前录制",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "确定", style: .default))
+            present(alert, animated: true)
+            return
+        }
+        
+        // 显示时间序列模式选择界面
+        let alert = UIAlertController(
+            title: "时间序列模式",
+            message: "选择操作",
+            preferredStyle: .actionSheet
+        )
+        
+        alert.addAction(UIAlertAction(title: "开始录制", style: .default) { _ in
+            self.startTimeSequenceRecording()
+        })
+        alert.addAction(UIAlertAction(title: "模式信息", style: .default) { _ in
+            self.showModeInfo()
+        })
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        if alert.preferredStyle == .actionSheet,
+           let popover = alert.popoverPresentationController {
+            popover.sourceView = modeSwitcherButton
+            popover.sourceRect = modeSwitcherButton.bounds
+        }
+        
+        present(alert, animated: true)
+    }
+    
+    private func startTimeSequenceRecording() {
+        // 跳转到时间序列录制界面（使用空截图数组作为默认值）
+        let timeSequenceVC = TimeSequenceViewController(screenshots: [])
+        let navController = UINavigationController(rootViewController: timeSequenceVC)
+        navController.modalPresentationStyle = .fullScreen
+        present(navController, animated: true)
+    }
+    
+    private func showModeInfo() {
+        // 显示模式信息
+        let alert = UIAlertController(
+            title: "时间序列模式",
+            message: "时间序列模式可以帮助您录制连续的视频片段，用于制作延时摄影等效果。",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "了解", style: .default))
+        present(alert, animated: true)
+    }
+}
+
+// 已删除的 SceneSelectionViewControllerDelegate 相关代码
+
+// 已删除的 ShootingGuideViewControllerDelegate 相关代码
+
+// 重复的 ModeSwitcherViewDelegate 扩展已移除
 

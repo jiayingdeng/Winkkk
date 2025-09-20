@@ -11,7 +11,16 @@ import AVFoundation
 import PhotosUI
 import CoreData
 
+// MARK: - VideoGalleryViewControllerDelegate
+protocol VideoGalleryViewControllerDelegate: AnyObject {
+    func videoGalleryViewController(_ controller: VideoGalleryViewController, didSelectVideo videoItem: VideoItem)
+    func videoGalleryViewControllerDidCancel(_ controller: VideoGalleryViewController)
+}
+
 class VideoGalleryViewController: UIViewController {
+    
+    // MARK: - Delegate
+    weak var delegate: VideoGalleryViewControllerDelegate?
     
     // MARK: - UI Components
     private lazy var collectionView: UICollectionView = {
@@ -251,7 +260,11 @@ class VideoGalleryViewController: UIViewController {
     
     // MARK: - Actions
     @objc private func closeButtonTapped() {
-        dismiss(animated: true)
+        if let delegate = delegate {
+            delegate.videoGalleryViewControllerDidCancel(self)
+        } else {
+            dismiss(animated: true)
+        }
     }
     
     @objc private func importButtonTapped() {
@@ -408,9 +421,13 @@ extension VideoGalleryViewController: UICollectionViewDelegate {
             // 添加视频按钮
             importButtonTapped()
         } else {
-            // 选择视频进行编辑
+            // 选择视频
             let video = videos[indexPath.item - 1]
-            openVideoEditor(with: video)
+            if let delegate = delegate {
+                delegate.videoGalleryViewController(self, didSelectVideo: video)
+            } else {
+                openVideoEditor(with: video)
+            }
         }
     }
     

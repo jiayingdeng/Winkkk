@@ -13,8 +13,12 @@ class TimeSequenceViewController: UIViewController {
     
     // MARK: - Properties
     private let screenshots: [ScreenshotItem]
+    private let sceneType: SceneType?
     private var selectedVideoURL: URL?
     private var extractedFrames: [UIImage] = []
+    
+    // 新的时间序列处理器
+    private var timeSequenceProcessor: TimeSequenceProcessor?
     
     // MARK: - UI Components
     private let gradientBackgroundView = GradientBackgroundView()
@@ -60,7 +64,19 @@ class TimeSequenceViewController: UIViewController {
     // MARK: - Initialization
     init(screenshots: [ScreenshotItem]) {
         self.screenshots = screenshots
+        self.sceneType = nil
         super.init(nibName: nil, bundle: nil)
+    }
+    
+    /// 新的初始化方法 - 用于时间序列模式
+    init(sceneType: SceneType) {
+        self.screenshots = []
+        self.sceneType = sceneType
+        super.init(nibName: nil, bundle: nil)
+        
+        // 创建专用的时间序列处理器
+        self.timeSequenceProcessor = TimeSequenceProcessor(sceneType: sceneType)
+        self.timeSequenceProcessor?.delegate = self
     }
     
     required init?(coder: NSCoder) {
@@ -108,14 +124,19 @@ class TimeSequenceViewController: UIViewController {
     private func setupHeaderView() {
         headerView.backgroundColor = .clear
         
-        // 标题
-        titleLabel.text = "⏰ 时间序列模式"
+        // 根据场景类型设置标题
+        if let sceneType = sceneType {
+            titleLabel.text = "\(sceneType.icon) \(sceneType.displayName)"
+            subtitleLabel.text = sceneType.description
+        } else {
+            titleLabel.text = "⏰ 时间序列模式"
+            subtitleLabel.text = "将视频关键时刻融合成一张艺术图片"
+        }
+        
         titleLabel.font = ThemeManager.titleFont
         titleLabel.textColor = .white
         titleLabel.textAlignment = .center
         
-        // 副标题
-        subtitleLabel.text = "将视频关键时刻融合成一张艺术图片"
         subtitleLabel.font = ThemeManager.bodyFont
         subtitleLabel.textColor = ThemeManager.secondaryText
         subtitleLabel.textAlignment = .center
@@ -411,8 +432,10 @@ class TimeSequenceViewController: UIViewController {
         print("🎬 选择视频")
         HapticFeedbackManager.shared.buttonTap()
         
-        // TODO: 实现视频选择功能
-        showComingSoonAlert(title: "选择视频", message: "视频选择功能开发中")
+        let galleryVC = VideoGalleryViewController()
+        galleryVC.delegate = self
+        let navController = UINavigationController(rootViewController: galleryVC)
+        present(navController, animated: true)
     }
     
     @objc private func frameCountChanged(_ sender: UISlider) {
@@ -426,8 +449,30 @@ class TimeSequenceViewController: UIViewController {
         print("🎨 处理时间序列")
         HapticFeedbackManager.shared.buttonTap()
         
-        // TODO: 实现时间序列处理
-        showComingSoonAlert(title: "生成中", message: "时间序列处理功能开发中")
+        guard let videoURL = selectedVideoURL else {
+            let alert = UIAlertController(
+                title: "请选择视频",
+                message: "请先选择要处理的视频文件",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "确定", style: .default))
+            present(alert, animated: true)
+            return
+        }
+        
+        guard let processor = timeSequenceProcessor else {
+            let alert = UIAlertController(
+                title: "处理器错误",
+                message: "时间序列处理器未初始化",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "确定", style: .default))
+            present(alert, animated: true)
+            return
+        }
+        
+        isProcessing = true
+        processor.processVideo(at: videoURL)
     }
     
     @objc private func saveButtonTapped() {
@@ -472,5 +517,143 @@ class TimeSequenceViewController: UIViewController {
         
         alert.addAction(UIAlertAction(title: "好的", style: .default))
         present(alert, animated: true)
+    }
+    
+    private func updateFramesPreview() {
+        // 清除现有帧
+        framesStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        // 显示提取的帧
+        for (index, frame) in extractedFrames.prefix(5).enumerated() {
+            let imageView = UIImageView(image: frame)
+            imageView.contentMode = .scaleAspectFill
+            imageView.clipsToBounds = true
+            imageView.layer.cornerRadius = 8
+            imageView.backgroundColor = .systemGray6
+            
+            imageView.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                imageView.widthAnchor.constraint(equalToConstant: 60),
+                imageView.heightAnchor.constraint(equalToConstant: 80)
+            ])
+            
+            framesStackView.addArrangedSubview(imageView)
+        }
+        
+        // 显示预览区域
+        previewContainerView.isHidden = extractedFrames.isEmpty
+        controlPanelView.isHidden = extractedFrames.isEmpty
+    }
+}
+
+// MARK: - VideoGalleryViewControllerDelegate
+extension TimeSequenceViewController: VideoGalleryViewControllerDelegate {
+    
+    func videoGalleryViewController(_ controller: VideoGalleryViewController, didSelectVideo videoItem: VideoItem) {
+        selectedVideoURL = videoItem.filePath
+        
+        // 生成视频缩略图
+        generateVideoThumbnail(from: videoItem.filePath) { [weak self] thumbnail in
+            DispatchQueue.main.async {
+                self?.videoPreviewImageView.image = thumbnail
+                self?.videoPreviewImageView.isHidden = false
+                self?.selectVideoButton.isHidden = true
+            }
+        }
+        
+        controller.dismiss(animated: true)
+    }
+    
+    func videoGalleryViewControllerDidCancel(_ controller: VideoGalleryViewController) {
+        controller.dismiss(animated: true)
+    }
+    
+    private func generateVideoThumbnail(from url: URL, completion: @escaping (UIImage?) -> Void) {
+        let asset = AVAsset(url: url)
+        let imageGenerator = AVAssetImageGenerator(asset: asset)
+        imageGenerator.appliesPreferredTrackTransform = true
+        
+        let time = CMTime(seconds: 1.0, preferredTimescale: 600)
+        
+        imageGenerator.generateCGImagesAsynchronously(forTimes: [NSValue(time: time)]) { _, cgImage, _, _, _ in
+            if let cgImage = cgImage {
+                let thumbnail = UIImage(cgImage: cgImage)
+                completion(thumbnail)
+            } else {
+                completion(nil)
+            }
+        }
+    }
+}
+
+// MARK: - TimeSequenceProcessorDelegate
+extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
+    
+    func timeSequenceProcessor(_ processor: TimeSequenceProcessor, didStartProcessing videoURL: URL) {
+        DispatchQueue.main.async {
+            self.statusLabel.text = "开始处理视频..."
+            self.progressView.progress = 0.0
+        }
+    }
+    
+    func timeSequenceProcessor(_ processor: TimeSequenceProcessor, didUpdateProgress progress: Float, currentFrame: Int, totalFrames: Int) {
+        DispatchQueue.main.async {
+            self.progressView.progress = progress
+            self.statusLabel.text = "处理中... (\(currentFrame)/\(totalFrames))"
+        }
+    }
+    
+    func timeSequenceProcessor(_ processor: TimeSequenceProcessor, didCompleteWithFrames frames: [UIImage]) {
+        DispatchQueue.main.async {
+            self.isProcessing = false
+            self.extractedFrames = frames
+            self.updateFramesPreview()
+            
+            // 生成合成图片
+            self.generateCompositeImage(from: frames)
+            
+            HapticFeedbackManager.shared.notificationSuccess()
+            self.statusLabel.text = "处理完成！"
+        }
+    }
+    
+    func timeSequenceProcessor(_ processor: TimeSequenceProcessor, didFailWithError error: TimeSequenceError) {
+        DispatchQueue.main.async {
+            self.isProcessing = false
+            
+            let alert = UIAlertController(
+                title: "处理失败",
+                message: error.localizedDescription,
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "确定", style: .default))
+            self.present(alert, animated: true)
+            
+            HapticFeedbackManager.shared.notificationError()
+            self.statusLabel.text = "处理失败，请重试"
+        }
+    }
+    
+    private func generateCompositeImage(from frames: [UIImage]) {
+        // 简单的时间序列合成逻辑 - 将多个帧叠加
+        guard !frames.isEmpty else { return }
+        
+        let firstFrame = frames[0]
+        let size = firstFrame.size
+        
+        UIGraphicsBeginImageContextWithOptions(size, false, 0.0)
+        
+        // 绘制所有帧，使用不同的透明度
+        for (index, frame) in frames.enumerated() {
+            let alpha = 1.0 / CGFloat(frames.count) * 0.8 + 0.2
+            frame.draw(in: CGRect(origin: .zero, size: size), blendMode: .normal, alpha: alpha)
+        }
+        
+        let compositeImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        
+        // 显示结果
+        resultImageView.image = compositeImage
+        resultContainerView.isHidden = false
     }
 }
