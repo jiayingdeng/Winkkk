@@ -63,9 +63,14 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
         super.viewDidAppear(animated)
         scrollToCurrentIndex(animated: false)
         
-        // 🎯 备用方案：在视图完全显示后尝试自动播放Live Photo
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        // 🎯 增强的Live Photo自动播放策略
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             self.tryAutoPlayLivePhotos()
+        }
+        
+        // 🎯 备用播放尝试
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+            self.manuallyTriggerLivePhotoPlayback()
         }
     }
     
@@ -175,6 +180,9 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
             // 设置委托来监听播放状态
             livePhotoView.delegate = self
             
+            // 🎯 添加标签以便后续查找
+            livePhotoView.tag = 9999
+            
             // 异步加载Live Photo
             Task {
                 do {
@@ -199,15 +207,34 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
                             if livePhotoView.superview != nil && 
                                livePhotoView.livePhoto != nil {
                                 
-                                // 延迟执行自动播放，确保sheet动画完成
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                // 🎯 增加更长的延迟，确保sheet完全展示并且视图在窗口层次结构中
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
                                     // 再次检查条件（防止用户快速关闭sheet）
                                     if livePhotoView.superview != nil && 
-                                       livePhotoView.livePhoto != nil {
-                                        livePhotoView.startPlayback(with: .full)
-                                        print("🎥 Live Photo自动播放已启动")
+                                       livePhotoView.livePhoto != nil &&
+                                       livePhotoView.window != nil {
+                                        
+                                        // 🎯 尝试多种播放方式
+                                        print("🎬 尝试Live Photo自动播放...")
+                                        
+                                        // 方法1：使用hint播放风格（更温和的自动播放）
+                                        livePhotoView.startPlayback(with: .hint)
+                                        print("🎥 Live Photo hint播放已启动")
+                                        
+                                        // 方法2：0.5秒后尝试完整播放
+                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                                            if livePhotoView.superview != nil && 
+                                               livePhotoView.livePhoto != nil &&
+                                               livePhotoView.window != nil {
+                                                livePhotoView.startPlayback(with: .full)
+                                                print("🎥 Live Photo完整播放已启动")
+                                            }
+                                        }
                                     } else {
                                         print("❌ Live Photo播放条件已不满足")
+                                        print("   - superview: \(livePhotoView.superview != nil)")
+                                        print("   - livePhoto: \(livePhotoView.livePhoto != nil)")
+                                        print("   - window: \(livePhotoView.window != nil)")
                                     }
                                 }
                             } else {
@@ -449,11 +476,121 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     
     // MARK: - PHLivePhotoViewDelegate
     func livePhotoView(_ livePhotoView: PHLivePhotoView, willBeginPlaybackWith playbackStyle: PHLivePhotoViewPlaybackStyle) {
-        print("🎬 Live Photo开始播放")
+        let styleString = playbackStyle == .full ? "完整播放" : "提示播放"
+        print("🎬 Live Photo开始播放 - 风格: \(styleString)")
+        
+        // 🎯 添加视觉反馈：Live Photo开始播放时稍微缩放
+        UIView.animate(withDuration: 0.1, delay: 0, options: [.allowUserInteraction]) {
+            livePhotoView.transform = CGAffineTransform(scaleX: 1.02, y: 1.02)
+        } completion: { _ in
+            UIView.animate(withDuration: 0.1) {
+                livePhotoView.transform = .identity
+            }
+        }
     }
     
     func livePhotoView(_ livePhotoView: PHLivePhotoView, didEndPlaybackWith playbackStyle: PHLivePhotoViewPlaybackStyle) {
-        print("⏹️ Live Photo播放结束")
+        let styleString = playbackStyle == .full ? "完整播放" : "提示播放"
+        print("⏹️ Live Photo播放结束 - 风格: \(styleString)")
+    }
+    
+    /// 🎯 新增：手动触发Live Photo播放的方法
+    private func manuallyTriggerLivePhotoPlayback() {
+        print("👆 手动触发Live Photo播放...")
+        
+        // 方法1：通过tag查找
+        if let livePhotoView = view.viewWithTag(9999) as? PHLivePhotoView {
+            triggerLivePhotoPlayback(livePhotoView)
+            return
+        }
+        
+        // 方法2：遍历查找
+        findAndTriggerLivePhotoInSubviews(stackView)
+    }
+    
+    /// 递归查找并触发Live Photo播放
+    private func findAndTriggerLivePhotoInSubviews(_ parentView: UIView) {
+        for subview in parentView.subviews {
+            if let livePhotoView = subview as? PHLivePhotoView,
+               livePhotoView.livePhoto != nil {
+                triggerLivePhotoPlayback(livePhotoView)
+                return
+            }
+            // 递归查找子视图
+            findAndTriggerLivePhotoInSubviews(subview)
+        }
+    }
+    
+    /// 触发Live Photo播放的核心方法
+    private func triggerLivePhotoPlayback(_ livePhotoView: PHLivePhotoView) {
+        print("🔍 找到Live Photo视图，详细状态检查:")
+        print("   - livePhoto存在: \(livePhotoView.livePhoto != nil)")
+        print("   - 视图在窗口中: \(livePhotoView.window != nil)")
+        print("   - 视图可见: \(!livePhotoView.isHidden)")
+        print("   - 视图alpha: \(livePhotoView.alpha)")
+        print("   - 手势识别器启用: \(livePhotoView.playbackGestureRecognizer.isEnabled)")
+        
+        guard livePhotoView.livePhoto != nil else {
+            print("❌ Live Photo数据不存在")
+            return
+        }
+        
+        // 🎯 强制播放策略
+        print("🎬 开始强制播放Live Photo...")
+        
+        // 策略1：hint播放
+        livePhotoView.startPlayback(with: .hint)
+        print("🎥 hint播放已触发")
+        
+        // 策略2：延迟完整播放
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            livePhotoView.startPlayback(with: .full)
+            print("🎥 完整播放已触发")
+        }
+        
+        // 策略3：模拟手势触发
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.simulateLivePhotoGesture(livePhotoView)
+        }
+        
+        // 策略4：持续尝试播放
+        var attemptCount = 0
+        let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
+            attemptCount += 1
+            if attemptCount > 3 {
+                timer.invalidate()
+                print("⏰ Live Photo播放尝试超时")
+                return
+            }
+            
+            print("🔄 第\(attemptCount)次尝试播放Live Photo")
+            livePhotoView.startPlayback(with: .full)
+        }
+        
+        // 5秒后停止尝试
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
+            timer.invalidate()
+        }
+    }
+    
+    /// 模拟Live Photo手势触发
+    private func simulateLivePhotoGesture(_ livePhotoView: PHLivePhotoView) {
+        print("👆 模拟Live Photo手势触发...")
+        
+        // 创建触摸事件
+        let center = CGPoint(x: livePhotoView.bounds.midX, y: livePhotoView.bounds.midY)
+        
+        // 模拟长按手势
+        let longPress = UILongPressGestureRecognizer()
+        longPress.minimumPressDuration = 0.1
+        
+        // 手动触发手势识别器
+        if livePhotoView.playbackGestureRecognizer.isEnabled {
+            // 尝试通过反射或其他方式触发播放
+            livePhotoView.playbackGestureRecognizer.isEnabled = false
+            livePhotoView.playbackGestureRecognizer.isEnabled = true
+            print("🔄 重置了手势识别器状态")
+        }
     }
     
     override func viewDidDisappear(_ animated: Bool) {
