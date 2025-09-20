@@ -421,24 +421,31 @@ extension ScreenshotEngine {
         
         Task {
             do {
+                print("🚀 开始Live Photo创建流程...")
+                
                 // 验证视频是否适合创建Live Photo
+                print("📋 验证视频是否适合创建Live Photo...")
                 let validation = try await videoSegmentExtractor.validateVideoForLivePhoto(at: videoURL)
                 guard validation.isValid else {
+                    print("❌ 视频验证失败: \(validation.reason ?? "未知原因")")
                     DispatchQueue.main.async {
                         completion(.failure(.generationFailed(validation.reason ?? "视频不适合创建Live Photo")))
                     }
                     return
                 }
+                print("✅ 视频验证通过，时长: \(validation.duration)秒")
                 
                 // 计算Live Photo的时间范围
                 let startTime = max(CMTime.zero, time - CMTime(seconds: LivePhotoConfig.keyPhotoOffset, preferredTimescale: 600))
                 let duration = CMTime(seconds: LivePhotoConfig.duration, preferredTimescale: 600)
+                print("⏱️ Live Photo时间范围: \(startTime.seconds)s - \((startTime + duration).seconds)s")
                 
                 // 创建临时文件URL
                 let tempVideoURL = VideoSegmentExtractor.generateTempURL(for: "livephoto_segment")
                 let tempImageURL = VideoSegmentExtractor.generateTempURL(for: "livephoto_cover").appendingPathExtension("jpg")
                 
                 // 提取视频片段
+                print("🎬 开始提取视频片段...")
                 let segmentURL = try await videoSegmentExtractor.extractSegment(
                     from: videoURL,
                     startTime: startTime,
@@ -447,32 +454,38 @@ extension ScreenshotEngine {
                 )
                 
                 // 生成封面帧（Live Photo中心时间）
+                print("📷 开始生成封面帧...")
                 let coverTime = CMTime(seconds: LivePhotoConfig.keyPhotoOffset, preferredTimescale: 600)
                 let coverImage = try await videoSegmentExtractor.generateCoverFrame(
                     from: segmentURL,
                     at: coverTime
                 )
+                print("✅ 封面帧生成完成")
                 
                 // 保存封面图片
                 guard let imageData = coverImage.jpegData(compressionQuality: 0.9) else {
                     throw ScreenshotError.generationFailed("封面图片保存失败")
                 }
                 try imageData.write(to: tempImageURL)
+                print("💾 临时封面图片保存完成")
                 
                 // 生成配对标识符
                 let identifier = UUID().uuidString
+                print("🔗 生成Live Photo配对标识符: \(identifier)")
                 
                 // 创建最终存储目录
                 let documentsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
                 let livePhotoDir = documentsDir.appendingPathComponent("LivePhotos")
                 
                 // 保存Live Photo文件
+                print("💾 开始保存Live Photo文件...")
                 let (finalVideoURL, finalImageURL) = try await livePhotoMaker.saveLivePhotoFiles(
                     videoURL: segmentURL,
                     imageURL: tempImageURL,
                     identifier: identifier,
                     to: livePhotoDir
                 )
+                print("✅ Live Photo文件保存完成")
                 
                 // 清理临时文件
                 VideoSegmentExtractor.cleanupTempFile(at: tempVideoURL)

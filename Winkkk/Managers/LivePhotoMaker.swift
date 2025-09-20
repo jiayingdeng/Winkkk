@@ -157,7 +157,7 @@ class LivePhotoMaker {
         
         guard let exportSession = AVAssetExportSession(
             asset: asset,
-            presetName: AVAssetExportPresetHighestQuality
+            presetName: AVAssetExportPresetMediumQuality  // 🚀 使用中等质量提升速度
         ) else {
             throw LivePhotoError.livePhotoCreationFailed("无法创建视频导出会话")
         }
@@ -170,17 +170,40 @@ class LivePhotoMaker {
         let metadataItem = createLivePhotoMetadataItem(identifier: identifier)
         exportSession.metadata = [metadataItem]
         
-        await exportSession.export()
+        print("🎬 开始Live Photo视频处理...")
+        
+        // 🚀 添加超时机制的导出
+        let exportResult = await withCheckedContinuation { continuation in
+            let timer = Timer.scheduledTimer(withTimeInterval: 20.0, repeats: false) { _ in
+                print("⏰ Live Photo视频处理超时，取消导出")
+                exportSession.cancelExport()
+                continuation.resume(returning: false)
+            }
+            
+            exportSession.exportAsynchronously {
+                timer.invalidate()
+                continuation.resume(returning: true)
+            }
+        }
+        
+        // 检查超时和导出结果
+        if !exportResult {
+            throw LivePhotoError.livePhotoCreationFailed("Live Photo视频处理超时（20秒）")
+        }
         
         switch exportSession.status {
         case .completed:
+            print("✅ Live Photo视频处理完成")
             break
         case .failed:
             let error = exportSession.error?.localizedDescription ?? "未知错误"
+            print("❌ Live Photo视频处理失败: \(error)")
             throw LivePhotoError.livePhotoCreationFailed("视频处理失败: \(error)")
         case .cancelled:
-            throw LivePhotoError.livePhotoCreationFailed("视频处理被取消")
+            print("⏹️ Live Photo视频处理被取消")
+            throw LivePhotoError.livePhotoCreationFailed("视频处理被取消或超时")
         default:
+            print("⚠️ Live Photo视频处理状态异常: \(exportSession.status.rawValue)")
             throw LivePhotoError.livePhotoCreationFailed("视频处理状态异常")
         }
     }

@@ -75,10 +75,10 @@ class VideoSegmentExtractor {
             throw ExtractionError.invalidTimeRange
         }
         
-        // 创建导出会话
+        // 创建导出会话 - 使用中等质量以提升速度
         guard let exportSession = AVAssetExportSession(
             asset: asset,
-            presetName: AVAssetExportPresetHighestQuality
+            presetName: AVAssetExportPresetMediumQuality
         ) else {
             throw ExtractionError.exportFailed("无法创建导出会话")
         }
@@ -91,19 +91,37 @@ class VideoSegmentExtractor {
         // 视频质量优化设置
         exportSession.shouldOptimizeForNetworkUse = true
         
-        // 执行导出
-        await exportSession.export()
+        // 🚀 添加超时机制的导出
+        let exportResult = await withCheckedContinuation { continuation in
+            let timer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: false) { _ in
+                exportSession.cancelExport()
+                continuation.resume(returning: false)
+            }
+            
+            exportSession.exportAsynchronously {
+                timer.invalidate()
+                continuation.resume(returning: true)
+            }
+        }
         
-        // 检查导出结果
+        // 检查超时和导出结果
+        if !exportResult {
+            throw ExtractionError.exportFailed("视频片段提取超时（30秒）")
+        }
+        
         switch exportSession.status {
         case .completed:
+            print("✅ 视频片段提取成功: \(outputURL.lastPathComponent)")
             return outputURL
         case .failed:
             let error = exportSession.error?.localizedDescription ?? "未知错误"
+            print("❌ 视频片段提取失败: \(error)")
             throw ExtractionError.exportFailed(error)
         case .cancelled:
-            throw ExtractionError.exportFailed("导出被取消")
+            print("⏹️ 视频片段提取被取消")
+            throw ExtractionError.exportFailed("导出被取消或超时")
         default:
+            print("⚠️ 视频片段提取状态异常: \(exportSession.status.rawValue)")
             throw ExtractionError.exportFailed("导出状态异常: \(exportSession.status.rawValue)")
         }
     }
