@@ -264,6 +264,17 @@ class LivePhotoMaker {
         case .failed:
             let error = exportSession.error?.localizedDescription ?? "未知错误"
             print("❌ Live Photo视频处理失败: \(error)")
+            
+            // 🎯 检测音频相关错误并提供友好提示
+            if let nsError = exportSession.error as NSError? {
+                print("   错误域: \(nsError.domain)")
+                print("   错误代码: \(nsError.code)")
+                
+                if nsError.code == -12848 || nsError.code == -11829 {
+                    throw LivePhotoError.livePhotoCreationFailed("视频音频格式不兼容，请尝试其他视频")
+                }
+            }
+            
             throw LivePhotoError.livePhotoCreationFailed("视频处理失败: \(error)")
         case .cancelled:
             print("⏹️ Live Photo视频处理被取消")

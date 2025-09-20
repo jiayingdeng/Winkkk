@@ -506,12 +506,51 @@ extension ScreenshotEngine {
                 }
                 
             } catch {
+                print("❌ Live Photo创建失败: \(error)")
+                
+                // 🎯 改进错误处理：提供更友好的错误信息
                 DispatchQueue.main.async {
+                    let friendlyError: ScreenshotError
+                    
                     if let screenshotError = error as? ScreenshotError {
-                        completion(.failure(screenshotError))
+                        friendlyError = screenshotError
+                    } else if let livePhotoError = error as? LivePhotoMaker.LivePhotoError {
+                        switch livePhotoError {
+                        case .invalidVideoURL, .invalidImageURL:
+                            friendlyError = .generationFailed("视频文件无效或损坏")
+                        case .livePhotoCreationFailed(let reason):
+                            if reason.contains("音频") || reason.contains("audio") {
+                                friendlyError = .generationFailed("视频音频格式不兼容，已自动处理")
+                            } else {
+                                friendlyError = .generationFailed("Live Photo创建失败：\(reason)")
+                            }
+                        case .fileSystemError(let reason):
+                            friendlyError = .generationFailed("文件系统错误：\(reason)")
+                        default:
+                            friendlyError = .generationFailed("Live Photo创建失败：\(livePhotoError.localizedDescription)")
+                        }
+                    } else if let extractorError = error as? VideoSegmentExtractor.ExtractionError {
+                        switch extractorError {
+                        case .videoNotReadable:
+                            friendlyError = .generationFailed("视频文件损坏或格式不支持")
+                        case .exportFailed(let reason):
+                            if reason.contains("音频") || reason.contains("audio") || reason.contains("-12848") || reason.contains("-11829") {
+                                friendlyError = .generationFailed("视频音频处理失败，请尝试其他视频")
+                            } else {
+                                friendlyError = .generationFailed("视频处理失败：\(reason)")
+                            }
+                        case .invalidTimeRange:
+                            friendlyError = .generationFailed("选择的时间范围无效")
+                        case .insufficientDuration:
+                            friendlyError = .generationFailed("视频时长不足，至少需要3秒")
+                        default:
+                            friendlyError = .generationFailed(extractorError.localizedDescription)
+                        }
                     } else {
-                        completion(.failure(.generationFailed(error.localizedDescription)))
+                        friendlyError = .generationFailed("Live Photo创建失败：\(error.localizedDescription)")
                     }
+                    
+                    completion(.failure(friendlyError))
                 }
             }
         }
