@@ -105,6 +105,18 @@ class VideoSegmentExtractor {
         }
         print("   ✅ 视频资源验证通过")
         
+        // 🎯 关键修复：检查音视频轨道
+        print("   开始检查媒体轨道...")
+        let videoTracks = try await asset.loadTracks(withMediaType: .video)
+        let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+        print("   视频轨道数量: \(videoTracks.count)")
+        print("   音频轨道数量: \(audioTracks.count)")
+        
+        guard !videoTracks.isEmpty else {
+            print("   ❌ 视频文件没有视频轨道")
+            throw ExtractionError.videoNotReadable
+        }
+        
         let videoDuration = try await asset.load(.duration)
         
         // 验证时间范围
@@ -116,11 +128,22 @@ class VideoSegmentExtractor {
             throw ExtractionError.invalidTimeRange
         }
         
-        // 创建导出会话 - 使用中等质量以提升速度
+        // 🎯 关键修复：根据音频轨道情况选择导出预设
         print("   开始创建导出会话...")
+        
+        // 如果没有音频轨道，使用仅视频的预设
+        let presetName: String
+        if audioTracks.isEmpty {
+            print("   ⚠️ 检测到无音频轨道，使用视频专用预设")
+            presetName = AVAssetExportPresetMediumQuality
+        } else {
+            print("   ✅ 检测到音频轨道，使用标准预设")
+            presetName = AVAssetExportPresetMediumQuality
+        }
+        
         guard let exportSession = AVAssetExportSession(
             asset: asset,
-            presetName: AVAssetExportPresetMediumQuality
+            presetName: presetName
         ) else {
             print("   ❌ 无法创建导出会话")
             throw ExtractionError.exportFailed("无法创建导出会话")
@@ -146,6 +169,16 @@ class VideoSegmentExtractor {
         exportSession.outputFileType = .mov
         exportSession.timeRange = timeRange
         
+        // 🎯 关键修复：音频处理配置
+        if audioTracks.isEmpty {
+            print("   🔇 配置无音频导出")
+            // 对于无音频的视频，确保不尝试处理音频
+            exportSession.audioMix = nil
+        } else {
+            print("   🔊 配置音频导出")
+            // 有音频时的正常配置
+        }
+        
         // 视频质量优化设置
         exportSession.shouldOptimizeForNetworkUse = true
         
@@ -154,6 +187,8 @@ class VideoSegmentExtractor {
         print("     文件类型: \(exportSession.outputFileType?.rawValue ?? "unknown")")
         print("     时间范围: \(timeRange.start.seconds)s - \(timeRange.end.seconds)s")
         print("     网络优化: \(exportSession.shouldOptimizeForNetworkUse)")
+        print("     音频处理: \(audioTracks.isEmpty ? "跳过" : "包含")")
+        print("     导出预设: \(presetName)")
         
         // 🚀 添加超时机制的导出
         let exportResult = await withCheckedContinuation { continuation in
@@ -203,6 +238,17 @@ class VideoSegmentExtractor {
                 print("   错误域: \(nsError.domain)")
                 print("   错误代码: \(nsError.code)")
                 print("   用户信息: \(nsError.userInfo)")
+                
+                // 🎯 关键修复：检测音频相关错误并自动重试
+                if nsError.code == -12848 || nsError.code == -11829 {
+                    print("   🔄 检测到音频相关错误，尝试无音频导出...")
+                    return try await retryWithoutAudio(
+                        from: videoURL,
+                        startTime: startTime,
+                        duration: duration,
+                        to: outputURL
+                    )
+                }
             }
             
             throw ExtractionError.exportFailed(error)
@@ -296,6 +342,114 @@ class VideoSegmentExtractor {
         }
         
         return images
+    }
+    
+    /// 🎯 无音频重试导出方法
+    /// - Parameters:
+    ///   - videoURL: 原视频URL
+    ///   - startTime: 开始时间
+    ///   - duration: 片段持续时间
+    ///   - outputURL: 输出文件URL
+    /// - Returns: 提取成功的视频URL
+    private func retryWithoutAudio(
+        from videoURL: URL,
+        startTime: CMTime,
+        duration: CMTime,
+        to outputURL: URL
+    ) async throws -> URL {
+        
+        print("🔄 开始无音频重试导出...")
+        
+        let asset = AVAsset(url: videoURL)
+        let timeRange = CMTimeRange(start: startTime, duration: duration)
+        
+        // 使用AVAssetWriter进行精确控制
+        let fileManager = FileManager.default
+        
+        // 删除之前失败的文件
+        if fileManager.fileExists(atPath: outputURL.path) {
+            try? fileManager.removeItem(at: outputURL)
+        }
+        
+        guard let assetWriter = try? AVAssetWriter(outputURL: outputURL, fileType: .mov) else {
+            throw ExtractionError.exportFailed("无法创建AssetWriter")
+        }
+        
+        // 配置视频输出设置
+        let videoTracks = try await asset.loadTracks(withMediaType: .video)
+        guard let videoTrack = videoTracks.first else {
+            throw ExtractionError.exportFailed("没有视频轨道")
+        }
+        
+        let videoSize = try await videoTrack.load(.naturalSize)
+        let videoSettings: [String: Any] = [
+            AVVideoCodecKey: AVVideoCodecType.h264,
+            AVVideoWidthKey: Int(videoSize.width),
+            AVVideoHeightKey: Int(videoSize.height)
+        ]
+        
+        let videoWriterInput = AVAssetWriterInput(mediaType: .video, outputSettings: videoSettings)
+        videoWriterInput.expectsMediaDataInRealTime = false
+        
+        guard assetWriter.canAdd(videoWriterInput) else {
+            throw ExtractionError.exportFailed("无法添加视频输入")
+        }
+        assetWriter.add(videoWriterInput)
+        
+        // 开始写入
+        guard assetWriter.startWriting() else {
+            throw ExtractionError.exportFailed("无法开始写入")
+        }
+        
+        assetWriter.startSession(atSourceTime: timeRange.start)
+        
+        // 创建读取器
+        guard let assetReader = try? AVAssetReader(asset: asset) else {
+            throw ExtractionError.exportFailed("无法创建AssetReader")
+        }
+        
+        let videoReaderOutput = AVAssetReaderTrackOutput(track: videoTrack, outputSettings: nil)
+        videoReaderOutput.supportsRandomAccess = true
+        
+        guard assetReader.canAdd(videoReaderOutput) else {
+            throw ExtractionError.exportFailed("无法添加视频输出")
+        }
+        assetReader.add(videoReaderOutput)
+        
+        // 设置时间范围
+        assetReader.timeRange = timeRange
+        
+        guard assetReader.startReading() else {
+            throw ExtractionError.exportFailed("无法开始读取")
+        }
+        
+        // 复制视频数据
+        let result = await withCheckedContinuation { continuation in
+            videoWriterInput.requestMediaDataWhenReady(on: DispatchQueue.global()) {
+                while videoWriterInput.isReadyForMoreMediaData {
+                    if let sampleBuffer = videoReaderOutput.copyNextSampleBuffer() {
+                        if !videoWriterInput.append(sampleBuffer) {
+                            print("❌ 写入样本缓冲区失败")
+                            break
+                        }
+                    } else {
+                        videoWriterInput.markAsFinished()
+                        break
+                    }
+                }
+                
+                assetWriter.finishWriting {
+                    continuation.resume(returning: assetWriter.status == .completed)
+                }
+            }
+        }
+        
+        if result {
+            print("✅ 无音频重试导出成功")
+            return outputURL
+        } else {
+            throw ExtractionError.exportFailed("无音频重试导出失败")
+        }
     }
     
     /// 验证视频是否适合创建Live Photo

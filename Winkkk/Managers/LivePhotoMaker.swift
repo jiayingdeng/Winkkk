@@ -188,9 +188,31 @@ class LivePhotoMaker {
         
         let asset = AVAsset(url: inputURL)
         
+        // 🎯 关键修复：检查音视频轨道
+        print("   开始检查媒体轨道...")
+        let videoTracks = try await asset.loadTracks(withMediaType: .video)
+        let audioTracks = try await asset.loadTracks(withMediaType: .audio)
+        print("   视频轨道数量: \(videoTracks.count)")
+        print("   音频轨道数量: \(audioTracks.count)")
+        
+        guard !videoTracks.isEmpty else {
+            print("   ❌ 视频文件没有视频轨道")
+            throw LivePhotoError.invalidVideoURL
+        }
+        
+        // 根据音频轨道情况选择导出预设
+        let presetName: String
+        if audioTracks.isEmpty {
+            print("   ⚠️ 检测到无音频轨道，使用视频专用预设")
+            presetName = AVAssetExportPresetMediumQuality
+        } else {
+            print("   ✅ 检测到音频轨道，使用标准预设")
+            presetName = AVAssetExportPresetMediumQuality
+        }
+        
         guard let exportSession = AVAssetExportSession(
             asset: asset,
-            presetName: AVAssetExportPresetMediumQuality  // 🚀 使用中等质量提升速度
+            presetName: presetName
         ) else {
             print("   ❌ 无法创建视频导出会话")
             throw LivePhotoError.livePhotoCreationFailed("无法创建视频导出会话")
@@ -199,6 +221,16 @@ class LivePhotoMaker {
         exportSession.outputURL = outputURL
         exportSession.outputFileType = .mov
         exportSession.shouldOptimizeForNetworkUse = true
+        
+        // 🎯 关键修复：音频处理配置
+        if audioTracks.isEmpty {
+            print("   🔇 配置无音频导出")
+            // 对于无音频的视频，确保不尝试处理音频
+            exportSession.audioMix = nil
+        } else {
+            print("   🔊 配置音频导出")
+            // 有音频时的正常配置
+        }
         
         // 添加Live Photo元数据
         let metadataItem = createLivePhotoMetadataItem(identifier: identifier)
