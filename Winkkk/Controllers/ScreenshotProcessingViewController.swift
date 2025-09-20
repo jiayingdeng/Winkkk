@@ -773,13 +773,44 @@ class ProcessingOptionCell: UITableViewCell {
         titleLabel.text = option.title
         descriptionLabel.text = option.description
         
-        // 🌟 为时间序列模式添加特殊的渐变背景突出显示
+        // 🌟 为时间序列模式添加多层次突出显示效果
         if option.title.contains("时间序列模式") {
-            backgroundColor = ThemeManager.primaryGradientStart.withAlphaComponent(0.3)
+            // 1. 更强烈的渐变背景 (60%透明度 → 更明显)
+            backgroundColor = ThemeManager.buttonPrimary.withAlphaComponent(0.6)
+            
+            // 2. 圆角和边框突出
             layer.cornerRadius = ThemeManager.standardCornerRadius
+            layer.borderWidth = 2.0
+            layer.borderColor = ThemeManager.buttonPrimary.cgColor
+            
+            // 3. 阴影效果增强视觉深度
+            layer.shadowColor = ThemeManager.buttonPrimary.cgColor
+            layer.shadowOffset = CGSize(width: 0, height: 4)
+            layer.shadowRadius = 8
+            layer.shadowOpacity = 0.4
+            
+            // 4. 图标特殊颜色突出
+            iconImageView.tintColor = ThemeManager.primaryText
+            
+            // 5. 标题文字加粗突出
+            titleLabel.font = ThemeManager.buttonFont.withSize(ThemeManager.buttonFont.pointSize + 1)
+            titleLabel.textColor = ThemeManager.primaryText
+            
+            // 6. 描述文字也加强对比
+            descriptionLabel.textColor = ThemeManager.primaryText.withAlphaComponent(0.8)
+            
         } else {
+            // 恢复默认样式
             backgroundColor = .clear
             layer.cornerRadius = 0
+            layer.borderWidth = 0
+            layer.shadowOpacity = 0
+            
+            // 恢复默认图标和文字颜色
+            iconImageView.tintColor = ThemeManager.buttonPrimary
+            titleLabel.font = ThemeManager.buttonFont
+            titleLabel.textColor = .white
+            descriptionLabel.textColor = UIColor.white.withAlphaComponent(0.7)
         }
     }
 }
