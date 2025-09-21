@@ -104,6 +104,15 @@ class TimeSequenceViewController: UIViewController {
         
         // 进入时间序列模式的触感反馈
         HapticFeedbackManager.shared.lightImpact()
+        
+        // 🆕 检测是否从录像界面跳转而来
+        if let videoURL = selectedVideoURL {
+            // 自动模式：隐藏视频选择UI，直接开始处理
+            enterAutoProcessingMode(with: videoURL)
+        } else {
+            // 手动模式：显示正常的选择界面
+            enterManualSelectionMode()
+        }
     }
     
     // MARK: - UI Setup
@@ -136,14 +145,8 @@ class TimeSequenceViewController: UIViewController {
     private func setupHeaderView() {
         headerView.backgroundColor = .clear
         
-        // 根据场景类型设置标题
-        if let sceneType = sceneType {
-            titleLabel.text = "\(sceneType.icon) \(sceneType.displayName)"
-            subtitleLabel.text = sceneType.description
-        } else {
-            titleLabel.text = "⏰ 时间序列模式"
-            subtitleLabel.text = "将视频关键时刻融合成一张艺术图片"
-        }
+        // 初始设置标题（稍后会根据模式更新）
+        updateTitleForCurrentMode()
         
         titleLabel.font = ThemeManager.titleFont
         titleLabel.textColor = .white
@@ -531,6 +534,137 @@ class TimeSequenceViewController: UIViewController {
         present(alert, animated: true)
     }
     
+    // MARK: - 🆕 Auto Processing Mode
+    
+    /// 进入自动处理模式 - 从录像界面跳转而来
+    private func enterAutoProcessingMode(with videoURL: URL) {
+        print("🎬 进入自动处理模式，视频URL: \(videoURL)")
+        
+        // 1. 隐藏视频选择区域
+        videoSelectionView.isHidden = true
+        
+        // 2. 显示处理区域
+        previewContainerView.isHidden = false
+        controlPanelView.isHidden = false
+        
+        // 3. 更新标题为自动处理模式
+        updateTitleForAutoMode()
+        
+        // 4. 自动开始处理
+        automaticallyStartProcessing(videoURL: videoURL)
+    }
+    
+    /// 进入手动选择模式 - 正常进入界面
+    private func enterManualSelectionMode() {
+        print("📱 进入手动选择模式")
+        
+        // 1. 显示视频选择界面
+        videoSelectionView.isHidden = false
+        
+        // 2. 隐藏处理区域（等待用户选择）
+        previewContainerView.isHidden = true
+        controlPanelView.isHidden = true
+        
+        // 3. 显示选择提示
+        updateTitleForManualMode()
+    }
+    
+    /// 自动开始处理视频
+    private func automaticallyStartProcessing(videoURL: URL) {
+        print("⚡ 自动开始处理视频：\(videoURL)")
+        
+        guard let processor = timeSequenceProcessor else {
+            print("❌ 时间序列处理器未初始化")
+            offerRetryOrBackOptions()
+            return
+        }
+        
+        // 1. 更新UI状态
+        statusLabel.text = "正在分析视频..."
+        progressView.isHidden = false
+        processButton.isEnabled = false
+        processButton.setTitle("自动处理中...", for: .normal)
+        
+        // 2. 开始处理
+        isProcessing = true
+        processor.processVideo(at: videoURL)
+    }
+    
+    /// 更新标题为当前模式
+    private func updateTitleForCurrentMode() {
+        if selectedVideoURL != nil {
+            updateTitleForAutoMode()
+        } else {
+            updateTitleForManualMode()
+        }
+    }
+    
+    /// 自动模式标题
+    private func updateTitleForAutoMode() {
+        if let sceneType = sceneType {
+            titleLabel.text = "🎬 正在处理\(sceneType.displayName)"
+            subtitleLabel.text = "请稍候，正在提取关键帧并生成时间序列图片..."
+        } else {
+            titleLabel.text = "🎬 正在处理时间序列"
+            subtitleLabel.text = "请稍候，正在提取关键帧并生成时间序列图片..."
+        }
+    }
+    
+    /// 手动模式标题
+    private func updateTitleForManualMode() {
+        if let sceneType = sceneType {
+            titleLabel.text = "\(sceneType.icon) \(sceneType.displayName)"
+            subtitleLabel.text = sceneType.description
+        } else {
+            titleLabel.text = "⏰ 时间序列模式"
+            subtitleLabel.text = "选择要处理的视频，生成时间序列艺术图片"
+        }
+    }
+    
+    /// 处理失败后的重试或返回选项
+    private func offerRetryOrBackOptions() {
+        let alert = UIAlertController(
+            title: "处理失败",
+            message: "视频处理遇到问题，您可以选择重试或返回录像界面",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "重试", style: .default) { [weak self] _ in
+            if let videoURL = self?.selectedVideoURL {
+                self?.automaticallyStartProcessing(videoURL: videoURL)
+            }
+        })
+        
+        alert.addAction(UIAlertAction(title: "返回", style: .cancel) { [weak self] _ in
+            self?.dismiss(animated: true)
+        })
+        
+        present(alert, animated: true)
+    }
+    
+    /// 自动滚动到结果区域
+    private func scrollToResultArea() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let resultOrigin = self.resultContainerView.frame.origin
+            let offset = CGPoint(x: 0, y: max(0, resultOrigin.y - 100))
+            self.scrollView.setContentOffset(offset, animated: true)
+        }
+    }
+    
+    /// 显示处理完成提示
+    private func showProcessingCompletedAlert(frameCount: Int) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            let alert = UIAlertController(
+                title: "✅ 时间序列处理完成",
+                message: "🎬 成功提取了 \(frameCount) 个关键帧\n🎨 已生成时间序列合成图片\n💾 您可以保存或分享结果",
+                preferredStyle: .alert
+            )
+            
+            alert.addAction(UIAlertAction(title: "查看结果", style: .default))
+            self.present(alert, animated: true)
+        }
+    }
+    
     private func updateFramesPreview() {
         // 清除现有帧
         framesStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
@@ -624,6 +758,12 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
             // 生成合成图片
             self.generateCompositeImage(from: frames)
             
+            // 🆕 自动滚动到结果区域
+            self.scrollToResultArea()
+            
+            // 🆕 显示处理完成提示
+            self.showProcessingCompletedAlert(frameCount: frames.count)
+            
             HapticFeedbackManager.shared.notificationSuccess()
             self.statusLabel.text = "处理完成！"
         }
@@ -633,16 +773,11 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
         DispatchQueue.main.async {
             self.isProcessing = false
             
-            let alert = UIAlertController(
-                title: "处理失败",
-                message: error.localizedDescription,
-                preferredStyle: .alert
-            )
-            alert.addAction(UIAlertAction(title: "确定", style: .default))
-            self.present(alert, animated: true)
+            // 🆕 使用增强的错误处理机制
+            self.offerRetryOrBackOptions()
             
             HapticFeedbackManager.shared.notificationError()
-            self.statusLabel.text = "处理失败，请重试"
+            self.statusLabel.text = "处理失败：\(error.localizedDescription)"
         }
     }
     
