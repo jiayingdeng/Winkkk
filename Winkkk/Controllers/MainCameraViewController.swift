@@ -25,6 +25,11 @@ class MainCameraViewController: UIViewController {
     
     // 时间序列模式切换按钮
     private let modeSwitcherButton = UIButton(type: .system)
+    private let modeSwitcherMainLabel = UILabel()
+    private let modeSwitcherSubLabel = UILabel()
+    
+    // 当前模式状态
+    private var isTimeSequenceMode = false
     
     // 录制状态指示
     private let recordingIndicatorView = UIView()
@@ -217,21 +222,53 @@ class MainCameraViewController: UIViewController {
     }
     
     private func setupModeSwitcher() {
-        modeSwitcherButton.setTitle("时间序列模式", for: .normal)
-        modeSwitcherButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
-        modeSwitcherButton.layer.cornerRadius = 22
-        modeSwitcherButton.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .medium)
-        modeSwitcherButton.setTitleColor(.white, for: .normal)
+        // 配置主容器按钮
+        modeSwitcherButton.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.8)
+        modeSwitcherButton.layer.cornerRadius = 18
         modeSwitcherButton.addTarget(self, action: #selector(modeSwitcherButtonTapped), for: .touchUpInside)
         
-        view.addSubview(modeSwitcherButton)
+        // 配置主标签（大字）
+        modeSwitcherMainLabel.text = "普通录像"
+        modeSwitcherMainLabel.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+        modeSwitcherMainLabel.textColor = .white
+        modeSwitcherMainLabel.textAlignment = .center
+        modeSwitcherMainLabel.isUserInteractionEnabled = false
         
+        // 配置副标签（小字）
+        modeSwitcherSubLabel.text = "点击切换时间序列模式"
+        modeSwitcherSubLabel.font = UIFont.systemFont(ofSize: 12, weight: .regular)
+        modeSwitcherSubLabel.textColor = UIColor.white.withAlphaComponent(0.9)
+        modeSwitcherSubLabel.textAlignment = .center
+        modeSwitcherSubLabel.isUserInteractionEnabled = false
+        
+        // 添加到控制面板
+        controlPanelBlurView.contentView.addSubview(modeSwitcherButton)
+        modeSwitcherButton.addSubview(modeSwitcherMainLabel)
+        modeSwitcherButton.addSubview(modeSwitcherSubLabel)
+        
+        // 设置约束
         modeSwitcherButton.translatesAutoresizingMaskIntoConstraints = false
+        modeSwitcherMainLabel.translatesAutoresizingMaskIntoConstraints = false
+        modeSwitcherSubLabel.translatesAutoresizingMaskIntoConstraints = false
+        
         NSLayoutConstraint.activate([
-            modeSwitcherButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-            modeSwitcherButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            modeSwitcherButton.heightAnchor.constraint(equalToConstant: 44),
-            modeSwitcherButton.widthAnchor.constraint(equalToConstant: 180)
+            // 主按钮约束
+            modeSwitcherButton.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
+            modeSwitcherButton.bottomAnchor.constraint(equalTo: recordButton.topAnchor, constant: -20),
+            modeSwitcherButton.heightAnchor.constraint(equalToConstant: 36),
+            modeSwitcherButton.widthAnchor.constraint(equalToConstant: 200),
+            
+            // 主标签约束
+            modeSwitcherMainLabel.topAnchor.constraint(equalTo: modeSwitcherButton.topAnchor, constant: 4),
+            modeSwitcherMainLabel.leadingAnchor.constraint(equalTo: modeSwitcherButton.leadingAnchor, constant: 8),
+            modeSwitcherMainLabel.trailingAnchor.constraint(equalTo: modeSwitcherButton.trailingAnchor, constant: -8),
+            modeSwitcherMainLabel.heightAnchor.constraint(equalToConstant: 16),
+            
+            // 副标签约束
+            modeSwitcherSubLabel.topAnchor.constraint(equalTo: modeSwitcherMainLabel.bottomAnchor, constant: 2),
+            modeSwitcherSubLabel.leadingAnchor.constraint(equalTo: modeSwitcherButton.leadingAnchor, constant: 8),
+            modeSwitcherSubLabel.trailingAnchor.constraint(equalTo: modeSwitcherButton.trailingAnchor, constant: -8),
+            modeSwitcherSubLabel.heightAnchor.constraint(equalToConstant: 12)
         ])
     }
     
@@ -575,8 +612,8 @@ extension MainCameraViewController {
             TimeSequenceModeManager.shared.reset()
             
             // 重置模式切换按钮
-            modeSwitcherButton.setTitle("普通录像", for: .normal)
-            modeSwitcherButton.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.8)
+            isTimeSequenceMode = false
+            updateModeSwitcherDisplay()
         } else {
             // 普通模式：跳转到视频播放器
             let playerVC = VideoPlayerViewController(videoURL: url)
@@ -841,8 +878,8 @@ extension MainCameraViewController {
     
     private func switchToNormalMode() {
         // 切换到普通录像模式
-        modeSwitcherButton.setTitle("普通录像", for: .normal)
-        modeSwitcherButton.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.8)
+        isTimeSequenceMode = false
+        updateModeSwitcherDisplay()
         
         // 更新界面状态
         let alert = UIAlertController(
@@ -901,8 +938,8 @@ extension MainCameraViewController {
     
     private func startTimeSequenceRecording(with sceneType: SceneType) {
         // 切换到时间序列模式
-        modeSwitcherButton.setTitle("时间序列模式", for: .normal)
-        modeSwitcherButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
+        isTimeSequenceMode = true
+        updateModeSwitcherDisplay()
         
         // 切换到时间序列模式
         TimeSequenceModeManager.shared.switchToTimeSequenceMode(with: sceneType)
@@ -926,6 +963,23 @@ extension MainCameraViewController {
         )
         alert.addAction(UIAlertAction(title: "了解", style: .default))
         present(alert, animated: true)
+    }
+    
+    // MARK: - Mode Switcher State Management
+    private func updateModeSwitcherDisplay() {
+        UIView.animate(withDuration: 0.3) {
+            if self.isTimeSequenceMode {
+                // 时间序列模式
+                self.modeSwitcherMainLabel.text = "⏰ 时间序列"
+                self.modeSwitcherSubLabel.text = "点击切换普通录像"
+                self.modeSwitcherButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
+            } else {
+                // 普通录像模式
+                self.modeSwitcherMainLabel.text = "📹 普通录像"
+                self.modeSwitcherSubLabel.text = "点击切换时间序列模式"
+                self.modeSwitcherButton.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.8)
+            }
+        }
     }
 }
 
