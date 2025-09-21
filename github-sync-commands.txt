@@ -1,0 +1,26 @@
+# GitHub项目同步命令
+# 请按顺序执行以下命令，记得替换YOUR_USERNAME为您的GitHub用户名
+
+# 1. 添加GitHub远程仓库（请替换YOUR_USERNAME）
+git remote add origin https://github.com/YOUR_USERNAME/Winkkk.git
+
+# 2. 查看当前分支
+git branch
+
+# 3. 重命名主分支为main（GitHub标准）
+git branch -M main
+
+# 4. 首次推送到GitHub
+git push -u origin main
+
+# 5. 后续推送命令（日常使用）
+git push
+
+# ============================================
+# 如果您想推送当前的feature分支：
+# ============================================
+
+# 1. 推送当前分支到GitHub
+git push -u origin video-player-sync-playback
+
+# 2. 在GitHub上创建Pull Request来合并到main分支
