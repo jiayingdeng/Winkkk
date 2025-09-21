@@ -621,6 +621,45 @@ class TimeSequenceViewController: UIViewController {
         }
     }
     
+    /// 选择视频后显示控制界面
+    private func showControlInterfaceAfterVideoSelection() {
+        print("🎛️ 显示控制界面 - 手动选择模式")
+        
+        // 1. 显示预览区域和控制面板
+        previewContainerView.isHidden = false
+        controlPanelView.isHidden = false
+        
+        // 2. 更新标题状态
+        if let sceneType = sceneType {
+            titleLabel.text = "\(sceneType.icon) \(sceneType.displayName)"
+            subtitleLabel.text = "调整参数并点击生成时间序列图片"
+        } else {
+            titleLabel.text = "⏰ 时间序列模式"
+            subtitleLabel.text = "调整参数并点击生成时间序列图片"
+        }
+        
+        // 3. 重置控制状态
+        isProcessing = false
+        updateProcessingState()
+        
+        // 4. 滚动到控制面板区域
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.scrollToControlPanel()
+        }
+    }
+    
+    /// 滚动到控制面板区域
+    private func scrollToControlPanel() {
+        let controlPanelFrame = controlPanelView.frame
+        let targetRect = CGRect(
+            x: 0,
+            y: controlPanelFrame.origin.y - 20,
+            width: controlPanelFrame.width,
+            height: controlPanelFrame.height + 40
+        )
+        scrollView.scrollRectToVisible(targetRect, animated: true)
+    }
+    
     /// 处理失败后的重试或返回选项
     private func offerRetryOrBackOptions() {
         let alert = UIAlertController(
@@ -704,6 +743,9 @@ extension TimeSequenceViewController: VideoGalleryViewControllerDelegate {
                 self?.videoPreviewImageView.image = thumbnail
                 self?.videoPreviewImageView.isHidden = false
                 self?.selectVideoButton.isHidden = true
+                
+                // 🆕 选择视频后显示控制界面
+                self?.showControlInterfaceAfterVideoSelection()
             }
         }
         
