@@ -75,7 +75,8 @@ class SceneSelectionViewController: UIViewController {
         let stack = UIStackView()
         stack.axis = .vertical
         stack.spacing = 16
-        stack.distribution = .fillEqually
+        stack.distribution = .fill
+        stack.alignment = .fill
         return stack
     }()
     
@@ -282,12 +283,12 @@ class SceneSelectionViewController: UIViewController {
             descLabel.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -16),
             
             // 难度
-            difficultyLabel.topAnchor.constraint(equalTo: descLabel.bottomAnchor, constant: 12),
+            difficultyLabel.topAnchor.constraint(equalTo: descLabel.bottomAnchor, constant: 16),
             difficultyLabel.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 16),
             difficultyLabel.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -16),
             
-            // 卡片高度
-            cardView.heightAnchor.constraint(equalToConstant: 160)
+            // 卡片最小高度 (增加了空间以适应内容)
+            cardView.heightAnchor.constraint(greaterThanOrEqualToConstant: 180)
         ]
         
         // 推荐标签约束
@@ -296,17 +297,12 @@ class SceneSelectionViewController: UIViewController {
                 recommendedBadge.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 12),
                 recommendedBadge.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -12)
             ])
-        } else {
-            constraints.append(
-                difficultyLabel.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -20)
-            )
         }
         
-        if sceneType.isRecommendedForBeginners {
-            constraints.append(
-                difficultyLabel.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -20)
-            )
-        }
+        // 确保难度标签始终固定在底部
+        constraints.append(
+            difficultyLabel.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -20)
+        )
         
         NSLayoutConstraint.activate(constraints)
         

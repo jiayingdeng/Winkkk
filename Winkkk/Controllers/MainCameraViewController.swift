@@ -106,8 +106,7 @@ class MainCameraViewController: UIViewController {
         // 底部控制面板
         setupControlPanel()
         
-        // 设置模式切换器
-        setupModeSwitcher()
+        // 注意：setupModeSwitcher() 已在 setupControlPanel() 中调用，避免重复调用
     }
     
     private func setupRecordingIndicator() {
@@ -129,28 +128,22 @@ class MainCameraViewController: UIViewController {
         controlPanelBlurView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
         view.addSubview(controlPanelBlurView)
         
-        // 相册按钮
-        setupGalleryButton()
-        
-        // 录制按钮
-        setupRecordButton()
-        
-        // 设置按钮
-        setupSettingsButton()
-        
-        // 设置模式切换器
-        setupModeSwitcher()
-        
         // 确保控制面板可以交互
         controlPanelBlurView.isUserInteractionEnabled = true
         controlPanelBlurView.contentView.isUserInteractionEnabled = true
+        
+        // 首先设置按钮样式
+        setupGalleryButton()
+        setupRecordButton()
+        setupSettingsButton()
         
         // 添加按钮到控制面板
         controlPanelBlurView.contentView.addSubview(galleryButton)
         controlPanelBlurView.contentView.addSubview(recordButton)
         controlPanelBlurView.contentView.addSubview(settingsButton)
         
-        // 模式切换器已在 setupModeSwitcher() 中添加
+        // 最后设置模式切换器（此时所有按钮都已添加到视图层次结构中）
+        setupModeSwitcher()
         
         print("🔧 控制面板配置完成，contentView交互: \(controlPanelBlurView.contentView.isUserInteractionEnabled)")
     }
@@ -254,12 +247,12 @@ class MainCameraViewController: UIViewController {
         NSLayoutConstraint.activate([
             // 主按钮约束
             modeSwitcherButton.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
-            modeSwitcherButton.bottomAnchor.constraint(equalTo: recordButton.topAnchor, constant: -20),
-            modeSwitcherButton.heightAnchor.constraint(equalToConstant: 36),
+            modeSwitcherButton.bottomAnchor.constraint(equalTo: recordButton.topAnchor, constant: -40),
+            modeSwitcherButton.heightAnchor.constraint(equalToConstant: 40),
             modeSwitcherButton.widthAnchor.constraint(equalToConstant: 200),
             
             // 主标签约束
-            modeSwitcherMainLabel.topAnchor.constraint(equalTo: modeSwitcherButton.topAnchor, constant: 4),
+            modeSwitcherMainLabel.topAnchor.constraint(equalTo: modeSwitcherButton.topAnchor, constant: 6),
             modeSwitcherMainLabel.leadingAnchor.constraint(equalTo: modeSwitcherButton.leadingAnchor, constant: 8),
             modeSwitcherMainLabel.trailingAnchor.constraint(equalTo: modeSwitcherButton.trailingAnchor, constant: -8),
             modeSwitcherMainLabel.heightAnchor.constraint(equalToConstant: 16),
@@ -317,7 +310,7 @@ class MainCameraViewController: UIViewController {
             controlPanelBlurView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             controlPanelBlurView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             controlPanelBlurView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            controlPanelBlurView.heightAnchor.constraint(equalToConstant: 140 + view.safeAreaInsets.bottom),
+            controlPanelBlurView.heightAnchor.constraint(equalToConstant: 160 + view.safeAreaInsets.bottom),
             
             // 按钮布局
             recordButton.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
