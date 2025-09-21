@@ -42,6 +42,35 @@ class SceneSelectionViewController: UIViewController {
         return label
     }()
     
+    // MARK: - 新增：时间序列模式说明区域
+    private let modeInfoView: UIView = {
+        let view = UIView()
+        view.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
+        view.layer.cornerRadius = 12
+        view.layer.borderWidth = 1
+        view.layer.borderColor = UIColor.systemBlue.withAlphaComponent(0.3).cgColor
+        return view
+    }()
+    
+    private let modeInfoTitleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "💡 时间序列录像模式"
+        label.font = UIFont.boldSystemFont(ofSize: 18)
+        label.textColor = .systemBlue
+        label.textAlignment = .center
+        return label
+    }()
+    
+    private let modeInfoContentLabel: UILabel = {
+        let label = UILabel()
+        label.text = "• 记录变化过程，创建艺术效果图\n• 需要固定拍摄位置\n• 适合：面包发酵、植物生长、化妆过程、手工制作"
+        label.font = UIFont.systemFont(ofSize: 14)
+        label.textColor = .label
+        label.textAlignment = .left
+        label.numberOfLines = 0
+        return label
+    }()
+    
     private let stackView: UIStackView = {
         let stack = UIStackView()
         stack.axis = .vertical
@@ -80,8 +109,13 @@ class SceneSelectionViewController: UIViewController {
         
         contentView.addSubview(titleLabel)
         contentView.addSubview(subtitleLabel)
+        contentView.addSubview(modeInfoView)
         contentView.addSubview(stackView)
         contentView.addSubview(cancelButton)
+        
+        // 添加模式说明内容
+        modeInfoView.addSubview(modeInfoTitleLabel)
+        modeInfoView.addSubview(modeInfoContentLabel)
         
         setupConstraints()
     }
@@ -91,6 +125,9 @@ class SceneSelectionViewController: UIViewController {
         contentView.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        modeInfoView.translatesAutoresizingMaskIntoConstraints = false
+        modeInfoTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        modeInfoContentLabel.translatesAutoresizingMaskIntoConstraints = false
         stackView.translatesAutoresizingMaskIntoConstraints = false
         cancelButton.translatesAutoresizingMaskIntoConstraints = false
         
@@ -118,8 +155,24 @@ class SceneSelectionViewController: UIViewController {
             subtitleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             subtitleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             
+            // ModeInfoView
+            modeInfoView.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 20),
+            modeInfoView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            modeInfoView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            
+            // ModeInfoTitleLabel
+            modeInfoTitleLabel.topAnchor.constraint(equalTo: modeInfoView.topAnchor, constant: 12),
+            modeInfoTitleLabel.leadingAnchor.constraint(equalTo: modeInfoView.leadingAnchor, constant: 16),
+            modeInfoTitleLabel.trailingAnchor.constraint(equalTo: modeInfoView.trailingAnchor, constant: -16),
+            
+            // ModeInfoContentLabel
+            modeInfoContentLabel.topAnchor.constraint(equalTo: modeInfoTitleLabel.bottomAnchor, constant: 8),
+            modeInfoContentLabel.leadingAnchor.constraint(equalTo: modeInfoView.leadingAnchor, constant: 16),
+            modeInfoContentLabel.trailingAnchor.constraint(equalTo: modeInfoView.trailingAnchor, constant: -16),
+            modeInfoContentLabel.bottomAnchor.constraint(equalTo: modeInfoView.bottomAnchor, constant: -12),
+            
             // StackView
-            stackView.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 40),
+            stackView.topAnchor.constraint(equalTo: modeInfoView.bottomAnchor, constant: 30),
             stackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             stackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             

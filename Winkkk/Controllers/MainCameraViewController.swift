@@ -848,32 +848,32 @@ extension MainCameraViewController {
             return
         }
         
-        // 显示录像模式选择界面
-        let alert = UIAlertController(
-            title: "📹 选择录像模式",
-            message: "选择您要使用的录像模式",
-            preferredStyle: .actionSheet
-        )
+        // 🎯 优化后的切换逻辑：直接根据当前状态切换
+        if isTimeSequenceMode {
+            // 当前是时间序列模式，切换到普通模式
+            switchToNormalMode()
+        } else {
+            // 当前是普通模式，进入时间序列场景选择
+            showTimeSequenceSceneSelection()
+        }
+    }
+    
+    // MARK: - 新增：直接显示场景选择
+    private func showTimeSequenceSceneSelection() {
+        // 直接进入场景选择界面（已融合说明信息）
+        let sceneSelectionVC = SceneSelectionViewController()
+        sceneSelectionVC.delegate = self
+        let navController = UINavigationController(rootViewController: sceneSelectionVC)
+        navController.modalPresentationStyle = .pageSheet
         
-        // 普通录像模式
-        alert.addAction(UIAlertAction(title: "📹 普通录像", style: .default) { _ in
-            self.switchToNormalMode()
-        })
-        
-        // 时间序列录像模式
-        alert.addAction(UIAlertAction(title: "⏰ 时间序列录像", style: .default) { _ in
-            self.showTimeSequenceModeOptions()
-        })
-        
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        
-        if alert.preferredStyle == .actionSheet,
-           let popover = alert.popoverPresentationController {
-            popover.sourceView = modeSwitcherButton
-            popover.sourceRect = modeSwitcherButton.bounds
+        if #available(iOS 15.0, *) {
+            if let sheet = navController.sheetPresentationController {
+                sheet.detents = [.large()]
+                sheet.prefersGrabberVisible = true
+            }
         }
         
-        present(alert, animated: true)
+        present(navController, animated: true)
     }
     
     private func switchToNormalMode() {
@@ -944,10 +944,10 @@ extension MainCameraViewController {
         // 切换到时间序列模式
         TimeSequenceModeManager.shared.switchToTimeSequenceMode(with: sceneType)
         
-        // 显示模式切换成功提示
+        // 显示优化后的模式切换成功提示
         let alert = UIAlertController(
-            title: "✅ 模式切换成功",
-            message: "已切换到时间序列录像模式\n场景：\(sceneType.displayName)",
+            title: "✅ 时间序列模式已启用",
+            message: "📹 场景类型：\(sceneType.displayName)\n⚙️ 录制参数：已优化设置\n🎯 提示：保持拍摄位置稳定",
             preferredStyle: .alert
         )
         alert.addAction(UIAlertAction(title: "开始录像", style: .default))
