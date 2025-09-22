@@ -162,6 +162,9 @@ class DETRSegmentationTestViewController: UIViewController {
         label.font = .systemFont(ofSize: 12, weight: .medium)
         label.translatesAutoresizingMaskIntoConstraints = false
         
+        // 确保imageView本身也设置了正确的AutoLayout属性
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        
         imageView.addSubview(label)
         NSLayoutConstraint.activate([
             label.leadingAnchor.constraint(equalTo: imageView.leadingAnchor),
@@ -286,11 +289,13 @@ class DETRSegmentationTestViewController: UIViewController {
         }
         
         print("🚀 开始处理图片分割...")
+        print("📸 图片信息: \(image.size), scale: \(image.scale)")
         updateUIState(isProcessing: true, hasImage: true)
         processingStartTime = Date()
         
         // 确保在后台线程处理
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            print("🔄 分割管理器开始处理...")
             self?.segmentationManager.segmentSubject(from: image) { result in
                 DispatchQueue.main.async {
                     print("✅ 分割处理完成，更新UI")

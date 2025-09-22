@@ -170,6 +170,13 @@ class SettingsViewController: UIViewController {
                         subtitle: "测试DETR模型多类别分割效果（人物、动物、植物、食物）",
                         icon: "brain.head.profile",
                         action: { [weak self] in self?.showDETRSegmentationTest() }
+                    ),
+                    SettingsItem(
+                        type: .action,
+                        title: "多主体合成测试",
+                        subtitle: "上传视频自动提取关键帧，测试多主体共享背景合成效果",
+                        icon: "camera.macro.circle",
+                        action: { [weak self] in self?.showMultiSubjectCompositeTest() }
                     )
                 ]
             ),
@@ -415,6 +422,17 @@ class SettingsViewController: UIViewController {
         let storyboard = UIStoryboard(name: "DETRSegmentationTest", bundle: nil)
         guard let testVC = storyboard.instantiateViewController(withIdentifier: "DETRSegmentationTestViewController") as? DETRSegmentationTestViewController else {
             print("❌ 无法从Storyboard加载DETRSegmentationTestViewController")
+            return
+        }
+        let navController = UINavigationController(rootViewController: testVC)
+        navController.modalPresentationStyle = .fullScreen
+        present(navController, animated: true)
+    }
+    
+    private func showMultiSubjectCompositeTest() {
+        let storyboard = UIStoryboard(name: "MultiSubjectCompositeTest", bundle: nil)
+        guard let testVC = storyboard.instantiateViewController(withIdentifier: "MultiSubjectCompositeTestViewController") as? MultiSubjectCompositeTestViewController else {
+            print("❌ 无法从Storyboard加载MultiSubjectCompositeTestViewController")
             return
         }
         let navController = UINavigationController(rootViewController: testVC)

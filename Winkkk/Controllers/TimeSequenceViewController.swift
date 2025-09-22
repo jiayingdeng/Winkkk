@@ -15,6 +15,24 @@ enum TimeSequenceLayout {
     case horizontal(spacing: CGFloat)
     case vertical(spacing: CGFloat)
     case grid(columns: Int, horizontalSpacing: CGFloat, verticalSpacing: CGFloat)
+    case multiSubjectSharedBackground    // 🌟 新增：多主体共享背景布局
+}
+
+/// 📐 多主体布局数据结构
+struct MultiSubjectLayout {
+    let canvasSize: CGSize          // 画布总尺寸
+    let positions: [CGPoint]        // 每个主体的位置
+    let subjectSize: CGSize         // 统一的主体尺寸
+    let spacing: CGFloat            // 主体间距
+    let layoutType: LayoutType      // 布局类型
+}
+
+enum LayoutType {
+    case horizontal                 // 水平一排
+    case vertical                   // 垂直一列
+    case grid(rows: Int, cols: Int) // 网格布局
+    case circular(center: CGPoint, radius: CGFloat) // 圆形布局
+    case custom([CGPoint])          // 自定义位置
 }
 
 class TimeSequenceViewController: UIViewController {
@@ -968,8 +986,13 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
         // 🎯 根据场景类型选择合成策略
         switch currentSceneType {
         case .objectChange, .personAction:
-            // 📋 策略1：水平时间轴合成 - 适合物体变化和人物动作
-            generateHorizontalTimelineComposite(from: frames, sceneType: currentSceneType)
+            // 📋 策略1：多主体共享背景合成 - 🌟 新功能！
+            if frames.count >= 3 {
+                generateSharedBackgroundMultiSubjectComposite(from: frames, sceneType: currentSceneType)
+            } else {
+                // 帧数太少时降级到水平时间轴
+                generateHorizontalTimelineComposite(from: frames, sceneType: currentSceneType)
+            }
             
         case .sportMotion:
             // 📋 策略2：轨迹叠加合成 - 适合运动轨迹
@@ -1088,6 +1111,232 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
     
     // 🗑️ 旧的布局计算函数已移除 - 透明度叠加不需要布局计算
     // 所有帧都绘制在同一位置 (origin: .zero)，只需要计算透明度
+    
+    // MARK: - 🌟 多主体共享背景合成算法
+    
+    /// 🌟 新功能：智能背景共享多主体合成
+    private func generateSharedBackgroundMultiSubjectComposite(from frames: [UIImage], sceneType: SceneType) {
+        guard let firstFrame = frames.first else { return }
+        
+        print("🎯 开始多主体共享背景合成，帧数: \(frames.count)")
+        
+        // 📐 1. 分析最佳布局
+        let layout = calculateOptimalMultiSubjectLayout(
+            frameCount: frames.count,
+            frameSize: firstFrame.size
+        )
+        
+        print("📏 布局计算完成: 画布尺寸 \(layout.canvasSize.width)×\(layout.canvasSize.height), 主体尺寸: \(layout.subjectSize.width)×\(layout.subjectSize.height)")
+        
+        // 🖼️ 2. 创建共享背景画布
+        UIGraphicsBeginImageContextWithOptions(layout.canvasSize, false, 0.0)
+        
+        // 🌄 3. 绘制一次背景（使用第一帧的背景）
+        let backgroundFrame = selectBestBackgroundFrame(from: frames)
+        backgroundFrame.draw(in: CGRect(origin: .zero, size: layout.canvasSize))
+        
+        print("🌄 背景绘制完成")
+        
+        // 🎯 4. 提取并放置每个主体
+        for (index, frame) in frames.enumerated() {
+            // 🔍 智能提取主体部分
+            if let extractedSubject = extractSubjectFromFrame(frame, index: index, totalFrames: frames.count) {
+                // 📍 计算放置位置
+                let position = layout.positions[index]
+                let targetRect = CGRect(
+                    origin: position,
+                    size: layout.subjectSize
+                )
+                
+                // 🎨 绘制主体到指定位置
+                extractedSubject.draw(in: targetRect)
+                
+                print("✅ 绘制主体 \(index + 1)/\(frames.count) 到位置: (\(Int(position.x)), \(Int(position.y)))")
+            } else {
+                print("⚠️ 主体 \(index + 1) 提取失败，跳过")
+            }
+        }
+        
+        // 🎉 完成合成
+        let compositeImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        
+        resultImageView.image = compositeImage
+        resultContainerView.isHidden = false
+        
+        print("🎉 多主体共享背景合成完成！")
+    }
+    
+    /// 📐 计算多主体最佳布局
+    private func calculateOptimalMultiSubjectLayout(frameCount: Int, frameSize: CGSize) -> MultiSubjectLayout {
+        
+        print("🧮 计算布局策略，帧数: \(frameCount)")
+        
+        // 🧮 智能计算：根据主体数量决定布局
+        switch frameCount {
+        case 1...3:
+            // 水平一排
+            return calculateHorizontalLayout(count: frameCount, frameSize: frameSize)
+        case 4...6:
+            // 2行布局
+            return calculateGridLayout(count: frameCount, rows: 2, frameSize: frameSize)
+        case 7...9:
+            // 3行布局
+            return calculateGridLayout(count: frameCount, rows: 3, frameSize: frameSize)
+        default:
+            // 自动密集布局
+            return calculateCompactLayout(count: frameCount, frameSize: frameSize)
+        }
+    }
+    
+    /// 🔄 水平布局计算
+    private func calculateHorizontalLayout(count: Int, frameSize: CGSize) -> MultiSubjectLayout {
+        
+        // 📏 计算主体尺寸 (稍微小一点，留出间距)
+        let maxSubjectWidth = frameSize.width * 0.5  // 主体占原图50%
+        let subjectSize = CGSize(
+            width: maxSubjectWidth,
+            height: maxSubjectWidth * 1.2  // 稍微高一点
+        )
+        
+        // 📐 计算画布和间距
+        let spacing: CGFloat = 30
+        let totalWidth = CGFloat(count) * subjectSize.width + CGFloat(count - 1) * spacing
+        let canvasSize = CGSize(
+            width: max(totalWidth + 60, frameSize.width),  // 至少比总宽度大60点
+            height: frameSize.height
+        )
+        
+        // 📍 计算每个主体位置
+        var positions: [CGPoint] = []
+        let startX = (canvasSize.width - totalWidth) / 2
+        let startY = (canvasSize.height - subjectSize.height) / 2
+        
+        for i in 0..<count {
+            let x = startX + CGFloat(i) * (subjectSize.width + spacing)
+            positions.append(CGPoint(x: x, y: startY))
+        }
+        
+        return MultiSubjectLayout(
+            canvasSize: canvasSize,
+            positions: positions,
+            subjectSize: subjectSize,
+            spacing: spacing,
+            layoutType: .horizontal
+        )
+    }
+    
+    /// 🔲 网格布局计算
+    private func calculateGridLayout(count: Int, rows: Int, frameSize: CGSize) -> MultiSubjectLayout {
+        
+        let cols = (count + rows - 1) / rows  // 向上取整
+        
+        // 📏 计算主体尺寸
+        let availableWidth = frameSize.width * 0.85
+        let availableHeight = frameSize.height * 0.85
+        let spacing: CGFloat = 20
+        
+        let subjectWidth = (availableWidth - CGFloat(cols - 1) * spacing) / CGFloat(cols)
+        let subjectHeight = (availableHeight - CGFloat(rows - 1) * spacing) / CGFloat(rows)
+        
+        let subjectSize = CGSize(
+            width: min(subjectWidth, subjectHeight),  // 保持正方形
+            height: min(subjectWidth, subjectHeight)
+        )
+        
+        // 📍 计算位置
+        var positions: [CGPoint] = []
+        let startX = (frameSize.width - (CGFloat(cols) * subjectSize.width + CGFloat(cols - 1) * spacing)) / 2
+        let startY = (frameSize.height - (CGFloat(rows) * subjectSize.height + CGFloat(rows - 1) * spacing)) / 2
+        
+        for i in 0..<count {
+            let row = i / cols
+            let col = i % cols
+            
+            let x = startX + CGFloat(col) * (subjectSize.width + spacing)
+            let y = startY + CGFloat(row) * (subjectSize.height + spacing)
+            
+            positions.append(CGPoint(x: x, y: y))
+        }
+        
+        return MultiSubjectLayout(
+            canvasSize: frameSize,
+            positions: positions,
+            subjectSize: subjectSize,
+            spacing: spacing,
+            layoutType: .grid(rows: rows, cols: cols)
+        )
+    }
+    
+    /// 📦 紧凑布局计算 (超过9个主体时使用)
+    private func calculateCompactLayout(count: Int, frameSize: CGSize) -> MultiSubjectLayout {
+        // 自动计算最佳行列数
+        let rows = Int(ceil(sqrt(Double(count))))
+        let cols = (count + rows - 1) / rows
+        
+        return calculateGridLayout(count: count, rows: rows, frameSize: frameSize)
+    }
+    
+    /// 🌄 选择最佳背景帧
+    private func selectBestBackgroundFrame(from frames: [UIImage]) -> UIImage {
+        
+        // 🏆 策略1：选择第一帧（最原始状态的背景）
+        if let firstFrame = frames.first {
+            return firstFrame
+        }
+        
+        // 🏆 策略2：选择中间帧（平衡状态的背景）
+        // let middleIndex = frames.count / 2
+        // return frames[middleIndex]
+        
+        // 这里应该不会到达，但为了安全起见
+        return frames[0]
+    }
+    
+    /// 🔍 智能主体提取
+    private func extractSubjectFromFrame(_ frame: UIImage, index: Int, totalFrames: Int) -> UIImage? {
+        
+        // 🎯 策略1：中心区域提取（最可靠的方法）
+        let percentage: CGFloat = 0.4  // 提取中心40%区域
+        if let centerSubject = extractCenterRegion(from: frame, percentage: percentage) {
+            return centerSubject
+        }
+        
+        // 🎯 策略2：如果中心提取失败，直接返回缩放后的原图
+        return frame
+    }
+    
+    /// 🎯 中心区域提取
+    private func extractCenterRegion(from image: UIImage, percentage: CGFloat) -> UIImage? {
+        
+        guard let cgImage = image.cgImage else { return nil }
+        
+        let imageSize = image.size
+        let cropSize = CGSize(
+            width: imageSize.width * percentage,
+            height: imageSize.height * percentage
+        )
+        
+        let cropRect = CGRect(
+            x: (imageSize.width - cropSize.width) / 2,
+            y: (imageSize.height - cropSize.height) / 2,
+            width: cropSize.width,
+            height: cropSize.height
+        )
+        
+        // 🔍 转换坐标系（Core Graphics坐标系是左下角原点）
+        let scaleFactor = image.scale
+        let pixelCropRect = CGRect(
+            x: cropRect.origin.x * scaleFactor,
+            y: cropRect.origin.y * scaleFactor,
+            width: cropRect.size.width * scaleFactor,
+            height: cropRect.size.height * scaleFactor
+        )
+        
+        guard let croppedCGImage = cgImage.cropping(to: pixelCropRect) else { return nil }
+        
+        return UIImage(cgImage: croppedCGImage, scale: image.scale, orientation: image.imageOrientation)
+    }
     
     // MARK: - 透明度叠加合成算法
     

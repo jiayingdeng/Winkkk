@@ -130,8 +130,8 @@ class SubjectSegmentationManager {
             )
         }
         
-        // 设置图片处理选项
-        request.imageCropAndScaleOption = .scaleFill
+        // 使用 centerCrop 保持长宽比，避免图片变形
+        request.imageCropAndScaleOption = .centerCrop
         
         // 执行请求
         let handler = VNImageRequestHandler(cgImage: inputImage, options: [:])

@@ -108,27 +108,55 @@ class EnhancedSubjectSegmentationManager {
     
     /// 对图片进行主体分割
     func segmentSubject(from image: UIImage, completion: @escaping EnhancedSegmentationCompletion) {
+        print("🎯 EnhancedSubjectSegmentationManager.segmentSubject 开始处理")
+        print("📋 当前分割类别: \(currentCategory.displayName)")
+        
         guard let visionModel = visionModel else {
+            print("❌ 模型未初始化")
             completion(.failure(.modelNotInitialized))
             return
         }
         
-        guard let inputImage = preprocessImage(image) else {
+        // 直接使用原图的CGImage，让Vision框架处理预处理
+        guard let inputImage = image.cgImage else {
+            print("❌ 无法获取CGImage")
             completion(.failure(.imagePreprocessingFailed))
             return
         }
         
+        print("✅ 图片准备成功，开始DETR模型推理（通过Vision框架）")
+        
         let request = VNCoreMLRequest(model: visionModel) { [weak self] request, error in
             if let error = error {
+                print("❌ DETR模型推理错误: \(error.localizedDescription)")
                 completion(.failure(.predictionFailed(error)))
                 return
             }
             
+            print("📊 DETR模型推理完成，处理结果...")
+            print("📊 结果数量: \(request.results?.count ?? 0)")
+            
+            // 详细分析所有输出
+            if let results = request.results {
+                for (index, result) in results.enumerated() {
+                    print("🔍 输出 \(index): \(type(of: result))")
+                    if let featureResult = result as? VNCoreMLFeatureValueObservation {
+                        print("   特征名: \(featureResult.featureName ?? "unknown")")
+                        if let multiArray = featureResult.featureValue.multiArrayValue {
+                            print("   形状: \(multiArray.shape), 数据类型: \(multiArray.dataType.rawValue)")
+                        }
+                    }
+                }
+            }
+            
             guard let results = request.results as? [VNCoreMLFeatureValueObservation],
                   let segmentationMap = results.first?.featureValue.multiArrayValue else {
+                print("❌ 无效的预测结果格式")
                 completion(.failure(.invalidPredictionResult))
                 return
             }
+            
+            print("✅ 获取到分割映射，shape: \(segmentationMap.shape)")
             
             self?.processEnhancedSegmentationResult(
                 originalImage: image,
@@ -137,13 +165,16 @@ class EnhancedSubjectSegmentationManager {
             )
         }
         
-        request.imageCropAndScaleOption = .scaleFill
+        // 使用 centerCrop 保持长宽比，避免图片变形
+        request.imageCropAndScaleOption = .centerCrop
         
         let handler = VNImageRequestHandler(cgImage: inputImage, options: [:])
         DispatchQueue.global(qos: .userInitiated).async {
             do {
+                print("🔄 执行DETR模型推理...")
                 try handler.perform([request])
             } catch {
+                print("❌ DETR模型推理执行失败: \(error.localizedDescription)")
                 completion(.failure(.predictionFailed(error)))
             }
         }
@@ -232,21 +263,33 @@ class EnhancedSubjectSegmentationManager {
         segmentationMap: MLMultiArray,
         completion: @escaping EnhancedSegmentationCompletion
     ) {
+        print("🔧 开始处理增强分割结果")
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
-            guard let self = self else { return }
+            guard let self = self else { 
+                print("❌ self 已释放")
+                return 
+            }
             
             do {
+                print("📊 获取检测到的类别...")
                 // 获取检测到的类别
                 let detectedClasses = self.getDetectedClasses(from: segmentationMap)
+                print("✅ 检测到 \(detectedClasses.count) 个类别")
                 
+                print("🎭 创建遮罩...")
                 // 创建遮罩
                 let mask = try self.createEnhancedMask(from: segmentationMap)
+                print("✅ 遮罩创建成功")
                 
+                print("✂️ 提取主体...")
                 // 提取主体
                 let subjectImage = try self.extractSubject(from: originalImage, with: mask)
+                print("✅ 主体提取成功")
                 
+                print("📊 计算置信度...")
                 // 计算置信度
                 let confidence = self.calculateCategoryConfidence(segmentationMap)
+                print("✅ 置信度: \(confidence)")
                 
                 // 创建增强结果
                 let result = EnhancedSegmentationResult(
@@ -258,11 +301,13 @@ class EnhancedSubjectSegmentationManager {
                     category: self.currentCategory
                 )
                 
+                print("🎉 分割结果创建成功，返回主线程")
                 DispatchQueue.main.async {
                     completion(.success(result))
                 }
                 
             } catch {
+                print("❌ 后处理失败: \(error.localizedDescription)")
                 DispatchQueue.main.async {
                     completion(.failure(.postProcessingFailed(error)))
                 }
