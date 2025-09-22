@@ -218,7 +218,14 @@ class MainCameraViewController: UIViewController {
         // 配置主容器按钮
         modeSwitcherButton.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.8)
         modeSwitcherButton.layer.cornerRadius = 18
+        modeSwitcherButton.isUserInteractionEnabled = true
+        
+        // 添加触摸事件
         modeSwitcherButton.addTarget(self, action: #selector(modeSwitcherButtonTapped), for: .touchUpInside)
+        modeSwitcherButton.addTarget(self, action: #selector(buttonPressed(_:)), for: .touchDown)
+        modeSwitcherButton.addTarget(self, action: #selector(buttonReleased(_:)), for: [.touchUpInside, .touchUpOutside])
+        
+        print("🔧 模式切换按钮已配置，isUserInteractionEnabled: \(modeSwitcherButton.isUserInteractionEnabled)")
         
         // 配置主标签（大字）
         modeSwitcherMainLabel.text = "普通录像"
@@ -234,8 +241,8 @@ class MainCameraViewController: UIViewController {
         modeSwitcherSubLabel.textAlignment = .center
         modeSwitcherSubLabel.isUserInteractionEnabled = false
         
-        // 添加到控制面板
-        controlPanelBlurView.contentView.addSubview(modeSwitcherButton)
+        // 添加到主视图（而不是控制面板）
+        view.addSubview(modeSwitcherButton)
         modeSwitcherButton.addSubview(modeSwitcherMainLabel)
         modeSwitcherButton.addSubview(modeSwitcherSubLabel)
         
@@ -245,9 +252,9 @@ class MainCameraViewController: UIViewController {
         modeSwitcherSubLabel.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            // 主按钮约束
-            modeSwitcherButton.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
-            modeSwitcherButton.bottomAnchor.constraint(equalTo: recordButton.topAnchor, constant: -40),
+            // 主按钮约束 - 位于屏幕顶部安全区域下方
+            modeSwitcherButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            modeSwitcherButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 25),
             modeSwitcherButton.heightAnchor.constraint(equalToConstant: 40),
             modeSwitcherButton.widthAnchor.constraint(equalToConstant: 200),
             
@@ -437,16 +444,33 @@ extension MainCameraViewController {
     }
     
     @objc private func buttonPressed(_ button: UIButton) {
-        print("🔽 按钮按下: \(button == recordButton ? "录制按钮" : "其他按钮")")
+        let buttonName = getButtonName(button)
+        print("🔽 按钮按下: \(buttonName)")
         UIView.animate(withDuration: 0.1) {
             button.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
         }
     }
     
     @objc private func buttonReleased(_ button: UIButton) {
-        print("🔼 按钮释放: \(button == recordButton ? "录制按钮" : "其他按钮")")
+        let buttonName = getButtonName(button)
+        print("🔼 按钮释放: \(buttonName)")
         UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5) {
             button.transform = .identity
+        }
+    }
+    
+    private func getButtonName(_ button: UIButton) -> String {
+        switch button {
+        case recordButton:
+            return "录制按钮"
+        case galleryButton:
+            return "图库按钮"
+        case settingsButton:
+            return "设置按钮"
+        case modeSwitcherButton:
+            return "模式切换按钮"
+        default:
+            return "其他按钮"
         }
     }
 }
@@ -785,6 +809,21 @@ extension MainCameraViewController {
         } else {
             print("❌ 录制按钮frame为零！")
         }
+        
+        // 验证模式切换按钮的状态
+        print("🔍 视图布局完成 - 模式切换按钮状态:")
+        print("   Frame: \(modeSwitcherButton.frame)")
+        print("   isUserInteractionEnabled: \(modeSwitcherButton.isUserInteractionEnabled)")
+        print("   isHidden: \(modeSwitcherButton.isHidden)")
+        print("   alpha: \(modeSwitcherButton.alpha)")
+        print("   superview: \(modeSwitcherButton.superview != nil ? "存在" : "nil")")
+        print("   控制面板frame: \(controlPanelBlurView.frame)")
+        
+        if modeSwitcherButton.frame != .zero {
+            print("✅ 模式切换按钮布局正常")
+        } else {
+            print("❌ 模式切换按钮frame为零！")
+        }
     }
 }
 
@@ -826,11 +865,15 @@ extension MainCameraViewController: SceneSelectionViewControllerDelegate {
 extension MainCameraViewController {
     
     @objc private func modeSwitcherButtonTapped() {
+        print("🎯 模式切换按钮被点击！当前模式：\(isTimeSequenceMode ? "时间序列" : "普通录像")")
+        print("🔍 录制状态：\(isRecording ? "录制中" : "未录制")")
+        
         // 触觉反馈
         hapticManager.buttonTap()
         
         // 检查是否正在录制
         guard !isRecording else {
+            print("⚠️ 当前正在录制，无法切换模式")
             let alert = UIAlertController(
                 title: "无法切换模式",
                 message: "请先停止当前录制",
@@ -843,9 +886,11 @@ extension MainCameraViewController {
         
         // 🎯 优化后的切换逻辑：直接根据当前状态切换
         if isTimeSequenceMode {
+            print("📹 切换到普通录像模式")
             // 当前是时间序列模式，切换到普通模式
             switchToNormalMode()
         } else {
+            print("⏰ 切换到时间序列模式")
             // 当前是普通模式，进入时间序列场景选择
             showTimeSequenceSceneSelection()
         }
