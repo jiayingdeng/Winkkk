@@ -942,7 +942,8 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
             print("❌ 场景类型未设置，使用默认透明度")
             // 如果没有场景类型，使用默认的线性透明度
             for (index, frame) in frames.enumerated() {
-                let alpha = (CGFloat(index + 1) / CGFloat(frames.count)) * 0.8 + 0.2
+                // 🔥 修复：同样调整默认透明度范围
+                let alpha = (CGFloat(index + 1) / CGFloat(frames.count)) * 0.6 + 0.1
                 frame.draw(
                     in: CGRect(origin: .zero, size: canvasSize),
                     blendMode: .normal,
@@ -970,7 +971,7 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
             // ✨ 核心：所有帧都绘制在同一位置，使用递增透明度
             frame.draw(
                 in: CGRect(origin: .zero, size: canvasSize),  // ← 同一位置！
-                blendMode: .normal,                          // ← 正常混合
+                blendMode: .normal,                          // ← 保持normal混合
                 alpha: alpha                                 // ← 场景优化的递增透明度！
             )
             
@@ -1016,8 +1017,9 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
     
     /// 计算场景特定的透明度
     private func calculateAlphaForScene(index: Int, totalFrames: Int, sceneType: SceneType) -> CGFloat {
-        // 🎯 核心算法：递增透明度计算
-        let baseAlpha = (CGFloat(index + 1) / CGFloat(totalFrames)) * 0.8 + 0.2
+        // 🔥 修复：调整透明度范围，确保所有帧都能看见
+        // 从10%到70%的范围，避免最后一帧100%完全覆盖前面的帧
+        let baseAlpha = (CGFloat(index + 1) / CGFloat(totalFrames)) * 0.6 + 0.1
         
         // 根据场景类型应用优化策略
         switch sceneType {
