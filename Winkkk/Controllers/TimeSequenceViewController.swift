@@ -744,8 +744,8 @@ class TimeSequenceViewController: UIViewController {
             imageView.translatesAutoresizingMaskIntoConstraints = false
             
             // 动态计算宽度，避免约束冲突
-            let frameCount = CGFloat(frames.count)
-            let totalSpacing = CGFloat(8 * (frames.count - 1)) // 间距总和
+            let frameCount = CGFloat(extractedFrames.count)
+            let totalSpacing = CGFloat(8 * (extractedFrames.count - 1)) // 间距总和
             let availableWidth = view.frame.width - 64 // 减去左右边距
             let dynamicWidth = max(50, min(80, (availableWidth - totalSpacing) / frameCount)) // 动态宽度，范围50-80
             
