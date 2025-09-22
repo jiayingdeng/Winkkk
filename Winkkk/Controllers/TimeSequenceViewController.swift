@@ -928,35 +928,53 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
     }
     
     private func generateCompositeImage(from frames: [UIImage]) {
-        // 🎯 时间序列合成逻辑 - 将多个帧排列成连环画效果
+        // 🌟 透明度叠加合成逻辑 - 创造幽灵轨迹的魔法效果
         guard !frames.isEmpty else { return }
         
-        let frameSize = frames[0].size
-        let frameCount = frames.count
+        // ✨ Step 1: 使用第一帧的尺寸作为最终画布尺寸
+        let canvasSize = frames.first!.size
         
-        // 🔧 根据帧数智能选择布局方向
-        let (canvasWidth, canvasHeight, layout) = calculateOptimalLayout(
-            frameSize: frameSize, 
-            frameCount: frameCount
-        )
+        // 🎨 Step 2: 创建透明背景画布
+        UIGraphicsBeginImageContextWithOptions(canvasSize, false, 0.0)
         
-        // 🎨 创建画布
-        UIGraphicsBeginImageContextWithOptions(
-            CGSize(width: canvasWidth, height: canvasHeight), 
-            false, 
-            0.0
-        )
+        // 🔍 获取当前场景类型
+        guard let currentSceneType = sceneType else {
+            print("❌ 场景类型未设置，使用默认透明度")
+            // 如果没有场景类型，使用默认的线性透明度
+            for (index, frame) in frames.enumerated() {
+                let alpha = (CGFloat(index + 1) / CGFloat(frames.count)) * 0.8 + 0.2
+                frame.draw(
+                    in: CGRect(origin: .zero, size: canvasSize),
+                    blendMode: .normal,
+                    alpha: alpha
+                )
+            }
+            
+            let compositeImage = UIGraphicsGetImageFromCurrentImageContext()
+            UIGraphicsEndImageContext()
+            
+            resultImageView.image = compositeImage
+            resultContainerView.isHidden = false
+            return
+        }
         
-        // 🖼️ 绘制每个帧到独立位置
+        // 🎯 Step 3: 关键绘制逻辑 - 所有帧都绘制在同一位置
         for (index, frame) in frames.enumerated() {
-            let frameRect = calculateFramePosition(
-                index: index, 
-                frameSize: frameSize, 
-                layout: layout
+            // 计算场景特定的透明度
+            let alpha = calculateAlphaForScene(
+                index: index,
+                totalFrames: frames.count,
+                sceneType: currentSceneType
             )
             
-            // ✨ 关键：每个帧都完全不透明，放在不同位置
-            frame.draw(in: frameRect, blendMode: .normal, alpha: 1.0)
+            // ✨ 核心：所有帧都绘制在同一位置，使用递增透明度
+            frame.draw(
+                in: CGRect(origin: .zero, size: canvasSize),  // ← 同一位置！
+                blendMode: .normal,                          // ← 正常混合
+                alpha: alpha                                 // ← 场景优化的递增透明度！
+            )
+            
+            print("🎨 绘制帧 \(index + 1)/\(frames.count)，透明度: \(String(format: "%.1f", alpha * 100))%")
         }
         
         let compositeImage = UIGraphicsGetImageFromCurrentImageContext()
@@ -965,57 +983,50 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
         // 显示结果
         resultImageView.image = compositeImage
         resultContainerView.isHidden = false
-    }
-    
-    /// 计算最优布局策略
-    private func calculateOptimalLayout(frameSize: CGSize, frameCount: Int) -> (width: CGFloat, height: CGFloat, layout: TimeSequenceLayout) {
-        let aspectRatio = frameSize.width / frameSize.height
         
-        // 🧮 根据屏幕尺寸和帧数智能选择布局
-        if frameCount <= 3 {
-            // 少帧数：水平排列
-            return (
-                width: frameSize.width * CGFloat(frameCount) + CGFloat(frameCount - 1) * 20,
-                height: frameSize.height,
-                layout: .horizontal(spacing: 20)
-            )
-        } else if aspectRatio > 1.5 {
-            // 横图：垂直堆叠
-            return (
-                width: frameSize.width,
-                height: frameSize.height * CGFloat(frameCount) + CGFloat(frameCount - 1) * 15,
-                layout: .vertical(spacing: 15)
-            )
-        } else {
-            // 竖图：水平排列
-            let columns = min(frameCount, 4) // 最多4列
-            let rows = Int(ceil(Double(frameCount) / Double(columns)))
-            
-            return (
-                width: frameSize.width * CGFloat(columns) + CGFloat(columns - 1) * 20,
-                height: frameSize.height * CGFloat(rows) + CGFloat(rows - 1) * 15,
-                layout: .grid(columns: columns, horizontalSpacing: 20, verticalSpacing: 15)
-            )
-        }
+        print("✅ 透明度叠加合成完成！场景类型: \(currentSceneType.displayName)")
     }
     
-    /// 计算每帧的绘制位置
-    private func calculateFramePosition(index: Int, frameSize: CGSize, layout: TimeSequenceLayout) -> CGRect {
-        switch layout {
-        case .horizontal(let spacing):
-            let x = (frameSize.width + spacing) * CGFloat(index)
-            return CGRect(x: x, y: 0, width: frameSize.width, height: frameSize.height)
-            
-        case .vertical(let spacing):
-            let y = (frameSize.height + spacing) * CGFloat(index)
-            return CGRect(x: 0, y: y, width: frameSize.width, height: frameSize.height)
-            
-        case .grid(let columns, let hSpacing, let vSpacing):
-            let row = index / columns
-            let col = index % columns
-            let x = (frameSize.width + hSpacing) * CGFloat(col)
-            let y = (frameSize.height + vSpacing) * CGFloat(row)
-            return CGRect(x: x, y: y, width: frameSize.width, height: frameSize.height)
+    // 🗑️ 旧的布局计算函数已移除 - 透明度叠加不需要布局计算
+    // 所有帧都绘制在同一位置 (origin: .zero)，只需要计算透明度
+    
+    // MARK: - 透明度叠加合成算法
+    
+    /// 🍞 物体变化场景透明度优化
+    private func optimizeForObjectChange(alpha: CGFloat) -> CGFloat {
+        // 物体变化：线性递增，突出渐变过程
+        // 结合参数：每0.3秒一帧，最多12帧，对比度+20%，饱和度+10%
+        return alpha
+    }
+    
+    /// 🧘‍♀️ 人物动作场景透明度优化
+    private func optimizeForHumanAction(alpha: CGFloat) -> CGFloat {
+        // 人物动作：保持肌肤自然，避免过度透明
+        // 结合参数：每0.2秒一帧，最多15帧，加权分布(开始20%，中间60%，结束20%)
+        // 色彩处理：对比度+5%，亮度+5%，保持自然肤色
+        return max(alpha, 0.3) // 最低30%透明度，确保人物可见性
+    }
+    
+    /// 🏀 运动轨迹场景透明度优化
+    private func optimizeForSportsMotion(alpha: CGFloat) -> CGFloat {
+        // 运动轨迹：增强对比，突出动作连贯性
+        // 结合参数：每0.1秒一帧，最多20帧，密集时间分布提取，锐度增强
+        return pow(alpha, 0.8) // 稍微增强中间帧的可见度，突出运动细节
+    }
+    
+    /// 计算场景特定的透明度
+    private func calculateAlphaForScene(index: Int, totalFrames: Int, sceneType: SceneType) -> CGFloat {
+        // 🎯 核心算法：递增透明度计算
+        let baseAlpha = (CGFloat(index + 1) / CGFloat(totalFrames)) * 0.8 + 0.2
+        
+        // 根据场景类型应用优化策略
+        switch sceneType {
+        case .objectChange:
+            return optimizeForObjectChange(baseAlpha)
+        case .personAction:
+            return optimizeForHumanAction(baseAlpha)
+        case .sportMotion:
+            return optimizeForSportsMotion(baseAlpha)
         }
     }
     
