@@ -117,7 +117,18 @@ class VideoGalleryViewController: UIViewController {
         
         // 设置导航栏按钮
         navigationItem.leftBarButtonItem = UIBarButtonItem(customView: closeButton)
-        navigationItem.rightBarButtonItem = UIBarButtonItem(customView: importButton)
+        
+        // 添加多主体测试按钮
+        let testButton = UIButton(type: .system)
+        testButton.setImage(UIImage(systemName: "testtube.2"), for: .normal)
+        testButton.tintColor = ThemeManager.primaryText
+        testButton.addTarget(self, action: #selector(testButtonTapped), for: .touchUpInside)
+        
+        let rightButtons = UIStackView(arrangedSubviews: [testButton, importButton])
+        rightButtons.axis = .horizontal
+        rightButtons.spacing = 16
+        
+        navigationItem.rightBarButtonItem = UIBarButtonItem(customView: rightButtons)
         
         // 设置标题样式
         navigationController?.navigationBar.titleTextAttributes = [
@@ -269,6 +280,24 @@ class VideoGalleryViewController: UIViewController {
     
     @objc private func importButtonTapped() {
         presentVideoImportOptions()
+    }
+    
+    @objc private func testButtonTapped() {
+        print("🧪 VideoGallery: Test button tapped")
+        presentMultiSubjectCompositeTest()
+    }
+    
+    /// 打开多主体合成测试页面
+    private func presentMultiSubjectCompositeTest() {
+        let storyboard = UIStoryboard(name: "MultiSubjectCompositeTest", bundle: nil)
+        guard let testViewController = storyboard.instantiateViewController(withIdentifier: "MultiSubjectCompositeTestViewController") as? MultiSubjectCompositeTestViewController else {
+            print("❌ 无法加载多主体合成测试页面")
+            return
+        }
+        
+        let navigationController = UINavigationController(rootViewController: testViewController)
+        navigationController.modalPresentationStyle = .fullScreen
+        present(navigationController, animated: true)
     }
     
     private func presentVideoImportOptions() {

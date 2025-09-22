@@ -44,6 +44,9 @@ class MultiSubjectCompositeTestViewController: UIViewController {
     private var extractedFrames: [UIImage] = []
     private var compositeResult: UIImage?
     private let timeSequenceManager = TimeSequenceModeManager.shared
+    private let subjectExtractionEngine = SubjectExtractionEngine()
+    private var detectionParameters = DetectionParameters()
+    private var currentExtractionResults: [ExtractionResult] = []
     
     // MARK: - Lifecycle
     
@@ -87,11 +90,14 @@ class MultiSubjectCompositeTestViewController: UIViewController {
         selectVideoButton.layer.cornerRadius = 8
         selectVideoButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
         
-        // 场景类型选择
+        // 场景类型选择 - 使用新的智能检测类型
         sceneTypeSegmentedControl.removeAllSegments()
-        sceneTypeSegmentedControl.insertSegment(withTitle: "物体变化", at: 0, animated: false)
-        sceneTypeSegmentedControl.insertSegment(withTitle: "人物动作", at: 1, animated: false)
-        sceneTypeSegmentedControl.selectedSegmentIndex = 0
+        for (index, subjectType) in SubjectType.allCases.enumerated() {
+            let title = "\(subjectType.icon) \(subjectType.rawValue)"
+            sceneTypeSegmentedControl.insertSegment(withTitle: title, at: index, animated: false)
+        }
+        sceneTypeSegmentedControl.selectedSegmentIndex = 0 // 默认选择食物类
+        sceneTypeSegmentedControl.addTarget(self, action: #selector(sceneTypeChanged), for: .valueChanged)
         
         // 帧数滑块
         frameCountSlider.minimumValue = 3
@@ -101,7 +107,7 @@ class MultiSubjectCompositeTestViewController: UIViewController {
         updateFrameCountLabel()
         
         // 处理按钮
-        processButton.setTitle("🚀 开始处理", for: .normal)
+        processButton.setTitle("🚀 开始智能处理", for: .normal)
         processButton.backgroundColor = .systemGreen
         processButton.setTitleColor(.white, for: .normal)
         processButton.layer.cornerRadius = 8
@@ -110,6 +116,138 @@ class MultiSubjectCompositeTestViewController: UIViewController {
         // 进度条
         progressView.isHidden = true
         progressView.progressTintColor = .systemBlue
+        
+        // 添加调试参数界面
+        setupDebugParametersUI()
+    }
+    
+    private func setupDebugParametersUI() {
+        // 创建调试参数容器
+        let debugContainer = UIView()
+        debugContainer.backgroundColor = .systemGray6
+        debugContainer.layer.cornerRadius = 8
+        debugContainer.translatesAutoresizingMaskIntoConstraints = false
+        
+        // 标题
+        let titleLabel = UILabel()
+        titleLabel.text = "🔧 智能检测参数调试"
+        titleLabel.font = .systemFont(ofSize: 16, weight: .semibold)
+        titleLabel.textColor = .systemBlue
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        // 创建参数滑块
+        let parametersStack = createParametersStackView()
+        
+        // 添加保存配置按钮
+        let saveConfigButton = UIButton(type: .system)
+        saveConfigButton.setTitle("💾 保存最佳配置", for: .normal)
+        saveConfigButton.backgroundColor = .systemPurple
+        saveConfigButton.setTitleColor(.white, for: .normal)
+        saveConfigButton.layer.cornerRadius = 6
+        saveConfigButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .medium)
+        saveConfigButton.addTarget(self, action: #selector(saveBestConfigTapped), for: .touchUpInside)
+        saveConfigButton.translatesAutoresizingMaskIntoConstraints = false
+        
+        debugContainer.addSubview(titleLabel)
+        debugContainer.addSubview(parametersStack)
+        debugContainer.addSubview(saveConfigButton)
+        controlStackView.addArrangedSubview(debugContainer)
+        
+        NSLayoutConstraint.activate([
+            titleLabel.topAnchor.constraint(equalTo: debugContainer.topAnchor, constant: 12),
+            titleLabel.leadingAnchor.constraint(equalTo: debugContainer.leadingAnchor, constant: 16),
+            titleLabel.trailingAnchor.constraint(equalTo: debugContainer.trailingAnchor, constant: -16),
+            
+            parametersStack.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 12),
+            parametersStack.leadingAnchor.constraint(equalTo: debugContainer.leadingAnchor, constant: 16),
+            parametersStack.trailingAnchor.constraint(equalTo: debugContainer.trailingAnchor, constant: -16),
+            
+            saveConfigButton.topAnchor.constraint(equalTo: parametersStack.bottomAnchor, constant: 12),
+            saveConfigButton.centerXAnchor.constraint(equalTo: debugContainer.centerXAnchor),
+            saveConfigButton.widthAnchor.constraint(equalToConstant: 120),
+            saveConfigButton.heightAnchor.constraint(equalToConstant: 32),
+            saveConfigButton.bottomAnchor.constraint(equalTo: debugContainer.bottomAnchor, constant: -12)
+        ])
+    }
+    
+    private func createParametersStackView() -> UIStackView {
+        let stackView = UIStackView()
+        stackView.axis = .vertical
+        stackView.spacing = 8
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        
+        // 显著性检测阈值
+        let saliencySlider = createParameterSlider(
+            title: "显著性阈值",
+            value: detectionParameters.saliencyThreshold,
+            range: 0.1...1.0,
+            tag: 1
+        )
+        
+        // 边缘检测阈值
+        let edgeSlider = createParameterSlider(
+            title: "边缘检测",
+            value: detectionParameters.edgeThreshold,
+            range: 0.05...0.5,
+            tag: 2
+        )
+        
+        // 轮廓平滑度
+        let contourSlider = createParameterSlider(
+            title: "轮廓平滑",
+            value: detectionParameters.contourSmoothness,
+            range: 0.1...2.0,
+            tag: 3
+        )
+        
+        // 背景移除强度
+        let backgroundSlider = createParameterSlider(
+            title: "背景移除",
+            value: detectionParameters.backgroundRemovalStrength,
+            range: 0.1...1.0,
+            tag: 4
+        )
+        
+        stackView.addArrangedSubview(saliencySlider)
+        stackView.addArrangedSubview(edgeSlider)
+        stackView.addArrangedSubview(contourSlider)
+        stackView.addArrangedSubview(backgroundSlider)
+        
+        return stackView
+    }
+    
+    private func createParameterSlider(title: String, value: Float, range: ClosedRange<Float>, tag: Int) -> UIView {
+        let container = UIView()
+        
+        let label = UILabel()
+        label.text = "\(title): \(String(format: "%.2f", value))"
+        label.font = .systemFont(ofSize: 14)
+        label.textColor = .secondaryLabel
+        label.translatesAutoresizingMaskIntoConstraints = false
+        
+        let slider = UISlider()
+        slider.minimumValue = range.lowerBound
+        slider.maximumValue = range.upperBound
+        slider.value = value
+        slider.tag = tag
+        slider.addTarget(self, action: #selector(parameterSliderChanged(_:)), for: .valueChanged)
+        slider.translatesAutoresizingMaskIntoConstraints = false
+        
+        container.addSubview(label)
+        container.addSubview(slider)
+        
+        NSLayoutConstraint.activate([
+            label.topAnchor.constraint(equalTo: container.topAnchor),
+            label.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            label.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            
+            slider.topAnchor.constraint(equalTo: label.bottomAnchor, constant: 4),
+            slider.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            slider.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            slider.bottomAnchor.constraint(equalTo: container.bottomAnchor)
+        ])
+        
+        return container
     }
     
     private func setupKeyFramesArea() {
@@ -162,6 +300,93 @@ class MultiSubjectCompositeTestViewController: UIViewController {
         dismiss(animated: true)
     }
     
+    @objc private func sceneTypeChanged() {
+        // 更新检测参数中的场景类型
+        let selectedType = SubjectType.allCases[sceneTypeSegmentedControl.selectedSegmentIndex]
+        detectionParameters.subjectType = selectedType
+        subjectExtractionEngine.updateParameters(detectionParameters)
+        
+        // 如果已有提取结果，重新处理
+        if !extractedFrames.isEmpty {
+            reprocessCurrentFrames()
+        }
+    }
+    
+    @objc private func parameterSliderChanged(_ sender: UISlider) {
+        // 更新对应的参数
+        switch sender.tag {
+        case 1: // 显著性阈值
+            detectionParameters.saliencyThreshold = sender.value
+        case 2: // 边缘检测
+            detectionParameters.edgeThreshold = sender.value
+        case 3: // 轮廓平滑
+            detectionParameters.contourSmoothness = sender.value
+        case 4: // 背景移除
+            detectionParameters.backgroundRemovalStrength = sender.value
+        default:
+            break
+        }
+        
+        // 更新标签显示
+        if let container = sender.superview,
+           let label = container.subviews.first(where: { $0 is UILabel }) as? UILabel {
+            let title = label.text?.components(separatedBy: ":").first ?? ""
+            label.text = "\(title): \(String(format: "%.2f", sender.value))"
+        }
+        
+        // 更新引擎参数
+        subjectExtractionEngine.updateParameters(detectionParameters)
+        
+        // 如果已有提取结果，实时更新预览
+        if !currentExtractionResults.isEmpty {
+            updateStagePreview()
+        }
+    }
+    
+    private func reprocessCurrentFrames() {
+        guard !extractedFrames.isEmpty else { return }
+        
+        Task {
+            await processFramesWithIntelligentExtraction(frames: extractedFrames)
+        }
+    }
+    
+    private func updateStagePreview() {
+        // 实时更新三阶段预览（仅更新第一帧作为示例）
+        guard let firstFrame = extractedFrames.first else { return }
+        
+        Task {
+            let result = await subjectExtractionEngine.extractSubject(from: firstFrame)
+            
+            DispatchQueue.main.async { [weak self] in
+                self?.updateStagePreviewUI(result: result)
+            }
+        }
+    }
+    
+    private func updateStagePreviewUI(result: ExtractionResult) {
+        // 这里可以更新三阶段预览UI
+        // 当前先简单显示在控制台
+        print("🔍 检测结果:")
+        print("- 场景类型: \(result.detectedSubjectType.rawValue)")
+        print("- 置信度: \(String(format: "%.2f", result.confidence))")
+        print("- 处理时间: \(String(format: "%.3f", result.processingTime))秒")
+    }
+    
+    @objc private func saveBestConfigTapped() {
+        let selectedType = SubjectType.allCases[sceneTypeSegmentedControl.selectedSegmentIndex]
+        subjectExtractionEngine.saveBestConfiguration(for: selectedType)
+        
+        // 显示保存成功提示
+        let alert = UIAlertController(
+            title: "✅ 配置已保存",
+            message: "已保存 \(selectedType.icon) \(selectedType.rawValue) 的最佳参数配置",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
+    }
+    
     // MARK: - Video Selection
     
     private func presentVideoSelector() {
@@ -193,11 +418,13 @@ class MultiSubjectCompositeTestViewController: UIViewController {
                 if let frames = frames, !frames.isEmpty {
                     self.extractedFrames = frames
                     self.displayKeyFrames(frames)
-                    self.progressView.setProgress(0.6, animated: true)
-                    self.statusLabel.text = "关键帧提取完成，正在合成..."
+                    self.progressView.setProgress(0.4, animated: true)
+                    self.statusLabel.text = "关键帧提取完成，开始智能主体检测..."
                     
-                    // 开始合成
-                    self.performComposite(frames: frames, sceneType: sceneType)
+                    // 使用新的智能提取引擎处理
+                    Task {
+                        await self.processFramesWithIntelligentExtraction(frames: frames)
+                    }
                 } else {
                     self.updateUIState(.failed)
                     self.statusLabel.text = "关键帧提取失败"
@@ -290,9 +517,205 @@ class MultiSubjectCompositeTestViewController: UIViewController {
         }
     }
     
+    // MARK: - Intelligent Subject Extraction
+    
+    /// 使用智能提取引擎处理帧
+    private func processFramesWithIntelligentExtraction(frames: [UIImage]) async {
+        currentExtractionResults.removeAll()
+        
+        DispatchQueue.main.async {
+            self.statusLabel.text = "🤖 正在进行智能主体检测..."
+            self.progressView.setProgress(0.5, animated: true)
+        }
+        
+        // 对每一帧进行智能提取
+        for (index, frame) in frames.enumerated() {
+            let result = await subjectExtractionEngine.extractSubject(from: frame)
+            currentExtractionResults.append(result)
+            
+            let progress = 0.5 + (0.3 * Float(index + 1) / Float(frames.count))
+            DispatchQueue.main.async {
+                self.progressView.setProgress(progress, animated: true)
+                self.statusLabel.text = "🤖 智能检测中... (\(index + 1)/\(frames.count))"
+            }
+        }
+        
+        DispatchQueue.main.async {
+            self.statusLabel.text = "🎨 正在创建智能合成..."
+            self.progressView.setProgress(0.8, animated: true)
+        }
+        
+        // 使用智能提取结果进行合成
+        let result = await createIntelligentComposite(extractionResults: currentExtractionResults)
+        
+        DispatchQueue.main.async {
+            if let result = result {
+                self.compositeResult = result
+                self.resultImageView.image = result
+                self.progressView.setProgress(1.0, animated: true)
+                self.statusLabel.text = "✅ 智能合成完成！"
+                
+                // 显示智能检测结果信息
+                self.displayIntelligentDetectionInfo()
+                self.updateUIState(.completed)
+            } else {
+                self.statusLabel.text = "❌ 智能合成失败"
+                self.updateUIState(.failed)
+            }
+        }
+    }
+    
+    /// 使用智能提取结果创建合成图像
+    private func createIntelligentComposite(extractionResults: [ExtractionResult]) async -> UIImage? {
+        guard let firstResult = extractionResults.first else { return nil }
+        
+        print("🎯 开始智能多主体合成，帧数: \(extractionResults.count)")
+        
+        // 计算布局（优先水平排列）
+        let layout = calculateIntelligentLayout(
+            frameCount: extractionResults.count,
+            baseSize: firstResult.originalImage.size,
+            detectedType: firstResult.detectedSubjectType
+        )
+        
+        // 创建画布
+        UIGraphicsBeginImageContextWithOptions(layout.canvasSize, false, 0.0)
+        
+        // 使用第一帧作为背景
+        firstResult.originalImage.draw(in: CGRect(origin: .zero, size: layout.canvasSize))
+        
+        // 放置每个智能提取的主体
+        for (index, result) in extractionResults.enumerated() {
+            let position = layout.positions[index]
+            let targetRect = CGRect(origin: position, size: layout.subjectSize)
+            
+            // 使用智能提取的结果
+            result.finalResult.draw(in: targetRect)
+        }
+        
+        let compositeImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        
+        print("✅ 智能多主体合成完成")
+        return compositeImage
+    }
+    
+    /// 计算智能布局（基于检测类型优化）
+    private func calculateIntelligentLayout(
+        frameCount: Int,
+        baseSize: CGSize,
+        detectedType: SubjectType
+    ) -> (canvasSize: CGSize, positions: [CGPoint], subjectSize: CGSize) {
+        
+        // 根据检测到的主体类型调整尺寸策略
+        let sizeMultiplier: CGFloat = {
+            switch detectedType {
+            case .food: return 0.3     // 食物类保持较大尺寸
+            case .person: return 0.35  // 人物需要更大空间
+            case .plant: return 0.28   // 植物可以稍小
+            case .object: return 0.32  // 物品中等尺寸
+            case .auto: return 0.3     // 默认尺寸
+            }
+        }()
+        
+        let subjectWidth = baseSize.width * sizeMultiplier
+        let subjectHeight = baseSize.height * sizeMultiplier
+        let spacing: CGFloat = 15 // 减小间距，让更多主体能水平排列
+        
+        // 优先水平排列策略
+        if frameCount <= 6 {  // 增加水平排列的上限
+            // 水平排列
+            let canvasWidth = baseSize.width
+            let canvasHeight = baseSize.height
+            var positions: [CGPoint] = []
+            
+            let totalSubjectWidth = CGFloat(frameCount) * subjectWidth + CGFloat(frameCount - 1) * spacing
+            
+            if totalSubjectWidth <= canvasWidth {
+                // 能够完全水平排列
+                let startX = (canvasWidth - totalSubjectWidth) / 2
+                let centerY = (canvasHeight - subjectHeight) / 2
+                
+                for i in 0..<frameCount {
+                    let x = startX + CGFloat(i) * (subjectWidth + spacing)
+                    positions.append(CGPoint(x: x, y: centerY))
+                }
+            } else {
+                // 调整尺寸以适应水平排列
+                let adjustedWidth = (canvasWidth - CGFloat(frameCount - 1) * spacing) / CGFloat(frameCount)
+                let adjustedHeight = adjustedWidth * (subjectHeight / subjectWidth)
+                let centerY = (canvasHeight - adjustedHeight) / 2
+                
+                for i in 0..<frameCount {
+                    let x = CGFloat(i) * (adjustedWidth + spacing)
+                    positions.append(CGPoint(x: x, y: centerY))
+                }
+                
+                return (
+                    canvasSize: baseSize,
+                    positions: positions,
+                    subjectSize: CGSize(width: adjustedWidth, height: adjustedHeight)
+                )
+            }
+            
+            return (
+                canvasSize: baseSize,
+                positions: positions,
+                subjectSize: CGSize(width: subjectWidth, height: subjectHeight)
+            )
+        } else {
+            // 网格排列（只有在主体太多时才使用）
+            let cols = 3
+            let rows = (frameCount + cols - 1) / cols
+            
+            let canvasWidth = baseSize.width
+            let canvasHeight = baseSize.height
+            
+            let gridWidth = CGFloat(cols) * subjectWidth + CGFloat(cols - 1) * spacing
+            let gridHeight = CGFloat(rows) * subjectHeight + CGFloat(rows - 1) * spacing
+            
+            let startX = (canvasWidth - gridWidth) / 2
+            let startY = (canvasHeight - gridHeight) / 2
+            
+            var positions: [CGPoint] = []
+            
+            for i in 0..<frameCount {
+                let row = i / cols
+                let col = i % cols
+                let x = startX + CGFloat(col) * (subjectWidth + spacing)
+                let y = startY + CGFloat(row) * (subjectHeight + spacing)
+                positions.append(CGPoint(x: x, y: y))
+            }
+            
+            return (
+                canvasSize: baseSize,
+                positions: positions,
+                subjectSize: CGSize(width: subjectWidth, height: subjectHeight)
+            )
+        }
+    }
+    
+    /// 显示智能检测信息
+    private func displayIntelligentDetectionInfo() {
+        guard let firstResult = currentExtractionResults.first else { return }
+        
+        let avgConfidence = currentExtractionResults.map { $0.confidence }.reduce(0, +) / Float(currentExtractionResults.count)
+        let avgProcessingTime = currentExtractionResults.map { $0.processingTime }.reduce(0, +) / Double(currentExtractionResults.count)
+        
+        let info = """
+        🤖 智能检测结果:
+        场景类型: \(firstResult.detectedSubjectType.icon) \(firstResult.detectedSubjectType.rawValue)
+        提取帧数: \(currentExtractionResults.count)
+        平均置信度: \(String(format: "%.1f%%", avgConfidence * 100))
+        平均处理时间: \(String(format: "%.2f", avgProcessingTime))秒
+        合成尺寸: \(Int(compositeResult?.size.width ?? 0)) × \(Int(compositeResult?.size.height ?? 0))
+        """
+        resultInfoLabel.text = info
+    }
+    
     private func performComposite(frames: [UIImage], sceneType: SceneType) {
+        // 保留原有方法作为回退机制
         Task {
-            // 使用简单的合成算法
             let result = await createMultiSubjectComposite(frames: frames, sceneType: sceneType)
             
             DispatchQueue.main.async {
@@ -302,7 +725,6 @@ class MultiSubjectCompositeTestViewController: UIViewController {
                     self.progressView.setProgress(1.0, animated: true)
                     self.statusLabel.text = "✅ 合成完成！"
                     
-                    // 显示结果信息
                     let info = """
                     场景类型: \(sceneType == .objectChange ? "物体变化" : "人物动作")
                     提取帧数: \(frames.count)
