@@ -87,30 +87,43 @@ class DETRSegmentationTestViewController: UIViewController {
     }
     
     private func setupCategorySegmentedControl() {
-        categorySegmentedControl.removeAllSegments()
-        
-        for (index, category) in EnhancedSubjectSegmentationManager.SegmentationCategory.allCases.enumerated() {
-            categorySegmentedControl.insertSegment(withTitle: category.displayName, at: index, animated: false)
+        guard let segmentedControl = categorySegmentedControl else {
+            print("⚠️ categorySegmentedControl is nil - IBOutlet not connected")
+            return
         }
         
-        categorySegmentedControl.selectedSegmentIndex = 0
-        categorySegmentedControl.addTarget(self, action: #selector(categoryChanged), for: .valueChanged)
+        segmentedControl.removeAllSegments()
+        
+        for (index, category) in EnhancedSubjectSegmentationManager.SegmentationCategory.allCases.enumerated() {
+            segmentedControl.insertSegment(withTitle: category.displayName, at: index, animated: false)
+        }
+        
+        segmentedControl.selectedSegmentIndex = 0
+        segmentedControl.addTarget(self, action: #selector(categoryChanged), for: .valueChanged)
     }
     
     private func setupButtons() {
         // 选择图片按钮
-        selectImageButton.setTitle("📷 选择图片", for: .normal)
-        selectImageButton.backgroundColor = .systemBlue
-        selectImageButton.setTitleColor(.white, for: .normal)
-        selectImageButton.layer.cornerRadius = 8
-        selectImageButton.addTarget(self, action: #selector(selectImageTapped), for: .touchUpInside)
+        guard let selectBtn = selectImageButton else {
+            print("⚠️ selectImageButton is nil - IBOutlet not connected")
+            return
+        }
+        selectBtn.setTitle("📷 选择图片", for: .normal)
+        selectBtn.backgroundColor = .systemBlue
+        selectBtn.setTitleColor(.white, for: .normal)
+        selectBtn.layer.cornerRadius = 8
+        selectBtn.addTarget(self, action: #selector(selectImageTapped), for: .touchUpInside)
         
         // 处理按钮
-        processButton.setTitle("🎯 开始分割", for: .normal)
-        processButton.backgroundColor = .systemGreen
-        processButton.setTitleColor(.white, for: .normal)
-        processButton.layer.cornerRadius = 8
-        processButton.addTarget(self, action: #selector(processImageTapped), for: .touchUpInside)
+        guard let processBtn = processButton else {
+            print("⚠️ processButton is nil - IBOutlet not connected")
+            return
+        }
+        processBtn.setTitle("🎯 开始分割", for: .normal)
+        processBtn.backgroundColor = .systemGreen
+        processBtn.setTitleColor(.white, for: .normal)
+        processBtn.layer.cornerRadius = 8
+        processBtn.addTarget(self, action: #selector(processImageTapped), for: .touchUpInside)
     }
     
     private func setupImageViews() {
@@ -129,7 +142,12 @@ class DETRSegmentationTestViewController: UIViewController {
         addLabelToImageView(maskImageView, text: "分割遮罩")
     }
     
-    private func addLabelToImageView(_ imageView: UIImageView, text: String) {
+    private func addLabelToImageView(_ imageView: UIImageView?, text: String) {
+        guard let imageView = imageView else {
+            print("⚠️ imageView is nil for label: \(text)")
+            return
+        }
+        
         let label = UILabel()
         label.text = text
         label.textAlignment = .center
@@ -148,58 +166,59 @@ class DETRSegmentationTestViewController: UIViewController {
     }
     
     private func setupInfoViews() {
-        statusLabel.text = "请选择图片开始测试"
-        statusLabel.textColor = .systemBlue
+        statusLabel?.text = "请选择图片开始测试"
+        statusLabel?.textColor = .systemBlue
         
-        confidenceLabel.text = "置信度: --"
-        processingTimeLabel.text = "处理时间: --"
+        confidenceLabel?.text = "置信度: --"
+        processingTimeLabel?.text = "处理时间: --"
         
-        detectedClassesTextView.backgroundColor = .systemGray6
-        detectedClassesTextView.layer.cornerRadius = 8
-        detectedClassesTextView.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
-        detectedClassesTextView.text = "检测结果将在这里显示..."
+        detectedClassesTextView?.backgroundColor = .systemGray6
+        detectedClassesTextView?.layer.cornerRadius = 8
+        detectedClassesTextView?.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        detectedClassesTextView?.text = "检测结果将在这里显示..."
     }
     
     private func initializeSegmentationManager() {
         do {
             try segmentationManager.initialize()
-            statusLabel.text = "✅ DETR模型加载成功"
-            statusLabel.textColor = .systemGreen
+            statusLabel?.text = "✅ DETR模型加载成功"
+            statusLabel?.textColor = .systemGreen
         } catch {
-            statusLabel.text = "❌ 模型加载失败: \(error.localizedDescription)"
-            statusLabel.textColor = .systemRed
-            processButton.isEnabled = false
+            statusLabel?.text = "❌ 模型加载失败: \(error.localizedDescription)"
+            statusLabel?.textColor = .systemRed
+            processButton?.isEnabled = false
         }
     }
     
     private func updateImageViews() {
-        originalImageView.image = currentImage
+        originalImageView?.image = currentImage
         updateUIState(isProcessing: false, hasImage: currentImage != nil)
     }
     
     private func updateUIState(isProcessing: Bool, hasImage: Bool) {
-        processButton.isEnabled = hasImage && !isProcessing
-        selectImageButton.isEnabled = !isProcessing
-        categorySegmentedControl.isEnabled = !isProcessing
+        processButton?.isEnabled = hasImage && !isProcessing
+        selectImageButton?.isEnabled = !isProcessing
+        categorySegmentedControl?.isEnabled = !isProcessing
         
         if isProcessing {
-            statusLabel.text = "🔄 正在处理..."
-            statusLabel.textColor = .systemOrange
+            statusLabel?.text = "🔄 正在处理..."
+            statusLabel?.textColor = .systemOrange
         } else if hasImage {
-            statusLabel.text = "✅ 图片已加载，可以开始分割"
-            statusLabel.textColor = .systemGreen
+            statusLabel?.text = "✅ 图片已加载，可以开始分割"
+            statusLabel?.textColor = .systemGreen
         } else {
-            statusLabel.text = "请选择图片开始测试"
-            statusLabel.textColor = .systemBlue
+            statusLabel?.text = "请选择图片开始测试"
+            statusLabel?.textColor = .systemBlue
         }
     }
     
     // MARK: - Actions
     
     @objc private func categoryChanged() {
-        let selectedCategory = EnhancedSubjectSegmentationManager.SegmentationCategory.allCases[categorySegmentedControl.selectedSegmentIndex]
+        guard let segmentedControl = categorySegmentedControl else { return }
+        let selectedCategory = EnhancedSubjectSegmentationManager.SegmentationCategory.allCases[segmentedControl.selectedSegmentIndex]
         segmentationManager.setSegmentationCategory(selectedCategory)
-        statusLabel.text = "🎯 分割类别: \(selectedCategory.displayName)"
+        statusLabel?.text = "🎯 分割类别: \(selectedCategory.displayName)"
     }
     
     @objc private func selectImageTapped() {
@@ -230,15 +249,15 @@ class DETRSegmentationTestViewController: UIViewController {
     
     @objc private func clearResults() {
         currentImage = nil
-        originalImageView.image = nil
-        segmentedImageView.image = nil
-        maskImageView.image = nil
+        originalImageView?.image = nil
+        segmentedImageView?.image = nil
+        maskImageView?.image = nil
         
-        statusLabel.text = "请选择图片开始测试"
-        statusLabel.textColor = .systemBlue
-        confidenceLabel.text = "置信度: --"
-        processingTimeLabel.text = "处理时间: --"
-        detectedClassesTextView.text = "检测结果将在这里显示..."
+        statusLabel?.text = "请选择图片开始测试"
+        statusLabel?.textColor = .systemBlue
+        confidenceLabel?.text = "置信度: --"
+        processingTimeLabel?.text = "处理时间: --"
+        detectedClassesTextView?.text = "检测结果将在这里显示..."
         
         updateUIState(isProcessing: false, hasImage: false)
     }
@@ -254,31 +273,31 @@ class DETRSegmentationTestViewController: UIViewController {
         switch result {
         case .success(let segmentationResult):
             // 显示结果图片
-            segmentedImageView.image = segmentationResult.subjectImage
-            maskImageView.image = segmentationResult.maskImage
+            segmentedImageView?.image = segmentationResult.subjectImage
+            maskImageView?.image = segmentationResult.maskImage
             
             // 更新信息
-            statusLabel.text = "✅ 分割完成"
-            statusLabel.textColor = .systemGreen
+            statusLabel?.text = "✅ 分割完成"
+            statusLabel?.textColor = .systemGreen
             
-            confidenceLabel.text = String(format: "置信度: %.1f%%", segmentationResult.confidence * 100)
-            processingTimeLabel.text = String(format: "处理时间: %.2f秒", processingTime)
+            confidenceLabel?.text = String(format: "置信度: %.1f%%", segmentationResult.confidence * 100)
+            processingTimeLabel?.text = String(format: "处理时间: %.2f秒", processingTime)
             
             // 显示检测到的类别
             displayDetectedClasses(segmentationResult.detectedClasses)
             
         case .failure(let error):
-            statusLabel.text = "❌ 分割失败: \(error.localizedDescription)"
-            statusLabel.textColor = .systemRed
+            statusLabel?.text = "❌ 分割失败: \(error.localizedDescription)"
+            statusLabel?.textColor = .systemRed
             
-            processingTimeLabel.text = String(format: "处理时间: %.2f秒", processingTime)
-            detectedClassesTextView.text = "处理失败，请重试"
+            processingTimeLabel?.text = String(format: "处理时间: %.2f秒", processingTime)
+            detectedClassesTextView?.text = "处理失败，请重试"
         }
     }
     
     private func displayDetectedClasses(_ classes: [DetectedClass]) {
         if classes.isEmpty {
-            detectedClassesTextView.text = "未检测到任何目标类别"
+            detectedClassesTextView?.text = "未检测到任何目标类别"
             return
         }
         
@@ -296,7 +315,7 @@ class DETRSegmentationTestViewController: UIViewController {
             text += "\n... 还有 \(classes.count - 10) 个类别"
         }
         
-        detectedClassesTextView.text = text
+        detectedClassesTextView?.text = text
     }
     
     private func showAlert(title: String, message: String) {
@@ -318,10 +337,10 @@ extension DETRSegmentationTestViewController: PHPickerViewControllerDelegate {
             DispatchQueue.main.async {
                 if let image = object as? UIImage {
                     self?.currentImage = image
-                    self?.originalImageView.image = image
+                    self?.originalImageView?.image = image
                     self?.updateUIState(isProcessing: false, hasImage: true)
-                    self?.statusLabel.text = "✅ 图片加载成功，可以开始分割"
-                    self?.statusLabel.textColor = .systemGreen
+                    self?.statusLabel?.text = "✅ 图片加载成功，可以开始分割"
+                    self?.statusLabel?.textColor = .systemGreen
                 } else {
                     self?.showAlert(title: "错误", message: "无法加载选择的图片")
                 }
