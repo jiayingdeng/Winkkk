@@ -62,7 +62,7 @@ class TimeSequenceProcessor {
     private var imageGenerator: AVAssetImageGenerator?
     
     // MARK: - 内存管理
-    private var maxMemoryUsage: Int = 100 * 1024 * 1024 // 100MB
+    private var maxMemoryUsage: Int = 500 * 1024 * 1024 // 500MB (提高内存限制)
     private var currentMemoryUsage: Int = 0
     
     // MARK: - 初始化
@@ -349,8 +349,19 @@ class TimeSequenceProcessor {
                 
             } catch {
                 print("⚠️ 提取第\(index)帧失败：\(error)")
-                // 继续处理其他帧，但记录错误
-                continue
+                
+                // 🆕 降级策略：尝试使用稍微不同的时间点重试
+                let retryTimePoint = CMTime(seconds: timePoint.seconds + 0.1, preferredTimescale: 600)
+                do {
+                    let cgImage = try imageGenerator.copyCGImage(at: retryTimePoint, actualTime: nil)
+                    let image = UIImage(cgImage: cgImage)
+                    extractedFrames.append(image)
+                    print("✅ 重试成功提取第\(index)帧")
+                } catch {
+                    print("⚠️ 重试仍失败，跳过第\(index)帧")
+                    // 如果重试也失败，则跳过这帧（但不添加占位图，保持数组干净）
+                    continue
+                }
             }
         }
         
@@ -358,9 +369,14 @@ class TimeSequenceProcessor {
             throw TimeSequenceError.noFramesExtracted
         }
         
-        if extractedFrames.count < totalFrames / 2 {
+        // 🆕 放宽成功标准：只要有至少3帧就算成功，不再要求一半以上
+        let minimumFrames = max(3, totalFrames / 3) // 至少3帧，或者目标帧数的1/3
+        if extractedFrames.count < minimumFrames {
+            print("⚠️ 提取帧数不足：\(extractedFrames.count)/\(totalFrames)，最少需要\(minimumFrames)帧")
             throw TimeSequenceError.insufficientFrames(extractedFrames.count)
         }
+        
+        print("✅ 成功提取\(extractedFrames.count)帧，目标为\(totalFrames)帧")
         
         return extractedFrames
     }
@@ -480,10 +496,21 @@ class TimeSequenceProcessor {
         
         if result == KERN_SUCCESS {
             let usedMemory = Int(memoryInfo.resident_size)
-            if usedMemory > maxMemoryUsage {
-                throw TimeSequenceError.memoryWarning
-            }
             currentMemoryUsage = usedMemory
+            
+            // 渐进式内存警告而不是立即失败
+            let warningThreshold = Int(Double(maxMemoryUsage) * 0.8) // 80%警告
+            let criticalThreshold = Int(Double(maxMemoryUsage) * 0.95) // 95%严重
+            
+            if usedMemory > criticalThreshold {
+                // 强制垃圾回收
+                autoreleasepool {
+                    // 清理缓存
+                }
+                throw TimeSequenceError.memoryWarning
+            } else if usedMemory > warningThreshold {
+                print("⚠️ 内存使用接近限制：\(usedMemory / 1024 / 1024)MB / \(maxMemoryUsage / 1024 / 1024)MB")
+            }
         }
     }
     

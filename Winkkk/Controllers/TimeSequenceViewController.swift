@@ -61,6 +61,9 @@ class TimeSequenceViewController: UIViewController {
         }
     }
     
+    // 用户选择的帧数量
+    private var selectedFrameCount: Int = 5
+    
     // MARK: - Initialization
     init(screenshots: [ScreenshotItem]) {
         self.screenshots = screenshots
@@ -196,7 +199,7 @@ class TimeSequenceViewController: UIViewController {
         
         // 帧堆栈视图
         framesStackView.axis = .horizontal
-        framesStackView.distribution = .fillEqually
+        framesStackView.distribution = .equalSpacing  // 改为等间距，避免固定宽度冲突
         framesStackView.spacing = 8
         framesStackView.alignment = .center
         
@@ -455,7 +458,11 @@ class TimeSequenceViewController: UIViewController {
     
     @objc private func frameCountChanged(_ sender: UISlider) {
         let count = Int(sender.value)
+        selectedFrameCount = count  // 保存用户选择的帧数
         frameCountLabel.text = "关键帧数量: \(count)"
+        
+        // 触感反馈
+        HapticFeedbackManager.shared.lightImpact()
         
         // TODO: 更新预览帧
     }
@@ -475,10 +482,28 @@ class TimeSequenceViewController: UIViewController {
             return
         }
         
+        guard let sceneType = sceneType else {
+            let alert = UIAlertController(
+                title: "场景类型错误",
+                message: "未设置场景类型",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "确定", style: .default))
+            present(alert, animated: true)
+            return
+        }
+        
+        // 🆕 使用用户选择的帧数创建自定义参数
+        let customParameters = createCustomParameters(for: sceneType, frameCount: selectedFrameCount)
+        
+        // 重新创建处理器以使用新参数
+        timeSequenceProcessor = TimeSequenceProcessor(sceneType: sceneType, parameters: customParameters)
+        timeSequenceProcessor?.delegate = self
+        
         guard let processor = timeSequenceProcessor else {
             let alert = UIAlertController(
                 title: "处理器错误",
-                message: "时间序列处理器未初始化",
+                message: "时间序列处理器初始化失败",
                 preferredStyle: .alert
             )
             alert.addAction(UIAlertAction(title: "确定", style: .default))
@@ -717,9 +742,16 @@ class TimeSequenceViewController: UIViewController {
             imageView.backgroundColor = .systemGray6
             
             imageView.translatesAutoresizingMaskIntoConstraints = false
+            
+            // 动态计算宽度，避免约束冲突
+            let frameCount = CGFloat(frames.count)
+            let totalSpacing = CGFloat(8 * (frames.count - 1)) // 间距总和
+            let availableWidth = view.frame.width - 64 // 减去左右边距
+            let dynamicWidth = max(50, min(80, (availableWidth - totalSpacing) / frameCount)) // 动态宽度，范围50-80
+            
             NSLayoutConstraint.activate([
-                imageView.widthAnchor.constraint(equalToConstant: 60),
-                imageView.heightAnchor.constraint(equalToConstant: 80)
+                imageView.widthAnchor.constraint(equalToConstant: dynamicWidth),
+                imageView.heightAnchor.constraint(equalToConstant: dynamicWidth * 1.33) // 保持4:3比例
             ])
             
             framesStackView.addArrangedSubview(imageView)
@@ -844,5 +876,20 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
         // 显示结果
         resultImageView.image = compositeImage
         resultContainerView.isHidden = false
+    }
+    
+    // MARK: - 参数创建
+    
+    /// 根据场景类型和用户选择创建自定义参数
+    private func createCustomParameters(for sceneType: SceneType, frameCount: Int) -> TimeSequenceParameters {
+        let defaultParams = TimeSequenceParameters.defaultParameters(for: sceneType)
+        
+        // 使用用户选择的帧数覆盖默认值
+        return TimeSequenceParameters(
+            sceneType: sceneType,
+            frameInterval: defaultParams.frameInterval,  // 保持默认间隔
+            totalFrames: frameCount,                      // 🆕 使用用户选择的帧数
+            processingMode: defaultParams.processingMode  // 保持默认处理模式
+        )
     }
 }
