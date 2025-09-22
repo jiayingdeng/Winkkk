@@ -454,10 +454,8 @@ extension VideoGalleryViewController: UICollectionViewDelegate {
     }
     
     private func openVideoEditor(with video: VideoItem) {
-        let playerVC = VideoPlayerViewController(videoURL: video.filePath)
-        let navController = UINavigationController(rootViewController: playerVC)
-        navController.modalPresentationStyle = .fullScreen
-        present(navController, animated: true)
+        // 🆕 使用时间序列模式管理器统一处理视频选择
+        TimeSequenceModeManager.shared.handleVideoSelection(video.filePath, from: self)
     }
     
     private func exportVideoToSystemLibrary(_ video: VideoItem) {

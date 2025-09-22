@@ -127,6 +127,33 @@ class TimeSequenceModeManager {
         return ShootingGuide.guide(for: sceneType)
     }
     
+    // MARK: - 视频处理
+    
+    /// 统一处理视频选择逻辑
+    /// - Parameters:
+    ///   - videoURL: 选中的视频URL
+    ///   - viewController: 当前视图控制器
+    func handleVideoSelection(_ videoURL: URL, from viewController: UIViewController) {
+        if isTimeSequenceMode, let sceneType = selectedSceneType {
+            // 时间序列模式：跳转到时间序列处理界面
+            print("🎬 时间序列模式：跳转到时间序列处理界面")
+            let timeSequenceVC = TimeSequenceViewController(videoURL: videoURL, sceneType: sceneType)
+            let navController = UINavigationController(rootViewController: timeSequenceVC)
+            navController.modalPresentationStyle = .fullScreen
+            viewController.present(navController, animated: true)
+            
+            // 重置时间序列模式状态
+            reset()
+        } else {
+            // 普通模式：跳转到视频播放器
+            print("📹 普通模式：跳转到视频播放器")
+            let playerVC = VideoPlayerViewController(videoURL: videoURL)
+            let navController = UINavigationController(rootViewController: playerVC)
+            navController.modalPresentationStyle = .fullScreen
+            viewController.present(navController, animated: true)
+        }
+    }
+    
     // MARK: - 私有方法
     
     /// 发送模式变化通知
