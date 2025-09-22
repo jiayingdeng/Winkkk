@@ -1022,11 +1022,11 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
         // 根据场景类型应用优化策略
         switch sceneType {
         case .objectChange:
-            return optimizeForObjectChange(baseAlpha)
+            return optimizeForObjectChange(alpha: baseAlpha)
         case .personAction:
-            return optimizeForHumanAction(baseAlpha)
+            return optimizeForHumanAction(alpha: baseAlpha)
         case .sportMotion:
-            return optimizeForSportsMotion(baseAlpha)
+            return optimizeForSportsMotion(alpha: baseAlpha)
         }
     }
     
