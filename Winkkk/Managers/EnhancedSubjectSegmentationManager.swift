@@ -153,13 +153,38 @@ class EnhancedSubjectSegmentationManager {
     func getDetectedClasses(from segmentationMap: MLMultiArray) -> [DetectedClass] {
         var detectedClasses: [Int: Int] = [:]
         
-        let height = segmentationMap.shape[1].intValue
-        let width = segmentationMap.shape[2].intValue
+        // 安全检查shape维度，防止数组越界
+        print("🔍 segmentationMap.shape: \(segmentationMap.shape), 维度数: \(segmentationMap.shape.count)")
+        guard segmentationMap.shape.count >= 2 else {
+            print("❌ segmentationMap.shape 维度不足: \(segmentationMap.shape)")
+            return []
+        }
+        
+        let height: Int
+        let width: Int
+        
+        // 根据shape的维度数来确定height和width的位置
+        if segmentationMap.shape.count == 2 {
+            // 2D: [height, width]
+            height = segmentationMap.shape[0].intValue
+            width = segmentationMap.shape[1].intValue
+        } else {
+            // 3D: [batch, height, width] 或其他格式
+            height = segmentationMap.shape[1].intValue
+            width = segmentationMap.shape[2].intValue
+        }
         
         // 统计每个类别的像素数量
         for y in 0..<height {
             for x in 0..<width {
-                let classIndex = segmentationMap[[0, NSNumber(value: y), NSNumber(value: x)]].intValue
+                let classIndex: Int
+                if segmentationMap.shape.count == 2 {
+                    // 2D数组访问: [y, x]
+                    classIndex = segmentationMap[[NSNumber(value: y), NSNumber(value: x)]].intValue
+                } else {
+                    // 3D数组访问: [batch, y, x]
+                    classIndex = segmentationMap[[0, NSNumber(value: y), NSNumber(value: x)]].intValue
+                }
                 detectedClasses[classIndex, default: 0] += 1
             }
         }
@@ -246,16 +271,34 @@ class EnhancedSubjectSegmentationManager {
     }
     
     private func createEnhancedMask(from segmentationMap: MLMultiArray) throws -> UIImage {
-        let height = segmentationMap.shape[1].intValue
-        let width = segmentationMap.shape[2].intValue
-        let targetClasses = currentCategory.targetClasses
+        // 安全获取尺寸
+        guard segmentationMap.shape.count >= 2 else {
+            throw SegmentationError.invalidPredictionResult
+        }
         
+        let height: Int
+        let width: Int
+        
+        if segmentationMap.shape.count == 2 {
+            height = segmentationMap.shape[0].intValue
+            width = segmentationMap.shape[1].intValue
+        } else {
+            height = segmentationMap.shape[1].intValue
+            width = segmentationMap.shape[2].intValue
+        }
+        
+        let targetClasses = currentCategory.targetClasses
         var maskData = [UInt8](repeating: 0, count: width * height)
         
         for y in 0..<height {
             for x in 0..<width {
                 let index = y * width + x
-                let classIndex = segmentationMap[[0, NSNumber(value: y), NSNumber(value: x)]].intValue
+                let classIndex: Int
+                if segmentationMap.shape.count == 2 {
+                    classIndex = segmentationMap[[NSNumber(value: y), NSNumber(value: x)]].intValue
+                } else {
+                    classIndex = segmentationMap[[0, NSNumber(value: y), NSNumber(value: x)]].intValue
+                }
                 
                 if targetClasses.contains(classIndex) {
                     maskData[index] = 255 // 白色（前景）
@@ -313,15 +356,34 @@ class EnhancedSubjectSegmentationManager {
     }
     
     private func calculateCategoryConfidence(_ segmentationMap: MLMultiArray) -> Float {
-        let height = segmentationMap.shape[1].intValue
-        let width = segmentationMap.shape[2].intValue
+        // 安全获取尺寸
+        guard segmentationMap.shape.count >= 2 else {
+            return 0.0
+        }
+        
+        let height: Int
+        let width: Int
+        
+        if segmentationMap.shape.count == 2 {
+            height = segmentationMap.shape[0].intValue
+            width = segmentationMap.shape[1].intValue
+        } else {
+            height = segmentationMap.shape[1].intValue
+            width = segmentationMap.shape[2].intValue
+        }
+        
         let targetClasses = currentCategory.targetClasses
         let totalPixels = width * height
         var foregroundPixels = 0
         
         for y in 0..<height {
             for x in 0..<width {
-                let classIndex = segmentationMap[[0, NSNumber(value: y), NSNumber(value: x)]].intValue
+                let classIndex: Int
+                if segmentationMap.shape.count == 2 {
+                    classIndex = segmentationMap[[NSNumber(value: y), NSNumber(value: x)]].intValue
+                } else {
+                    classIndex = segmentationMap[[0, NSNumber(value: y), NSNumber(value: x)]].intValue
+                }
                 if targetClasses.contains(classIndex) {
                     foregroundPixels += 1
                 }
