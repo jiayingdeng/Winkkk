@@ -412,7 +412,11 @@ class SettingsViewController: UIViewController {
     
     // MARK: - Developer Options
     private func showDETRSegmentationTest() {
-        let testVC = DETRSegmentationTestViewController()
+        let storyboard = UIStoryboard(name: "DETRSegmentationTest", bundle: nil)
+        guard let testVC = storyboard.instantiateViewController(withIdentifier: "DETRSegmentationTestViewController") as? DETRSegmentationTestViewController else {
+            print("❌ 无法从Storyboard加载DETRSegmentationTestViewController")
+            return
+        }
         let navController = UINavigationController(rootViewController: testVC)
         navController.modalPresentationStyle = .fullScreen
         present(navController, animated: true)
