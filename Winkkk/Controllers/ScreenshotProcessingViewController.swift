@@ -251,6 +251,12 @@ class ScreenshotProcessingViewController: UIViewController {
                     action: { [weak self] in self?.showBatchImageEnhancement() }
                 ),
                 ProcessingOption(
+                    title: "🧠 DETR智能分割",
+                    description: "AI识别并提取人物、动物、植物、食物等主体",
+                    icon: "brain.head.profile",
+                    action: { [weak self] in self?.showDETRSubjectSegmentation() }
+                ),
+                ProcessingOption(
                     title: "🧩 创建拼图",
                     description: "将多张截图制作成拼图",
                     icon: "square.grid.3x3",
@@ -467,6 +473,91 @@ extension ScreenshotProcessingViewController {
         // 跳转到拼图创建页面
         let collageVC = CollageViewController(images: images)
         navigationController?.pushViewController(collageVC, animated: true)
+    }
+    
+    private func showDETRSubjectSegmentation() {
+        print("🧠 DETR智能分割")
+        
+        // 检查是否有图片可以处理
+        guard !screenshots.isEmpty else {
+            showAlert(title: "无法处理", message: "没有可用的图片进行智能分割")
+            return
+        }
+        
+        // 如果只有一张图片，直接跳转到单图分割界面
+        if screenshots.count == 1 {
+            guard let firstImage = screenshots.first?.image else {
+                showAlert(title: "错误", message: "无法加载图片")
+                return
+            }
+            
+            // 触觉反馈
+            HapticFeedbackManager.shared.buttonTap()
+            
+            // 跳转到DETR分割测试页面
+            let detrTestVC = DETRSegmentationTestViewController()
+            detrTestVC.setInitialImage(firstImage) // 我们需要添加这个方法
+            let navController = UINavigationController(rootViewController: detrTestVC)
+            navController.modalPresentationStyle = .fullScreen
+            present(navController, animated: true)
+            
+        } else {
+            // 多张图片，显示选择提示
+            let alert = UIAlertController(
+                title: "选择分割图片", 
+                message: "DETR智能分割目前支持单张图片处理，请选择一张图片进行分割。", 
+                preferredStyle: .alert
+            )
+            
+            alert.addAction(UIAlertAction(title: "选择第一张", style: .default) { [weak self] _ in
+                guard let self = self,
+                      let firstImage = self.screenshots.first?.image else { return }
+                
+                HapticFeedbackManager.shared.buttonTap()
+                let detrTestVC = DETRSegmentationTestViewController()
+                detrTestVC.setInitialImage(firstImage)
+                let navController = UINavigationController(rootViewController: detrTestVC)
+                navController.modalPresentationStyle = .fullScreen
+                self.present(navController, animated: true)
+            })
+            
+            alert.addAction(UIAlertAction(title: "手动选择", style: .default) { [weak self] _ in
+                // TODO: 可以实现一个图片选择器让用户选择要分割的图片
+                self?.showImageSelectionForSegmentation()
+            })
+            
+            alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+            present(alert, animated: true)
+        }
+    }
+    
+    private func showImageSelectionForSegmentation() {
+        // 简单实现：显示所有图片让用户选择
+        let alert = UIAlertController(title: "选择要分割的图片", message: nil, preferredStyle: .actionSheet)
+        
+        for (index, screenshot) in screenshots.enumerated() {
+            alert.addAction(UIAlertAction(title: "图片 \(index + 1)", style: .default) { [weak self] _ in
+                guard let self = self,
+                      let image = screenshot.image else { return }
+                
+                HapticFeedbackManager.shared.buttonTap()
+                let detrTestVC = DETRSegmentationTestViewController()
+                detrTestVC.setInitialImage(image)
+                let navController = UINavigationController(rootViewController: detrTestVC)
+                navController.modalPresentationStyle = .fullScreen
+                self.present(navController, animated: true)
+            })
+        }
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        // iPad支持
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = view.bounds
+        }
+        
+        present(alert, animated: true)
     }
     
     // MARK: - 时间序列模式 (新增核心功能)

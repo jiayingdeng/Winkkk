@@ -799,8 +799,12 @@ class TimeSequenceViewController: UIViewController {
         // 清除现有帧
         framesStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
         
+        // 🔧 修复：显示所有提取的帧，而不是固定限制为5帧
+        let framesToShow = extractedFrames
+        let maxDisplayFrames = min(8, framesToShow.count) // 最多显示8帧，避免界面过挤
+        
         // 显示提取的帧
-        for (index, frame) in extractedFrames.prefix(5).enumerated() {
+        for (index, frame) in framesToShow.prefix(maxDisplayFrames).enumerated() {
             let imageView = UIImageView(image: frame)
             imageView.contentMode = .scaleAspectFill
             imageView.clipsToBounds = true
@@ -810,10 +814,10 @@ class TimeSequenceViewController: UIViewController {
             imageView.translatesAutoresizingMaskIntoConstraints = false
             
             // 动态计算宽度，避免约束冲突
-            let frameCount = CGFloat(extractedFrames.count)
-            let totalSpacing = CGFloat(8 * (extractedFrames.count - 1)) // 间距总和
+            let frameCount = CGFloat(min(maxDisplayFrames, extractedFrames.count))
+            let totalSpacing = CGFloat(8 * (Int(frameCount) - 1)) // 间距总和
             let availableWidth = view.frame.width - 64 // 减去左右边距
-            let dynamicWidth = max(50, min(80, (availableWidth - totalSpacing) / frameCount)) // 动态宽度，范围50-80
+            let dynamicWidth = max(40, min(80, (availableWidth - totalSpacing) / frameCount)) // 动态宽度，范围40-80
             
             NSLayoutConstraint.activate([
                 imageView.widthAnchor.constraint(equalToConstant: dynamicWidth),
@@ -823,9 +827,32 @@ class TimeSequenceViewController: UIViewController {
             framesStackView.addArrangedSubview(imageView)
         }
         
+        // 如果有更多帧未显示，添加提示
+        if extractedFrames.count > maxDisplayFrames {
+            let moreLabel = UILabel()
+            moreLabel.text = "+\(extractedFrames.count - maxDisplayFrames)"
+            moreLabel.font = UIFont.systemFont(ofSize: 12, weight: .medium)
+            moreLabel.textColor = ThemeManager.secondaryText
+            moreLabel.textAlignment = .center
+            moreLabel.backgroundColor = UIColor.systemGray5
+            moreLabel.layer.cornerRadius = 8
+            moreLabel.clipsToBounds = true
+            
+            moreLabel.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                moreLabel.widthAnchor.constraint(equalToConstant: 40),
+                moreLabel.heightAnchor.constraint(equalToConstant: 40 * 1.33)
+            ])
+            
+            framesStackView.addArrangedSubview(moreLabel)
+        }
+        
         // 显示预览区域
         previewContainerView.isHidden = extractedFrames.isEmpty
         controlPanelView.isHidden = extractedFrames.isEmpty
+        
+        // 🆕 更新预览标题显示实际帧数
+        previewTitleLabel.text = "📸 提取的关键帧 (\(extractedFrames.count)帧)"
     }
 }
 
@@ -928,64 +955,135 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
     }
     
     private func generateCompositeImage(from frames: [UIImage]) {
-        // 🌟 透明度叠加合成逻辑 - 创造幽灵轨迹的魔法效果
+        // 🌟 智能场景合成逻辑 - 根据场景类型选择最佳合成策略
         guard !frames.isEmpty else { return }
-        
-        // ✨ Step 1: 使用第一帧的尺寸作为最终画布尺寸
-        let canvasSize = frames.first!.size
-        
-        // 🎨 Step 2: 创建透明背景画布
-        UIGraphicsBeginImageContextWithOptions(canvasSize, false, 0.0)
         
         // 🔍 获取当前场景类型
         guard let currentSceneType = sceneType else {
-            print("❌ 场景类型未设置，使用默认透明度")
-            // 如果没有场景类型，使用默认的线性透明度
-            for (index, frame) in frames.enumerated() {
-                // 🔥 修复：同样调整默认透明度范围
-                let alpha = (CGFloat(index + 1) / CGFloat(frames.count)) * 0.6 + 0.1
-                frame.draw(
-                    in: CGRect(origin: .zero, size: canvasSize),
-                    blendMode: .normal,
-                    alpha: alpha
-                )
-            }
-            
-            let compositeImage = UIGraphicsGetImageFromCurrentImageContext()
-            UIGraphicsEndImageContext()
-            
-            resultImageView.image = compositeImage
-            resultContainerView.isHidden = false
+            print("❌ 场景类型未设置，使用默认叠加合成")
+            generateDefaultOverlayComposite(from: frames)
             return
         }
         
-        // 🎯 Step 3: 关键绘制逻辑 - 所有帧都绘制在同一位置
+        // 🎯 根据场景类型选择合成策略
+        switch currentSceneType {
+        case .objectChange, .personAction:
+            // 📋 策略1：水平时间轴合成 - 适合物体变化和人物动作
+            generateHorizontalTimelineComposite(from: frames, sceneType: currentSceneType)
+            
+        case .sportMotion:
+            // 📋 策略2：轨迹叠加合成 - 适合运动轨迹
+            generateTrajectoryOverlayComposite(from: frames, sceneType: currentSceneType)
+        }
+        
+        print("✅ 智能场景合成完成！场景类型: \(currentSceneType.displayName)")
+    }
+    
+    /// 📋 策略1：水平时间轴合成 (物体变化 + 人物动作类)
+    private func generateHorizontalTimelineComposite(from frames: [UIImage], sceneType: SceneType) {
+        guard let firstFrame = frames.first else { return }
+        
+        // 🎨 画布尺寸：宽度 = 帧宽 × 帧数，高度 = 帧高
+        let frameSize = firstFrame.size
+        let canvasSize = CGSize(
+            width: frameSize.width * CGFloat(frames.count),
+            height: frameSize.height
+        )
+        
+        print("📏 水平时间轴画布尺寸: \(canvasSize.width) × \(canvasSize.height)")
+        
+        // 🖼️ 创建画布
+        UIGraphicsBeginImageContextWithOptions(canvasSize, false, 0.0)
+        
+        // 🎯 绘制每一帧到不同的水平位置
         for (index, frame) in frames.enumerated() {
-            // 计算场景特定的透明度
             let alpha = calculateAlphaForScene(
                 index: index,
                 totalFrames: frames.count,
-                sceneType: currentSceneType
+                sceneType: sceneType
             )
             
-            // ✨ 核心：所有帧都绘制在同一位置，使用递增透明度
+            // ✨ 关键：每帧绘制在不同的水平位置
+            let xOffset = frameSize.width * CGFloat(index)
+            let drawRect = CGRect(
+                x: xOffset,
+                y: 0,
+                width: frameSize.width,
+                height: frameSize.height
+            )
+            
+            frame.draw(in: drawRect, blendMode: .normal, alpha: alpha)
+            
+            print("🎨 \(sceneType.icon) 绘制帧 \(index + 1)/\(frames.count)，位置: x=\(Int(xOffset))，透明度: \(String(format: "%.1f", alpha * 100))%")
+        }
+        
+        // 🎉 完成合成
+        let compositeImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        
+        resultImageView.image = compositeImage
+        resultContainerView.isHidden = false
+    }
+    
+    /// 📋 策略2：轨迹叠加合成 (运动轨迹类)
+    private func generateTrajectoryOverlayComposite(from frames: [UIImage], sceneType: SceneType) {
+        guard let firstFrame = frames.first else { return }
+        
+        // 🎨 画布尺寸：保持原始帧尺寸，用于轨迹叠加
+        let canvasSize = firstFrame.size
+        
+        print("📏 轨迹叠加画布尺寸: \(canvasSize.width) × \(canvasSize.height)")
+        
+        // 🖼️ 创建画布
+        UIGraphicsBeginImageContextWithOptions(canvasSize, false, 0.0)
+        
+        // 🎯 所有帧叠加在同一位置，创建运动轨迹效果
+        for (index, frame) in frames.enumerated() {
+            let alpha = calculateAlphaForScene(
+                index: index,
+                totalFrames: frames.count,
+                sceneType: sceneType
+            )
+            
+            // ✨ 关键：所有帧叠加在同一位置，形成轨迹残影
             frame.draw(
-                in: CGRect(origin: .zero, size: canvasSize),  // ← 同一位置！
-                blendMode: .normal,                          // ← 保持normal混合
-                alpha: alpha                                 // ← 场景优化的递增透明度！
+                in: CGRect(origin: .zero, size: canvasSize),
+                blendMode: .normal,
+                alpha: alpha
             )
             
-            print("🎨 绘制帧 \(index + 1)/\(frames.count)，透明度: \(String(format: "%.1f", alpha * 100))%")
+            print("🎨 \(sceneType.icon) 绘制轨迹帧 \(index + 1)/\(frames.count)，透明度: \(String(format: "%.1f", alpha * 100))%")
+        }
+        
+        // 🎉 完成合成
+        let compositeImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        
+        resultImageView.image = compositeImage
+        resultContainerView.isHidden = false
+    }
+    
+    /// 默认叠加合成 (无场景类型时的备用方案)
+    private func generateDefaultOverlayComposite(from frames: [UIImage]) {
+        guard let firstFrame = frames.first else { return }
+        
+        let canvasSize = firstFrame.size
+        UIGraphicsBeginImageContextWithOptions(canvasSize, false, 0.0)
+        
+        for (index, frame) in frames.enumerated() {
+            let alpha = (CGFloat(index + 1) / CGFloat(frames.count)) * 0.6 + 0.1
+            frame.draw(
+                in: CGRect(origin: .zero, size: canvasSize),
+                blendMode: .normal,
+                alpha: alpha
+            )
         }
         
         let compositeImage = UIGraphicsGetImageFromCurrentImageContext()
         UIGraphicsEndImageContext()
         
-        // 显示结果
         resultImageView.image = compositeImage
         resultContainerView.isHidden = false
-        
-        print("✅ 透明度叠加合成完成！场景类型: \(currentSceneType.displayName)")
     }
     
     // 🗑️ 旧的布局计算函数已移除 - 透明度叠加不需要布局计算

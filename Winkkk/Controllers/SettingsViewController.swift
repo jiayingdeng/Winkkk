@@ -160,6 +160,20 @@ class SettingsViewController: UIViewController {
                 ]
             ),
             
+            // 开发者选项 (调试用)
+            SettingsSection(
+                title: "开发者选项",
+                items: [
+                    SettingsItem(
+                        type: .action,
+                        title: "DETR智能分割测试",
+                        subtitle: "测试DETR模型多类别分割效果（人物、动物、植物、食物）",
+                        icon: "brain.head.profile",
+                        action: { [weak self] in self?.showDETRSegmentationTest() }
+                    )
+                ]
+            ),
+            
             // 关于
             SettingsSection(
                 title: "关于",
@@ -394,6 +408,14 @@ class SettingsViewController: UIViewController {
         })
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         present(alert, animated: true)
+    }
+    
+    // MARK: - Developer Options
+    private func showDETRSegmentationTest() {
+        let testVC = DETRSegmentationTestViewController()
+        let navController = UINavigationController(rootViewController: testVC)
+        navController.modalPresentationStyle = .fullScreen
+        present(navController, animated: true)
     }
     
     // MARK: - Helper Methods
