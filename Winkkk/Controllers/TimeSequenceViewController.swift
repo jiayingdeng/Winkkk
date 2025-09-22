@@ -8,6 +8,14 @@
 
 import UIKit
 import AVFoundation
+import Photos
+
+/// 时间序列布局类型
+enum TimeSequenceLayout {
+    case horizontal(spacing: CGFloat)
+    case vertical(spacing: CGFloat)
+    case grid(columns: Int, horizontalSpacing: CGFloat, verticalSpacing: CGFloat)
+}
 
 class TimeSequenceViewController: UIViewController {
     
@@ -519,16 +527,56 @@ class TimeSequenceViewController: UIViewController {
         print("💾 保存结果")
         HapticFeedbackManager.shared.buttonTap()
         
-        // TODO: 实现保存功能
-        showComingSoonAlert(title: "保存", message: "保存功能开发中")
+        guard let image = resultImageView.image else {
+            showAlert(title: "保存失败", message: "没有可保存的图片")
+            return
+        }
+        
+        // 检查相册访问权限
+        let status = PHPhotoLibrary.authorizationStatus()
+        switch status {
+        case .authorized:
+            saveImageToPhotoLibrary(image)
+        case .notDetermined:
+            PHPhotoLibrary.requestAuthorization { [weak self] status in
+                DispatchQueue.main.async {
+                    if status == .authorized {
+                        self?.saveImageToPhotoLibrary(image)
+                    } else {
+                        self?.showAlert(title: "权限被拒绝", message: "请在设置中允许访问相册以保存图片")
+                    }
+                }
+            }
+        case .denied, .restricted:
+            showAlert(title: "需要相册权限", message: "请在设置 > 隐私与安全性 > 照片中允许访问相册")
+        case .limited:
+            saveImageToPhotoLibrary(image)
+        @unknown default:
+            showAlert(title: "权限错误", message: "无法确定相册访问权限")
+        }
     }
     
     @objc private func shareButtonTapped() {
         print("📤 分享结果")
         HapticFeedbackManager.shared.buttonTap()
         
-        // TODO: 实现分享功能
-        showComingSoonAlert(title: "分享", message: "分享功能开发中")
+        guard let image = resultImageView.image else {
+            showAlert(title: "分享失败", message: "没有可分享的图片")
+            return
+        }
+        
+        let activityViewController = UIActivityViewController(
+            activityItems: [image],
+            applicationActivities: nil
+        )
+        
+        // 为iPad设置popover
+        if let popover = activityViewController.popoverPresentationController {
+            popover.sourceView = shareButton
+            popover.sourceRect = shareButton.bounds
+        }
+        
+        present(activityViewController, animated: true)
     }
     
     // MARK: - Helper Methods
@@ -548,7 +596,7 @@ class TimeSequenceViewController: UIViewController {
         }
     }
     
-    private func showComingSoonAlert(title: String, message: String) {
+    private func showAlert(title: String, message: String) {
         let alert = UIAlertController(
             title: title,
             message: message,
@@ -557,6 +605,24 @@ class TimeSequenceViewController: UIViewController {
         
         alert.addAction(UIAlertAction(title: "好的", style: .default))
         present(alert, animated: true)
+    }
+    
+    /// 保存图片到相册
+    private func saveImageToPhotoLibrary(_ image: UIImage) {
+        PHPhotoLibrary.shared().performChanges({
+            PHAssetChangeRequest.creationRequestForAsset(from: image)
+        }) { [weak self] success, error in
+            DispatchQueue.main.async {
+                if success {
+                    HapticFeedbackManager.shared.notificationSuccess()
+                    self?.showAlert(title: "保存成功", message: "时间序列图片已保存到相册")
+                } else {
+                    HapticFeedbackManager.shared.notificationError()
+                    let errorMessage = error?.localizedDescription ?? "未知错误"
+                    self?.showAlert(title: "保存失败", message: "保存图片时出错：\(errorMessage)")
+                }
+            }
+        }
     }
     
     // MARK: - 🆕 Auto Processing Mode
@@ -832,6 +898,9 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
             // 生成合成图片
             self.generateCompositeImage(from: frames)
             
+            // 🆕 处理完成后恢复正常标题状态
+            self.updateTitleForManualMode()
+            
             // 🆕 自动滚动到结果区域
             self.scrollToResultArea()
             
@@ -847,6 +916,9 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
         DispatchQueue.main.async {
             self.isProcessing = false
             
+            // 🆕 处理失败后也恢复正常标题状态
+            self.updateTitleForManualMode()
+            
             // 🆕 使用增强的错误处理机制
             self.offerRetryOrBackOptions()
             
@@ -856,18 +928,35 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
     }
     
     private func generateCompositeImage(from frames: [UIImage]) {
-        // 简单的时间序列合成逻辑 - 将多个帧叠加
+        // 🎯 时间序列合成逻辑 - 将多个帧排列成连环画效果
         guard !frames.isEmpty else { return }
         
-        let firstFrame = frames[0]
-        let size = firstFrame.size
+        let frameSize = frames[0].size
+        let frameCount = frames.count
         
-        UIGraphicsBeginImageContextWithOptions(size, false, 0.0)
+        // 🔧 根据帧数智能选择布局方向
+        let (canvasWidth, canvasHeight, layout) = calculateOptimalLayout(
+            frameSize: frameSize, 
+            frameCount: frameCount
+        )
         
-        // 绘制所有帧，使用不同的透明度
+        // 🎨 创建画布
+        UIGraphicsBeginImageContextWithOptions(
+            CGSize(width: canvasWidth, height: canvasHeight), 
+            false, 
+            0.0
+        )
+        
+        // 🖼️ 绘制每个帧到独立位置
         for (index, frame) in frames.enumerated() {
-            let alpha = 1.0 / CGFloat(frames.count) * 0.8 + 0.2
-            frame.draw(in: CGRect(origin: .zero, size: size), blendMode: .normal, alpha: alpha)
+            let frameRect = calculateFramePosition(
+                index: index, 
+                frameSize: frameSize, 
+                layout: layout
+            )
+            
+            // ✨ 关键：每个帧都完全不透明，放在不同位置
+            frame.draw(in: frameRect, blendMode: .normal, alpha: 1.0)
         }
         
         let compositeImage = UIGraphicsGetImageFromCurrentImageContext()
@@ -876,6 +965,58 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
         // 显示结果
         resultImageView.image = compositeImage
         resultContainerView.isHidden = false
+    }
+    
+    /// 计算最优布局策略
+    private func calculateOptimalLayout(frameSize: CGSize, frameCount: Int) -> (width: CGFloat, height: CGFloat, layout: TimeSequenceLayout) {
+        let aspectRatio = frameSize.width / frameSize.height
+        
+        // 🧮 根据屏幕尺寸和帧数智能选择布局
+        if frameCount <= 3 {
+            // 少帧数：水平排列
+            return (
+                width: frameSize.width * CGFloat(frameCount) + CGFloat(frameCount - 1) * 20,
+                height: frameSize.height,
+                layout: .horizontal(spacing: 20)
+            )
+        } else if aspectRatio > 1.5 {
+            // 横图：垂直堆叠
+            return (
+                width: frameSize.width,
+                height: frameSize.height * CGFloat(frameCount) + CGFloat(frameCount - 1) * 15,
+                layout: .vertical(spacing: 15)
+            )
+        } else {
+            // 竖图：水平排列
+            let columns = min(frameCount, 4) // 最多4列
+            let rows = Int(ceil(Double(frameCount) / Double(columns)))
+            
+            return (
+                width: frameSize.width * CGFloat(columns) + CGFloat(columns - 1) * 20,
+                height: frameSize.height * CGFloat(rows) + CGFloat(rows - 1) * 15,
+                layout: .grid(columns: columns, horizontalSpacing: 20, verticalSpacing: 15)
+            )
+        }
+    }
+    
+    /// 计算每帧的绘制位置
+    private func calculateFramePosition(index: Int, frameSize: CGSize, layout: TimeSequenceLayout) -> CGRect {
+        switch layout {
+        case .horizontal(let spacing):
+            let x = (frameSize.width + spacing) * CGFloat(index)
+            return CGRect(x: x, y: 0, width: frameSize.width, height: frameSize.height)
+            
+        case .vertical(let spacing):
+            let y = (frameSize.height + spacing) * CGFloat(index)
+            return CGRect(x: 0, y: y, width: frameSize.width, height: frameSize.height)
+            
+        case .grid(let columns, let hSpacing, let vSpacing):
+            let row = index / columns
+            let col = index % columns
+            let x = (frameSize.width + hSpacing) * CGFloat(col)
+            let y = (frameSize.height + vSpacing) * CGFloat(row)
+            return CGRect(x: x, y: y, width: frameSize.width, height: frameSize.height)
+        }
     }
     
     // MARK: - 参数创建
