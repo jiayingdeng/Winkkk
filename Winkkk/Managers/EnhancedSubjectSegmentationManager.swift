@@ -101,6 +101,11 @@ class EnhancedSubjectSegmentationManager {
         return currentCategory
     }
     
+    /// 检查模型是否已准备就绪
+    func isModelReady() -> Bool {
+        return model != nil && visionModel != nil
+    }
+    
     /// 对图片进行主体分割
     func segmentSubject(from image: UIImage, completion: @escaping EnhancedSegmentationCompletion) {
         guard let visionModel = visionModel else {

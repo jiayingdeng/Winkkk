@@ -38,6 +38,7 @@ class DETRSegmentationTestViewController: UIViewController {
     private var currentImage: UIImage?
     private var segmentationManager = EnhancedSubjectSegmentationManager.shared
     private var processingStartTime: Date?
+    private var modelStatusTimer: Timer?
     
     // MARK: - Public Methods
     
@@ -55,6 +56,11 @@ class DETRSegmentationTestViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         initializeSegmentationManager()
+        startModelStatusTimer()
+    }
+    
+    deinit {
+        modelStatusTimer?.invalidate()
     }
     
     // MARK: - Setup
@@ -179,14 +185,45 @@ class DETRSegmentationTestViewController: UIViewController {
     }
     
     private func initializeSegmentationManager() {
-        do {
-            try segmentationManager.initialize()
-            statusLabel?.text = "✅ DETR模型加载成功"
-            statusLabel?.textColor = .systemGreen
-        } catch {
-            statusLabel?.text = "❌ 模型加载失败: \(error.localizedDescription)"
-            statusLabel?.textColor = .systemRed
-            processButton?.isEnabled = false
+        statusLabel?.text = "🔄 正在加载DETR模型..."
+        statusLabel?.textColor = .systemOrange
+        
+        // 在后台线程初始化模型，避免阻塞主线程
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            do {
+                try self?.segmentationManager.initialize()
+                DispatchQueue.main.async {
+                    self?.statusLabel?.text = "✅ DETR模型加载成功"
+                    self?.statusLabel?.textColor = .systemGreen
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self?.statusLabel?.text = "❌ 模型加载失败: \(error.localizedDescription)"
+                    self?.statusLabel?.textColor = .systemRed
+                    self?.processButton?.isEnabled = false
+                }
+            }
+        }
+    }
+    
+    private func startModelStatusTimer() {
+        modelStatusTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.updateUIStateIfNeeded()
+            }
+        }
+    }
+    
+    private func updateUIStateIfNeeded() {
+        // 只有在模型状态发生变化时才更新UI
+        let hasImage = currentImage != nil
+        let isProcessing = processButton?.isEnabled == false && hasImage
+        updateUIState(isProcessing: isProcessing, hasImage: hasImage)
+        
+        // 如果模型已加载完成，停止定时器
+        if segmentationManager.isModelReady() {
+            modelStatusTimer?.invalidate()
+            modelStatusTimer = nil
         }
     }
     
@@ -196,16 +233,21 @@ class DETRSegmentationTestViewController: UIViewController {
     }
     
     private func updateUIState(isProcessing: Bool, hasImage: Bool) {
-        processButton?.isEnabled = hasImage && !isProcessing
+        processButton?.isEnabled = hasImage && !isProcessing && segmentationManager.isModelReady()
         selectImageButton?.isEnabled = !isProcessing
         categorySegmentedControl?.isEnabled = !isProcessing
         
         if isProcessing {
-            statusLabel?.text = "🔄 正在处理..."
+            statusLabel?.text = "🔄 DETR模型分析中，请稍候..."
             statusLabel?.textColor = .systemOrange
         } else if hasImage {
-            statusLabel?.text = "✅ 图片已加载，可以开始分割"
-            statusLabel?.textColor = .systemGreen
+            if segmentationManager.isModelReady() {
+                statusLabel?.text = "✅ 图片已加载，可以开始分割"
+                statusLabel?.textColor = .systemGreen
+            } else {
+                statusLabel?.text = "⏳ 模型加载中，请稍候..."
+                statusLabel?.textColor = .systemOrange
+            }
         } else {
             statusLabel?.text = "请选择图片开始测试"
             statusLabel?.textColor = .systemBlue
@@ -237,12 +279,23 @@ class DETRSegmentationTestViewController: UIViewController {
             return
         }
         
+        // 检查模型是否已初始化
+        guard segmentationManager.isModelReady() else {
+            showAlert(title: "提示", message: "模型正在加载中，请稍后再试")
+            return
+        }
+        
+        print("🚀 开始处理图片分割...")
         updateUIState(isProcessing: true, hasImage: true)
         processingStartTime = Date()
         
-        segmentationManager.segmentSubject(from: image) { [weak self] result in
-            DispatchQueue.main.async {
-                self?.handleSegmentationResult(result)
+        // 确保在后台线程处理
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.segmentationManager.segmentSubject(from: image) { result in
+                DispatchQueue.main.async {
+                    print("✅ 分割处理完成，更新UI")
+                    self?.handleSegmentationResult(result)
+                }
             }
         }
     }
