@@ -926,8 +926,9 @@ class SubjectExtractionDebugViewController: UIViewController {
     }
     
     @objc private func dismissViewController() {
-        if let navigationController = navigationController {
-            navigationController.popViewController(animated: true)
+        // 由于页面是以模态形式呈现的，需要dismiss整个导航控制器
+        if let presentingViewController = navigationController?.presentingViewController {
+            presentingViewController.dismiss(animated: true, completion: nil)
         } else {
             dismiss(animated: true, completion: nil)
         }
