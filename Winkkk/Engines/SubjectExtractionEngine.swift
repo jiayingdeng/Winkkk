@@ -683,10 +683,10 @@ extension SubjectExtractionEngine {
         
         // 设置颜色矩阵（基于第一个聚类 - 主体颜色）
         if let mainColor = colorClusters.first {
-            // 增强主要颜色通道
-            colorFilter.rVector = CIVector(x: mainColor[0], y: 0, z: 0, w: 0)
-            colorFilter.gVector = CIVector(x: 0, y: mainColor[1], z: 0, w: 0)
-            colorFilter.bVector = CIVector(x: 0, y: 0, z: mainColor[2], w: 0)
+            // 增强主要颜色通道 (将 Float 转换为 CGFloat)
+            colorFilter.rVector = CIVector(x: CGFloat(mainColor[0]), y: 0, z: 0, w: 0)
+            colorFilter.gVector = CIVector(x: 0, y: CGFloat(mainColor[1]), z: 0, w: 0)
+            colorFilter.bVector = CIVector(x: 0, y: 0, z: CGFloat(mainColor[2]), w: 0)
             colorFilter.aVector = CIVector(x: 0, y: 0, z: 0, w: 1)
         }
         
