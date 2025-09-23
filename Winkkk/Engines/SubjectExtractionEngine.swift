@@ -107,6 +107,7 @@ class SubjectExtractionEngine {
             )
         }
         
+        do {
             // 第一阶段：粗略定位
             let stage1Result = await performStage1Detection(ciImage: ciImage)
             
@@ -336,15 +337,36 @@ extension SubjectExtractionEngine {
                     return
                 }
                 
-                let bounds = pose.boundingBox
-                let imageRect = CGRect(
-                    x: bounds.origin.x * ciImage.extent.width,
-                    y: bounds.origin.y * ciImage.extent.height,
-                    width: bounds.size.width * ciImage.extent.width,
-                    height: bounds.size.height * ciImage.extent.height
-                )
+                // VNHumanBodyPoseObservation doesn't have boundingBox, calculate from key points
+                let allPoints = try? pose.recognizedPoints(.all)
+                let validPoints = allPoints?.values.compactMap { point in
+                    point.confidence > 0.3 ? point.location : nil
+                } ?? []
                 
-                continuation.resume(returning: (pose.confidence, imageRect))
+                let bounds: CGRect
+                if !validPoints.isEmpty {
+                    let minX = validPoints.map { $0.x }.min() ?? 0
+                    let maxX = validPoints.map { $0.x }.max() ?? 1
+                    let minY = validPoints.map { $0.y }.min() ?? 0
+                    let maxY = validPoints.map { $0.y }.max() ?? 1
+                    
+                    bounds = CGRect(
+                        x: minX * ciImage.extent.width,
+                        y: minY * ciImage.extent.height,
+                        width: (maxX - minX) * ciImage.extent.width,
+                        height: (maxY - minY) * ciImage.extent.height
+                    )
+                } else {
+                    bounds = CGRect(
+                        x: ciImage.extent.width * 0.25,
+                        y: ciImage.extent.height * 0.25,
+                        width: ciImage.extent.width * 0.5,
+                        height: ciImage.extent.height * 0.5
+                    )
+                }
+                
+                let confidence: Float = validPoints.isEmpty ? 0.3 : 0.8
+                continuation.resume(returning: (confidence, bounds))
             }
             
             let handler = VNImageRequestHandler(ciImage: ciImage)
@@ -655,21 +677,17 @@ extension SubjectExtractionEngine {
     ) async -> CIImage? {
         
         // 基于颜色聚类结果创建前景mask
-        let colorFilter = CIFilter.colorRange()
+        // 使用 CIColorMatrix 来创建颜色选择mask
+        let colorFilter = CIFilter.colorMatrix()
         colorFilter.inputImage = ciImage
         
-        // 设置颜色范围（基于第一个聚类 - 主体颜色）
+        // 设置颜色矩阵（基于第一个聚类 - 主体颜色）
         if let mainColor = colorClusters.first {
-            colorFilter.color0 = CIColor(
-                red: CGFloat(mainColor[0] - 0.2),
-                green: CGFloat(mainColor[1] - 0.2),
-                blue: CGFloat(mainColor[2] - 0.2)
-            )
-            colorFilter.color1 = CIColor(
-                red: CGFloat(mainColor[0] + 0.2),
-                green: CGFloat(mainColor[1] + 0.2),
-                blue: CGFloat(mainColor[2] + 0.2)
-            )
+            // 增强主要颜色通道
+            colorFilter.rVector = CIVector(x: mainColor[0], y: 0, z: 0, w: 0)
+            colorFilter.gVector = CIVector(x: 0, y: mainColor[1], z: 0, w: 0)
+            colorFilter.bVector = CIVector(x: 0, y: 0, z: mainColor[2], w: 0)
+            colorFilter.aVector = CIVector(x: 0, y: 0, z: 0, w: 1)
         }
         
         guard let colorMask = colorFilter.outputImage else { return refinedMask }
