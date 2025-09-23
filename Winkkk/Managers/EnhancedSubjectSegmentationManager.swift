@@ -51,7 +51,7 @@ class EnhancedSubjectSegmentationManager {
             case .plant:
                 return [58] // potted plant
             case .food:
-                return [46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61] // banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, donut, cake
+                return [46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 79] // banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, donut, cake, toothbrush(临时添加)
             case .object:
                 return [39, 40, 41, 42, 43, 44, 45] // bottle, wine glass, cup, fork, knife, spoon, bowl
             case .all:
@@ -224,7 +224,7 @@ class EnhancedSubjectSegmentationManager {
         
         // 转换为DetectedClass对象并排序
         return detectedClasses.compactMap { (classIndex, pixelCount) -> DetectedClass? in
-            guard classIndex < cocoClassNames.count && pixelCount > totalPixels / 1000 else { return nil } // 过滤掉占比太小的类别
+            guard classIndex < cocoClassNames.count && pixelCount > totalPixels / 10000 else { return nil } // 放宽筛选条件，便于调试
             
             let confidence = Float(pixelCount) / Float(totalPixels)
             return DetectedClass(
@@ -333,6 +333,7 @@ class EnhancedSubjectSegmentationManager {
         }
         
         let targetClasses = currentCategory.targetClasses
+        print("🎯 当前目标类别: \(targetClasses)")
         var maskData = [UInt8](repeating: 0, count: width * height)
         
         for y in 0..<height {
