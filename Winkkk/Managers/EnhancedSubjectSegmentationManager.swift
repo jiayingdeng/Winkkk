@@ -49,11 +49,15 @@ class EnhancedSubjectSegmentationManager {
             case .animal:
                 return [14, 15, 16, 17, 18, 19, 20, 21, 22, 23] // bird, cat, dog, horse, sheep, cow, elephant, bear, zebra, giraffe
             case .plant:
-                return [58] // potted plant
+                return [64] // potted plant (正确索引)
             case .food:
-                return [46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 79] // banana, apple, sandwich, orange, broccoli, carrot, hot dog, pizza, donut, cake, toothbrush(临时添加)
+                // 根据COCO数据集的正确索引: 52=banana, 53=apple, 54=sandwich, 55=orange, 56=broccoli, 57=carrot, 58=hot dog, 59=pizza, 60=donut, 61=cake
+                return [52, 53, 54, 55, 56, 57, 58, 59, 60, 61]
             case .object:
-                return [39, 40, 41, 42, 43, 44, 45] // bottle, wine glass, cup, fork, knife, spoon, bowl
+                // 日常用品: 39=bottle, 40=wine glass, 41=cup, 42=fork, 43=knife, 44=spoon, 45=bowl, 46=banana等被移除
+                // 家具: 62=chair, 63=couch, 65=bed, 67=dining table, 70=toilet等
+                // 电子设备: 72=tv, 73=laptop, 74=mouse, 75=remote, 76=keyboard, 77=cell phone等
+                return [39, 40, 41, 42, 43, 44, 45, 62, 63, 65, 67, 70, 72, 73, 74, 75, 76, 77, 78, 79]
             case .all:
                 return Set(0...79) // 所有COCO类别
             }
@@ -143,7 +147,9 @@ class EnhancedSubjectSegmentationManager {
                     if let featureResult = result as? VNCoreMLFeatureValueObservation {
                         print("   特征名: \(featureResult.featureName ?? "unknown")")
                         if let multiArray = featureResult.featureValue.multiArrayValue {
-                            print("   形状: \(multiArray.shape), 数据类型: \(multiArray.dataType.rawValue)")
+                            print("   📐 实际模型输出形状: \(multiArray.shape) (分辨率: \(multiArray.shape[0])x\(multiArray.shape[1]))")
+                            print("   🔢 数据类型: \(multiArray.dataType.rawValue)")
+                            print("   💾 数据总量: \(multiArray.count) 个值")
                         }
                     }
                 }
@@ -165,13 +171,26 @@ class EnhancedSubjectSegmentationManager {
             )
         }
         
-        // 使用 centerCrop 保持长宽比，避免图片变形
-        request.imageCropAndScaleOption = .centerCrop
+        // 预处理方式选择 - 测试不同选项来优化效果
+        // .centerCrop - 裁剪中心区域，可能丢失边缘重要信息
+        // .scaleFit - 等比缩放，保持完整图像，短边会有透明区域  
+        // .scaleFill - 等比缩放填充，可能改变纵横比，但物体更大更清晰
+        request.imageCropAndScaleOption = .scaleFill // 改为填充模式，提升物体识别精度
+        print("🖼️ 图像预处理设置: scaleFill (填充缩放，物体更大更清晰，可能轻微变形)")
+        print("📐 原始图像尺寸: \(inputImage.width) x \(inputImage.height)")
+        print("📐 模型输入尺寸: 将被缩放到模型要求的尺寸")
         
-        let handler = VNImageRequestHandler(cgImage: inputImage, options: [:])
+        // 高分辨率处理选项 - 尝试提升模型输入质量
+        let handlerOptions: [VNImageOption : Any] = [
+            .ciContext: CIContext(options: [.workingColorSpace: CGColorSpaceCreateDeviceRGB()]),
+            .properties: [:]
+        ]
+        
+        let handler = VNImageRequestHandler(cgImage: inputImage, options: handlerOptions)
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 print("🔄 执行DETR模型推理...")
+                print("🔧 图像处理选项: 使用高质量CIContext")
                 try handler.perform([request])
             } catch {
                 print("❌ DETR模型推理执行失败: \(error.localizedDescription)")
@@ -180,12 +199,46 @@ class EnhancedSubjectSegmentationManager {
         }
     }
     
+    /// 智能类别聚合 - 判断某个类别是否应该包含在指定分割类别中
+    private func shouldIncludeClassForCategory(classIndex: Int, category: SegmentationCategory) -> Bool {
+        // 获取类别名称
+        let className = classIndex < cocoClassNames.count ? cocoClassNames[classIndex] : ""
+        
+        switch category {
+        case .food:
+            // 对于食物类别，包含一些可能与食物相关的类别
+            // 例如：dining table(餐桌)可能与食物场景相关
+            return classIndex == 67 // dining table - 在餐桌上的物体可能是食物
+            
+        case .object:
+            // 对于物品类别，扩展包含更多日常用品
+            return false // 暂时保持严格匹配
+            
+        case .person:
+            // 人物相关，可能包含一些人体部位或相关物品
+            return false
+            
+        case .animal:
+            // 动物相关
+            return false
+            
+        case .plant:
+            // 植物相关，可能包含一些植物制品
+            return false
+            
+        case .all:
+            return false // 全部模式不需要额外聚合
+        }
+    }
+    
     /// 获取检测到的类别信息
     func getDetectedClasses(from segmentationMap: MLMultiArray) -> [DetectedClass] {
+        print("🔍 === 开始详细分析分割映射 ===")
         var detectedClasses: [Int: Int] = [:]
         
         // 安全检查shape维度，防止数组越界
         print("🔍 segmentationMap.shape: \(segmentationMap.shape), 维度数: \(segmentationMap.shape.count)")
+        print("🔍 segmentationMap数据类型: \(segmentationMap.dataType)")
         guard segmentationMap.shape.count >= 2 else {
             print("❌ segmentationMap.shape 维度不足: \(segmentationMap.shape)")
             return []
@@ -205,7 +258,10 @@ class EnhancedSubjectSegmentationManager {
             width = segmentationMap.shape[2].intValue
         }
         
+        print("📐 分割映射尺寸: \(width) x \(height) = \(width * height) 像素")
+        
         // 统计每个类别的像素数量
+        print("📊 开始统计像素分布...")
         for y in 0..<height {
             for x in 0..<width {
                 let classIndex: Int
@@ -221,19 +277,58 @@ class EnhancedSubjectSegmentationManager {
         }
         
         let totalPixels = width * height
+        print("📈 检测到 \(detectedClasses.count) 个不同的类别索引")
         
-        // 转换为DetectedClass对象并排序
-        return detectedClasses.compactMap { (classIndex, pixelCount) -> DetectedClass? in
-            guard classIndex < cocoClassNames.count && pixelCount > totalPixels / 10000 else { return nil } // 放宽筛选条件，便于调试
+        // 分析原始类别分布
+        print("🎯 原始类别分布（按像素数排序）:")
+        let sortedRawClasses = detectedClasses.sorted { $0.value > $1.value }
+        for (index, (classIndex, pixelCount)) in sortedRawClasses.enumerated() {
+            let percentage = Double(pixelCount) / Double(totalPixels) * 100
+            let className = classIndex < cocoClassNames.count ? cocoClassNames[classIndex] : "未知类别"
+            print("   \(index + 1). 类别\(classIndex)(\(className)): \(pixelCount)像素 (\(String(format: "%.3f", percentage))%)")
+            if index >= 9 { // 只显示前10个
+                print("   ... (\(detectedClasses.count - 10)个其他类别)")
+                break
+            }
+        }
+        
+        // 应用筛选条件并转换为DetectedClass对象
+        let minPixelThreshold = totalPixels / 10000 // 放宽筛选条件，便于调试
+        print("🎯 筛选阈值: \(minPixelThreshold) 像素 (\(String(format: "%.4f", Double(minPixelThreshold)/Double(totalPixels)*100))%)")
+        
+        let validClasses = detectedClasses.compactMap { (classIndex, pixelCount) -> DetectedClass? in
+            let isValidIndex = classIndex < cocoClassNames.count
+            let meetsThreshold = pixelCount > minPixelThreshold
+            
+            if !isValidIndex {
+                print("   ❌ 类别\(classIndex): 索引超出范围 (最大: \(cocoClassNames.count-1))")
+                return nil
+            }
+            
+            if !meetsThreshold {
+                let className = cocoClassNames[classIndex]
+                print("   ❌ 类别\(classIndex)(\(className)): 像素数\(pixelCount)低于阈值\(minPixelThreshold)")
+                return nil
+            }
             
             let confidence = Float(pixelCount) / Float(totalPixels)
+            let className = cocoClassNames[classIndex]
+            print("   ✅ 类别\(classIndex)(\(className)): \(pixelCount)像素 (\(String(format: "%.2f", confidence*100))%)")
+            
             return DetectedClass(
                 classIndex: classIndex,
-                className: cocoClassNames[classIndex],
+                className: className,
                 confidence: confidence,
                 pixelCount: pixelCount
             )
         }.sorted { $0.confidence > $1.confidence }
+        
+        print("🎉 最终有效检测结果: \(validClasses.count)个类别")
+        for (index, detectedClass) in validClasses.enumerated() {
+            print("   \(index + 1). \(detectedClass.className) - \(String(format: "%.2f", detectedClass.confidence * 100))% (\(detectedClass.pixelCount)像素)")
+        }
+        
+        return validClasses
     }
     
     // MARK: - Private Methods
@@ -333,8 +428,15 @@ class EnhancedSubjectSegmentationManager {
         }
         
         let targetClasses = currentCategory.targetClasses
-        print("🎯 当前目标类别: \(targetClasses)")
+        print("🎯 === 开始创建遮罩 ===")
+        print("🎯 当前分割类别: \(currentCategory)")
+        print("🎯 目标类别索引: \(targetClasses)")
+        print("🎯 目标类别名称: \(targetClasses.compactMap { $0 < cocoClassNames.count ? cocoClassNames[$0] : "未知(\($0))" })")
+        print("📐 遮罩尺寸: \(width) x \(height) = \(width * height) 像素")
+        
         var maskData = [UInt8](repeating: 0, count: width * height)
+        var foregroundPixels = 0
+        var classPixelCounts: [Int: Int] = [:]
         
         for y in 0..<height {
             for x in 0..<width {
@@ -346,12 +448,36 @@ class EnhancedSubjectSegmentationManager {
                     classIndex = segmentationMap[[0, NSNumber(value: y), NSNumber(value: x)]].intValue
                 }
                 
-                if targetClasses.contains(classIndex) {
+                classPixelCounts[classIndex, default: 0] += 1
+                
+                // 智能类别聚合 - 检查是否为目标类别或相似类别
+                let isTargetClass = targetClasses.contains(classIndex) || 
+                                   shouldIncludeClassForCategory(classIndex: classIndex, category: currentCategory)
+                
+                if isTargetClass {
                     maskData[index] = 255 // 白色（前景）
+                    foregroundPixels += 1
                 } else {
                     maskData[index] = 0   // 黑色（背景）
                 }
             }
+        }
+        
+        // 输出遮罩创建统计信息
+        print("📊 === 遮罩创建统计 ===")
+        print("🎨 前景像素数: \(foregroundPixels) / \(width * height) (\(String(format: "%.2f", Double(foregroundPixels) / Double(width * height) * 100))%)")
+        print("🎭 各类别像素分布:")
+        for (classIndex, count) in classPixelCounts.sorted(by: { $0.value > $1.value }) {
+            let className = classIndex < cocoClassNames.count ? cocoClassNames[classIndex] : "未知"
+            let percentage = Double(count) / Double(width * height) * 100
+            let isDirectTarget = targetClasses.contains(classIndex)
+            let isSmartTarget = shouldIncludeClassForCategory(classIndex: classIndex, category: currentCategory)
+            let status = isDirectTarget ? "✅目标" : (isSmartTarget ? "🧠智能" : "❌背景")
+            print("   \(className)(\(classIndex)): \(count) 像素 (\(String(format: "%.2f", percentage))%) \(status)")
+        }
+        
+        if foregroundPixels == 0 {
+            print("⚠️ 警告: 没有检测到任何目标类别的像素，遮罩将完全为黑色！")
         }
         
         let colorSpace = CGColorSpaceCreateDeviceGray()
