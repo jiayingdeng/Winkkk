@@ -166,6 +166,13 @@ class SettingsViewController: UIViewController {
                 items: [
                     SettingsItem(
                         type: .action,
+                        title: "🔍 主体提取调试",
+                        subtitle: "测试Vision框架+Core Image三阶段智能主体提取算法",
+                        icon: "magnifyingglass.circle",
+                        action: { [weak self] in self?.showSubjectExtractionDebug() }
+                    ),
+                    SettingsItem(
+                        type: .action,
                         title: "DETR智能分割测试",
                         subtitle: "测试DETR模型多类别分割效果（人物、动物、植物、食物）",
                         icon: "brain.head.profile",
@@ -418,6 +425,14 @@ class SettingsViewController: UIViewController {
     }
     
     // MARK: - Developer Options
+    private func showSubjectExtractionDebug() {
+        print("🔍 启动主体提取调试页面...")
+        let debugVC = SubjectExtractionDebugViewController()
+        let navController = UINavigationController(rootViewController: debugVC)
+        navController.modalPresentationStyle = .fullScreen
+        present(navController, animated: true)
+    }
+    
     private func showDETRSegmentationTest() {
         let storyboard = UIStoryboard(name: "DETRSegmentationTest", bundle: nil)
         guard let testVC = storyboard.instantiateViewController(withIdentifier: "DETRSegmentationTestViewController") as? DETRSegmentationTestViewController else {

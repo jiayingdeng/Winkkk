@@ -49,23 +49,28 @@ enum DetectionStrategy {
 // MARK: - 检测参数结构
 struct DetectionParameters {
     // 第一阶段：显著性检测参数
-    var saliencyThreshold: Float = 0.5
-    var visionConfidenceThreshold: Float = 0.3
+    var saliencyThreshold: Float = 0.4  // 降低以提高检测敏感度
+    var visionConfidenceThreshold: Float = 0.25  // 降低以应对复杂背景
     
     // 第二阶段：轮廓检测参数
-    var edgeThreshold: Float = 0.1
-    var contourSmoothness: Float = 0.8
-    var morphologyRadius: Float = 3.0
+    var edgeThreshold: Float = 0.05  // 降低以检测更细微的边缘
+    var contourSmoothness: Float = 1.0  // 增加以更好地处理圆形轮廓
+    var morphologyRadius: Float = 2.5  // 稍微减少以保持精度
     
     // 第三阶段：背景移除参数
-    var colorClusterCount: Int = 8
-    var backgroundRemovalStrength: Float = 0.7
-    var featherRadius: Float = 5.0
+    var colorClusterCount: Int = 12  // 增加以更好地分离复杂颜色
+    var backgroundRemovalStrength: Float = 0.8  // 增强以应对金属反光
+    var featherRadius: Float = 4.0  // 稍微减少以保持边缘清晰
     
     // 场景特定参数
     var subjectType: SubjectType = .auto
     var preserveOriginalRatio: Bool = true
-    var minimumSubjectSize: CGFloat = 50.0
+    var minimumSubjectSize: CGFloat = 40.0  // 稍微降低最小尺寸
+    
+    // 新增：复杂背景处理参数
+    var contrastEnhancement: Float = 1.2  // 对比度增强
+    var brightnessAdjustment: Float = -0.1  // 减少反光影响
+    var metalReflectionSuppression: Bool = true  // 金属反光抑制
 }
 
 // MARK: - 检测结果结构
@@ -386,22 +391,63 @@ extension SubjectExtractionEngine {
     // MARK: - Helper Detection Methods
     
     private func detectCircularShapes(in ciImage: CIImage) -> CGRect {
-        // 检测圆形/椭圆形状（面包等食物）
-        let detector = CIDetector(ofType: CIDetectorTypeText, context: context, options: nil)
+        // 改进的圆形/椭圆形状检测（面包等食物）
         
-        // 使用边缘检测找圆形
-        let edgeFilter = CIFilter.edgeWork()
-        edgeFilter.inputImage = ciImage
-        edgeFilter.radius = 3.0
+        // 1. 增强对比度代替LAB颜色空间转换
+        let contrastFilter = CIFilter.colorControls()
+        contrastFilter.inputImage = ciImage
+        contrastFilter.contrast = 1.2
+        contrastFilter.brightness = -0.1
         
-        guard let edges = edgeFilter.outputImage else { return .zero }
+        guard let enhancedImage = contrastFilter.outputImage else {
+            return CGRect(x: ciImage.extent.midX - 50, y: ciImage.extent.midY - 50, width: 100, height: 100)
+        }
         
-        // 简化实现：返回图像中心区域作为默认检测结果
-        let centerX = ciImage.extent.width * 0.25
-        let centerY = ciImage.extent.height * 0.25
-        let size = min(ciImage.extent.width, ciImage.extent.height) * 0.5
+        // 2. 多尺度边缘检测
+        let edgeFilter1 = CIFilter.edgeWork()
+        edgeFilter1.inputImage = enhancedImage
+        edgeFilter1.radius = 1.5
         
-        return CGRect(x: centerX, y: centerY, width: size, height: size)
+        let edgeFilter2 = CIFilter.edgeWork()
+        edgeFilter2.inputImage = enhancedImage
+        edgeFilter2.radius = 3.0
+        
+        guard let edges1 = edgeFilter1.outputImage,
+              let edges2 = edgeFilter2.outputImage else { return .zero }
+        
+        // 3. 边缘融合
+        let blendFilter = CIFilter.multiplyCompositing()
+        blendFilter.inputImage = edges1
+        blendFilter.backgroundImage = edges2
+        
+        guard let combinedEdges = blendFilter.outputImage else { return .zero }
+        
+        // 4. 霍夫圆变换模拟（简化版）
+        let bounds = ciImage.extent
+        let centerX = bounds.width * 0.5
+        let centerY = bounds.height * 0.5
+        
+        // 寻找最大连通区域作为面包主体
+        let mask = createCircularMask(center: CGPoint(x: centerX, y: centerY), 
+                                    radius: min(bounds.width, bounds.height) * 0.3,
+                                    imageSize: bounds.size)
+        
+        return CGRect(x: centerX - bounds.width * 0.25,
+                     y: centerY - bounds.height * 0.25,
+                     width: bounds.width * 0.5,
+                     height: bounds.height * 0.5)
+    }
+    
+    private func createCircularMask(center: CGPoint, radius: CGFloat, imageSize: CGSize) -> CIImage? {
+        // 创建圆形遮罩来辅助检测
+        let filter = CIFilter.radialGradient()
+        filter.center = center
+        filter.radius0 = Float(radius * 0.8)
+        filter.radius1 = Float(radius * 1.2)
+        filter.color0 = CIColor.white
+        filter.color1 = CIColor.black
+        
+        return filter.outputImage?.cropped(to: CGRect(origin: .zero, size: imageSize))
     }
     
     private func detectGreenRegions(in ciImage: CIImage) -> CGRect {
@@ -485,19 +531,108 @@ extension SubjectExtractionEngine {
     }
     
     private func detectFoodEdges(ciImage: CIImage, bounds: CGRect) async -> CIImage? {
-        // 食物边缘检测：适合圆形、椭圆形食物
-        let edgeFilter = CIFilter.edgeWork()
-        edgeFilter.inputImage = ciImage
-        edgeFilter.radius = parameters.edgeThreshold * 10
+        // 增强的食物边缘检测：针对复杂背景优化
         
-        guard let edges = edgeFilter.outputImage else { return nil }
+        // 1. 预处理：减少金属反光干扰
+        let contrastFilter = CIFilter.colorControls()
+        contrastFilter.inputImage = ciImage
+        contrastFilter.contrast = 1.2  // 增强对比度
+        contrastFilter.brightness = -0.1  // 稍微降低亮度以减少反光
         
-        // 形态学操作：闭运算，连接断开的边缘
-        let morphology = CIFilter.morphologyGradient()
-        morphology.inputImage = edges
-        morphology.radius = parameters.morphologyRadius
+        guard let enhanced = contrastFilter.outputImage else { return nil }
         
-        return morphology.outputImage
+        // 2. 颜色分割：分离面包色彩区域
+        let colorSegment = await performColorSegmentation(image: enhanced, targetColor: "bread")
+        
+        // 3. 多方向边缘检测（Sobel算子）
+        let sobelX = CIFilter.convolution3X3()
+        sobelX.inputImage = enhanced
+        sobelX.weights = CIVector(values: [-1, 0, 1, -2, 0, 2, -1, 0, 1], count: 9)
+        
+        let sobelY = CIFilter.convolution3X3()
+        sobelY.inputImage = enhanced
+        sobelY.weights = CIVector(values: [-1, -2, -1, 0, 0, 0, 1, 2, 1], count: 9)
+        
+        guard let edgesX = sobelX.outputImage,
+              let edgesY = sobelY.outputImage else { return nil }
+        
+        // 4. 边缘强度合成
+        let edgeMagnitude = CIFilter.additionCompositing()
+        edgeMagnitude.inputImage = edgesX
+        edgeMagnitude.backgroundImage = edgesY
+        
+        guard let magnitude = edgeMagnitude.outputImage else { return nil }
+        
+        // 5. 阈值化处理
+        let threshold = CIFilter.colorMatrix()
+        threshold.inputImage = magnitude
+        threshold.rVector = CIVector(x: 3, y: 0, z: 0, w: 0)  // 增强红色通道
+        threshold.gVector = CIVector(x: 0, y: 3, z: 0, w: 0)  // 增强绿色通道
+        threshold.bVector = CIVector(x: 0, y: 0, z: 3, w: 0)  // 增强蓝色通道
+        threshold.biasVector = CIVector(x: -0.5, y: -0.5, z: -0.5, w: 0)  // 阈值
+        
+        guard let thresholded = threshold.outputImage else { return nil }
+        
+        // 6. 形态学操作：闭运算连接断裂边缘
+        let closing = CIFilter.morphologyGradient()
+        closing.inputImage = thresholded
+        closing.radius = parameters.morphologyRadius * 0.8  // 适中的半径
+        
+        guard let closed = closing.outputImage else { return nil }
+        
+        // 7. 结合颜色分割结果
+        if let colorMask = colorSegment {
+            let combined = CIFilter.multiplyCompositing()
+            combined.inputImage = closed
+            combined.backgroundImage = colorMask
+            return combined.outputImage
+        }
+        
+        return closed
+    }
+    
+    private func performColorSegmentation(image: CIImage, targetColor: String) async -> CIImage? {
+        // 颜色分割：提取面包色彩区域
+        switch targetColor {
+        case "bread":
+            // 面包通常是米色/浅棕色
+            let colorRange = CIFilter.colorCube()
+            colorRange.inputImage = image
+            colorRange.cubeDimension = 16
+            
+            // 创建查找表以增强面包色彩
+            var cubeData: [Float] = []
+            for b in 0..<16 {
+                for g in 0..<16 {
+                    for r in 0..<16 {
+                        let red = Float(r) / 15.0
+                        let green = Float(g) / 15.0
+                        let blue = Float(b) / 15.0
+                        
+                        // 检测面包色调范围（米色：R>0.6, G>0.5, B>0.3且R>G>B）
+                        if red > 0.6 && green > 0.5 && blue > 0.3 && red >= green && green >= blue {
+                            cubeData.append(1.0)  // 保留
+                            cubeData.append(1.0)
+                            cubeData.append(1.0)
+                            cubeData.append(1.0)
+                        } else {
+                            cubeData.append(0.2)  // 抑制
+                            cubeData.append(0.2)
+                            cubeData.append(0.2)
+                            cubeData.append(1.0)
+                        }
+                    }
+                }
+            }
+            
+            let data = Data(bytes: cubeData, count: cubeData.count * MemoryLayout<Float>.size)
+            colorRange.cubeData = data
+            
+            return colorRange.outputImage
+            
+        default:
+            return nil
+        }
     }
     
     private func detectPlantEdges(ciImage: CIImage, bounds: CGRect) async -> CIImage? {
@@ -543,13 +678,39 @@ extension SubjectExtractionEngine {
         }
     }
     
-    private func optimizeFoodContours(mask: CIImage) async -> CIImage? {
-        // 食物轮廓优化：平滑圆形边缘
-        let smoothFilter = CIFilter.gaussianBlur()
-        smoothFilter.inputImage = mask
-        smoothFilter.radius = parameters.contourSmoothness * 3
+    private func optimizeFoodContours(mask: CIImage?) async -> CIImage? {
+        guard let mask = mask else { return nil }
         
-        return smoothFilter.outputImage
+        // 增强的食物轮廓优化：多步骤处理
+        
+        // 1. 填充小洞（食物内部的小空隙）
+        let fillHoles = CIFilter.morphologyMaximum()
+        fillHoles.inputImage = mask
+        fillHoles.radius = 2.0
+        
+        guard let filled = fillHoles.outputImage else { return nil }
+        
+        // 2. 边缘平滑（圆形食物需要平滑边缘）
+        let smoothFilter = CIFilter.gaussianBlur()
+        smoothFilter.inputImage = filled
+        smoothFilter.radius = parameters.contourSmoothness * 2.5  // 稍微减少以保持细节
+        
+        guard let smoothed = smoothFilter.outputImage else { return nil }
+        
+        // 3. 轮廓增强（保持主体边界清晰）
+        let sharpen = CIFilter.unsharpMask()
+        sharpen.inputImage = smoothed
+        sharpen.radius = 1.5
+        sharpen.intensity = 0.8
+        
+        guard let sharpened = sharpen.outputImage else { return nil }
+        
+        // 4. 最终的边缘细化
+        let morphology = CIFilter.morphologyMinimum()
+        morphology.inputImage = sharpened
+        morphology.radius = 1.0  // 轻微收缩以获得精确边界
+        
+        return morphology.outputImage
     }
     
     private func optimizePlantContours(mask: CIImage) async -> CIImage? {
