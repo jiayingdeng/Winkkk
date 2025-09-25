@@ -181,10 +181,24 @@ class SettingsViewController: UIViewController {
                     ),
                     SettingsItem(
                         type: .action,
+                        title: "🎯 DeepLabV3人物分割",
+                        subtitle: "专业人物分割测试（运动轨迹场景优化）",
+                        icon: "person.crop.circle.fill",
+                        action: { [weak self] in self?.showDeepLabV3Test() }
+                    ),
+                    SettingsItem(
+                        type: .action,
                         title: "DETR智能分割测试",
                         subtitle: "测试DETR模型多类别分割效果（人物、动物、植物、食物）",
                         icon: "brain.head.profile",
                         action: { [weak self] in self?.showDETRSegmentationTest() }
+                    ),
+                    SettingsItem(
+                        type: .action,
+                        title: "📹 视频分割测试",
+                        subtitle: "上传视频提取关键帧，测试DeepLabV3批量分割效果与一致性",
+                        icon: "video.badge.waveform",
+                        action: { [weak self] in self?.showVideoSegmentationTest() }
                     ),
                     SettingsItem(
                         type: .action,
@@ -449,12 +463,27 @@ class SettingsViewController: UIViewController {
         present(navController, animated: true)
     }
     
+    private func showDeepLabV3Test() {
+        print("🎯 启动DeepLabV3人物分割测试页面...")
+        let testVC = DeepLabV3TestViewController()
+        let navController = UINavigationController(rootViewController: testVC)
+        navController.modalPresentationStyle = .fullScreen
+        present(navController, animated: true)
+    }
+    
     private func showDETRSegmentationTest() {
         let storyboard = UIStoryboard(name: "DETRSegmentationTest", bundle: nil)
         guard let testVC = storyboard.instantiateViewController(withIdentifier: "DETRSegmentationTestViewController") as? DETRSegmentationTestViewController else {
             print("❌ 无法从Storyboard加载DETRSegmentationTestViewController")
             return
         }
+        let navController = UINavigationController(rootViewController: testVC)
+        navController.modalPresentationStyle = .fullScreen
+        present(navController, animated: true)
+    }
+    
+    private func showVideoSegmentationTest() {
+        let testVC = VideoSegmentationTestViewController()
         let navController = UINavigationController(rootViewController: testVC)
         navController.modalPresentationStyle = .fullScreen
         present(navController, animated: true)

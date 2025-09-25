@@ -36,7 +36,7 @@ class OnboardingViewController: UIViewController {
     // MARK: - Data
     private let onboardingData: [OnboardingPageData] = [
         OnboardingPageData(
-            title: "欢迎使用 Winkkk",
+            title: "欢迎使用 Moment",
             subtitle: "专为爱美的你打造",
             description: "轻松从视频中截取完美瞬间\n让每一帧都成为精彩回忆",
             imageName: "heart.fill",

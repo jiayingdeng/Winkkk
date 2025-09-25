@@ -44,10 +44,14 @@ class DETRSegmentationTestViewController: UIViewController {
     // MARK: - Public Methods
     
     func setInitialImage(_ image: UIImage) {
+        print("🖼️ setInitialImage: 设置预设图片，尺寸: \(image.size)")
         currentImage = image
         // 如果视图已经加载，立即更新UI
         if isViewLoaded {
+            print("🖼️ setInitialImage: 视图已加载，立即更新UI")
             updateImageViews()
+        } else {
+            print("🖼️ setInitialImage: 视图未加载，将在viewDidAppear中更新")
         }
     }
     
@@ -59,6 +63,18 @@ class DETRSegmentationTestViewController: UIViewController {
         initializeSegmentationManager()
         startModelStatusTimer()
         showWelcomeHint()
+    }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        
+        // 如果有预设的图片，确保UI正确更新
+        if let image = currentImage {
+            print("📱 viewDidAppear: 检测到预设图片，更新UI")
+            updateImageViews()
+            statusLabel?.text = "✅ 图片已预载，可以开始分割"
+            statusLabel?.textColor = .systemGreen
+        }
     }
     
     deinit {
@@ -259,15 +275,21 @@ class DETRSegmentationTestViewController: UIViewController {
     }
     
     private func updateUIStateIfNeeded() {
-        // 只有在模型状态发生变化时才更新UI
-        let hasImage = currentImage != nil
-        let isProcessing = processButton?.isEnabled == false && hasImage
-        updateUIState(isProcessing: isProcessing, hasImage: hasImage)
+        // 检查模型是否已准备就绪
+        let modelReady = segmentationManager.isModelReady()
         
-        // 如果模型已加载完成，停止定时器
-        if segmentationManager.isModelReady() {
+        // 如果模型已加载完成，停止定时器并更新UI
+        if modelReady {
             modelStatusTimer?.invalidate()
             modelStatusTimer = nil
+            
+            // 只有在有图片的情况下才更新状态为可以分割
+            let hasImage = currentImage != nil
+            if hasImage {
+                statusLabel?.text = "✅ 图片已加载，可以开始分割"
+                statusLabel?.textColor = .systemGreen
+                processButton?.isEnabled = true
+            }
         }
     }
     
@@ -554,12 +576,13 @@ extension DETRSegmentationTestViewController: PHPickerViewControllerDelegate {
         result.itemProvider.loadObject(ofClass: UIImage.self) { [weak self] object, error in
             DispatchQueue.main.async {
                 if let image = object as? UIImage {
+                    print("📷 PHPicker: 成功加载图片，尺寸: \(image.size)")
                     self?.currentImage = image
                     self?.originalImageView?.image = image
                     self?.updateUIState(isProcessing: false, hasImage: true)
-                    self?.statusLabel?.text = "✅ 图片加载成功，可以开始分割"
-                    self?.statusLabel?.textColor = .systemGreen
+                    print("📷 PHPicker: UI状态已更新")
                 } else {
+                    print("❌ PHPicker: 无法加载图片，错误: \(error?.localizedDescription ?? "未知错误")")
                     self?.showAlert(title: "错误", message: "无法加载选择的图片")
                 }
             }
