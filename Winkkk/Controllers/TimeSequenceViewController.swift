@@ -682,8 +682,22 @@ class TimeSequenceViewController: UIViewController {
     private func automaticallyStartProcessing(videoURL: URL) {
         print("⚡ 自动开始处理视频：\(videoURL)")
         
+        guard let sceneType = sceneType else {
+            print("❌ 场景类型未设置")
+            offerRetryOrBackOptions()
+            return
+        }
+        
+        // 🔧 修复：使用用户选择的帧数创建自定义参数
+        let customParameters = createCustomParameters(for: sceneType, frameCount: selectedFrameCount)
+        print("🔧 自动模式参数：帧数=\(selectedFrameCount), 场景=\(sceneType.displayName)")
+        
+        // 🔧 修复：重新创建处理器以使用正确参数
+        timeSequenceProcessor = TimeSequenceProcessor(sceneType: sceneType, parameters: customParameters)
+        timeSequenceProcessor?.delegate = self
+        
         guard let processor = timeSequenceProcessor else {
-            print("❌ 时间序列处理器未初始化")
+            print("❌ 时间序列处理器重新初始化失败")
             offerRetryOrBackOptions()
             return
         }
@@ -1358,15 +1372,29 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
     /// 🏀 运动轨迹场景透明度优化
     private func optimizeForSportsMotion(alpha: CGFloat) -> CGFloat {
         // 运动轨迹：增强对比，突出动作连贯性
-        // 结合参数：每0.1秒一帧，最多20帧，密集时间分布提取，锐度增强
-        return pow(alpha, 0.6) // 🔥 优化：从0.8改为0.6，显著增强中间帧可见度，突出运动轨迹连贯性
+        // 🔧 修复：根据帧数调整透明度算法
+        let frameCount = extractedFrames.count > 0 ? extractedFrames.count : selectedFrameCount
+        
+        if frameCount <= 8 {
+            // 少帧模式（3-8帧）：使用保守的透明度增强
+            return pow(alpha, 0.7) // 温和增强，确保每帧都能清晰看到
+        } else if frameCount <= 15 {
+            // 中等帧数（9-15帧）：平衡透明度
+            return pow(alpha, 0.6) // 中等增强
+        } else {
+            // 多帧模式（16+帧）：更激进的透明度增强
+            let enhancedAlpha = min(alpha * 1.3, 0.9) // 提高30%，但不超过90%
+            return pow(enhancedAlpha, 0.4) // 更激进的幂函数，确保前面帧可见
+        }
     }
     
     /// 计算场景特定的透明度
     private func calculateAlphaForScene(index: Int, totalFrames: Int, sceneType: SceneType) -> CGFloat {
-        // 🔥 修复：调整透明度范围，确保所有帧都能看见
-        // 从10%到70%的范围，避免最后一帧100%完全覆盖前面的帧
-        let baseAlpha = (CGFloat(index + 1) / CGFloat(totalFrames)) * 0.6 + 0.1
+        // 🔧 修复：根据帧数动态调整透明度范围
+        let (minAlpha, maxAlpha) = getAlphaRangeForFrameCount(totalFrames, sceneType: sceneType)
+        let baseAlpha = (CGFloat(index + 1) / CGFloat(totalFrames)) * (maxAlpha - minAlpha) + minAlpha
+        
+        print("📊 帧\(index+1)/\(totalFrames): 基础透明度=\(String(format: "%.2f", baseAlpha))")
         
         // 根据场景类型应用优化策略
         switch sceneType {
@@ -1376,6 +1404,25 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
             return optimizeForHumanAction(alpha: baseAlpha)
         case .sportMotion:
             return optimizeForSportsMotion(alpha: baseAlpha)
+        }
+    }
+    
+    /// 根据帧数和场景类型获取适合的透明度范围
+    private func getAlphaRangeForFrameCount(_ frameCount: Int, sceneType: SceneType) -> (CGFloat, CGFloat) {
+        switch sceneType {
+        case .sportMotion:
+            if frameCount <= 5 {
+                return (0.25, 0.85) // 25%-85%，适合少帧，确保层次丰富
+            } else if frameCount <= 8 {
+                return (0.2, 0.8) // 20%-80%，适合中少帧
+            } else if frameCount <= 12 {
+                return (0.15, 0.75) // 15%-75%，适合中等帧数
+            } else {
+                return (0.1, 0.7) // 10%-70%，适合多帧
+            }
+        case .objectChange, .personAction:
+            // 其他场景保持原有逻辑
+            return (0.1, 0.7)
         }
     }
     
