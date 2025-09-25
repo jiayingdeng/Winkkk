@@ -1074,22 +1074,25 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
         // 🖼️ 创建画布
         UIGraphicsBeginImageContextWithOptions(canvasSize, false, 0.0)
         
-        // 🎯 所有帧叠加在同一位置，创建运动轨迹效果
-        for (index, frame) in frames.enumerated() {
+        // 🎯 反向绘制：从最后一帧开始绘制，让最后一帧最清晰
+        // 效果：开始帧不清晰（在上层但透明度低），最后帧清晰（在底层但透明度高）
+        print("🔄 使用反向绘制策略：开始帧不清晰 → 最后帧清晰")
+        
+        for (reverseIndex, frame) in frames.enumerated().reversed() {
             let alpha = calculateAlphaForScene(
-                index: index,
+                index: reverseIndex,
                 totalFrames: frames.count,
                 sceneType: sceneType
             )
             
-            // ✨ 关键：所有帧叠加在同一位置，形成轨迹残影
+            // ✨ 关键：反向绘制，最后一帧先绘制（在底层），开始帧后绘制（在上层）
             frame.draw(
                 in: CGRect(origin: .zero, size: canvasSize),
                 blendMode: .normal,
                 alpha: alpha
             )
             
-            print("🎨 \(sceneType.icon) 绘制轨迹帧 \(index + 1)/\(frames.count)，透明度: \(String(format: "%.1f", alpha * 100))%")
+            print("🎨 \(sceneType.icon) 反向绘制帧 \(reverseIndex + 1)/\(frames.count)，透明度: \(String(format: "%.1f", alpha * 100))%")
         }
         
         // 🎉 完成合成
