@@ -490,7 +490,8 @@ class TimeSequenceViewController: UIViewController {
         // 触感反馈
         HapticFeedbackManager.shared.lightImpact()
         
-        // TODO: 更新预览帧
+        // 🆕 实时更新关键帧预览
+        updateKeyFramePreview(frameCount: count)
     }
     
     @objc private func processButtonTapped() {
@@ -886,6 +887,225 @@ class TimeSequenceViewController: UIViewController {
         // 🆕 更新预览标题显示实际帧数
         previewTitleLabel.text = "📸 提取的关键帧 (\(extractedFrames.count)帧)"
     }
+    
+    // MARK: - 🆕 实时关键帧预览
+    
+    /// 滑块变化时更新关键帧预览
+    private func updateKeyFramePreview(frameCount: Int) {
+        guard let videoURL = selectedVideoURL else {
+            print("📱 没有选择视频，跳过预览更新")
+            return
+        }
+        
+        // 显示加载状态
+        showPreviewLoadingState(frameCount: frameCount)
+        
+        // 异步提取预览帧
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.extractPreviewFrames(videoURL: videoURL, frameCount: frameCount)
+        }
+    }
+    
+    /// 显示预览加载状态
+    private func showPreviewLoadingState(frameCount: Int) {
+        previewTitleLabel.text = "📸 正在更新预览 (\(frameCount)帧)..."
+        
+        // 清除现有预览并显示加载占位
+        framesStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        // 添加加载占位符
+        for _ in 0..<min(frameCount, 8) {
+            let placeholderView = createLoadingPlaceholder()
+            framesStackView.addArrangedSubview(placeholderView)
+        }
+    }
+    
+    /// 创建加载占位符
+    private func createLoadingPlaceholder() -> UIView {
+        let placeholder = UIView()
+        placeholder.backgroundColor = UIColor.systemGray5
+        placeholder.layer.cornerRadius = 8
+        placeholder.clipsToBounds = true
+        
+        // 添加加载动画
+        let activityIndicator = UIActivityIndicatorView(style: .medium)
+        activityIndicator.startAnimating()
+        activityIndicator.translatesAutoresizingMaskIntoConstraints = false
+        
+        placeholder.addSubview(activityIndicator)
+        
+        placeholder.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            placeholder.widthAnchor.constraint(equalToConstant: 40),
+            placeholder.heightAnchor.constraint(equalToConstant: 40 * 1.33),
+            activityIndicator.centerXAnchor.constraint(equalTo: placeholder.centerXAnchor),
+            activityIndicator.centerYAnchor.constraint(equalTo: placeholder.centerYAnchor)
+        ])
+        
+        return placeholder
+    }
+    
+    /// 提取预览帧（轻量级版本）
+    private func extractPreviewFrames(videoURL: URL, frameCount: Int) {
+        do {
+            // 1. 加载视频资产
+            let asset = AVAsset(url: videoURL)
+            let duration = asset.duration.seconds
+            
+            guard duration > 0 else {
+                DispatchQueue.main.async {
+                    self.showPreviewError("视频时长无效")
+                }
+                return
+            }
+            
+            // 2. 创建图像生成器
+            let imageGenerator = AVAssetImageGenerator(asset: asset)
+            imageGenerator.appliesPreferredTrackTransform = true
+            imageGenerator.requestedTimeToleranceBefore = CMTime.zero
+            imageGenerator.requestedTimeToleranceAfter = CMTime.zero
+            imageGenerator.maximumSize = CGSize(width: 360, height: 640) // 预览用小尺寸
+            
+            // 3. 计算时间点（使用与正式处理相同的逻辑）
+            let timePoints = calculatePreviewTimePoints(duration: duration, frameCount: frameCount)
+            
+            // 4. 提取预览帧
+            var previewFrames: [UIImage] = []
+            
+            for timePoint in timePoints {
+                do {
+                    let cgImage = try imageGenerator.copyCGImage(at: timePoint, actualTime: nil)
+                    let image = UIImage(cgImage: cgImage)
+                    previewFrames.append(image)
+                } catch {
+                    print("⚠️ 预览帧提取失败: \(error)")
+                    // 继续提取其他帧
+                }
+            }
+            
+            // 5. 更新UI
+            DispatchQueue.main.async {
+                self.updatePreviewFramesUI(previewFrames, targetCount: frameCount)
+            }
+            
+        } catch {
+            DispatchQueue.main.async {
+                self.showPreviewError(error.localizedDescription)
+            }
+        }
+    }
+    
+    /// 计算预览时间点
+    private func calculatePreviewTimePoints(duration: Double, frameCount: Int) -> [CMTime] {
+        var timePoints: [CMTime] = []
+        
+        guard let sceneType = sceneType else {
+            // 默认均匀分布
+            let step = duration / Double(frameCount)
+            for i in 0..<frameCount {
+                let time = CMTime(seconds: Double(i) * step, preferredTimescale: 600)
+                timePoints.append(time)
+            }
+            return timePoints
+        }
+        
+        // 使用与正式处理相同的时间点计算逻辑
+        switch sceneType {
+        case .objectChange, .personAction:
+            // 均匀分布
+            let step = duration / Double(frameCount)
+            for i in 0..<frameCount {
+                let time = CMTime(seconds: Double(i) * step, preferredTimescale: 600)
+                timePoints.append(time)
+            }
+            
+        case .sportMotion:
+            // 密集分布（运动轨迹）
+            let step = duration / Double(frameCount)
+            for i in 0..<frameCount {
+                let time = CMTime(seconds: Double(i) * step, preferredTimescale: 600)
+                timePoints.append(time)
+            }
+        }
+        
+        return timePoints
+    }
+    
+    /// 更新预览帧UI
+    private func updatePreviewFramesUI(_ frames: [UIImage], targetCount: Int) {
+        // 清除现有预览
+        framesStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        if frames.isEmpty {
+            showPreviewError("未能提取到预览帧")
+            return
+        }
+        
+        // 显示预览帧
+        let maxDisplayFrames = min(8, frames.count)
+        for (index, frame) in frames.prefix(maxDisplayFrames).enumerated() {
+            let imageView = UIImageView(image: frame)
+            imageView.contentMode = .scaleAspectFill
+            imageView.clipsToBounds = true
+            imageView.layer.cornerRadius = 8
+            imageView.layer.borderWidth = 1
+            imageView.layer.borderColor = UIColor.systemBlue.withAlphaComponent(0.3).cgColor
+            
+            imageView.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                imageView.widthAnchor.constraint(equalToConstant: 40),
+                imageView.heightAnchor.constraint(equalToConstant: 40 * 1.33)
+            ])
+            
+            framesStackView.addArrangedSubview(imageView)
+        }
+        
+        // 如果有更多帧未显示
+        if frames.count > maxDisplayFrames {
+            let moreLabel = UILabel()
+            moreLabel.text = "+\(frames.count - maxDisplayFrames)"
+            moreLabel.font = UIFont.systemFont(ofSize: 12, weight: .medium)
+            moreLabel.textColor = ThemeManager.secondaryText
+            moreLabel.textAlignment = .center
+            moreLabel.backgroundColor = UIColor.systemGray5
+            moreLabel.layer.cornerRadius = 8
+            moreLabel.clipsToBounds = true
+            
+            moreLabel.translatesAutoresizingMaskIntoConstraints = false
+            NSLayoutConstraint.activate([
+                moreLabel.widthAnchor.constraint(equalToConstant: 40),
+                moreLabel.heightAnchor.constraint(equalToConstant: 40 * 1.33)
+            ])
+            
+            framesStackView.addArrangedSubview(moreLabel)
+        }
+        
+        // 更新标题
+        previewTitleLabel.text = "📸 预览关键帧 (\(frames.count)/\(targetCount)帧)"
+        
+        // 显示预览区域
+        previewContainerView.isHidden = false
+    }
+    
+    /// 显示预览错误
+    private func showPreviewError(_ message: String) {
+        previewTitleLabel.text = "📸 预览失败"
+        
+        // 清除现有预览并显示错误
+        framesStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        
+        let errorLabel = UILabel()
+        errorLabel.text = "⚠️ \(message)"
+        errorLabel.font = UIFont.systemFont(ofSize: 12)
+        errorLabel.textColor = .systemRed
+        errorLabel.textAlignment = .center
+        errorLabel.numberOfLines = 0
+        
+        errorLabel.translatesAutoresizingMaskIntoConstraints = false
+        framesStackView.addArrangedSubview(errorLabel)
+        
+        print("❌ 预览错误: \(message)")
+    }
 }
 
 // MARK: - VideoGalleryViewControllerDelegate
@@ -1078,21 +1298,25 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
         // 效果：开始帧不清晰（在上层但透明度低），最后帧清晰（在底层但透明度高）
         print("🔄 使用反向绘制策略：开始帧不清晰 → 最后帧清晰")
         
-        for (reverseIndex, frame) in frames.enumerated().reversed() {
+        for (drawIndex, frame) in frames.enumerated().reversed() {
+            // 🔧 修复：反向绘制时，需要反向计算透明度
+            // 原理：最后一帧先绘制（底层），需要用最高透明度，所以用 (totalFrames - 1)
+            //      第一帧后绘制（上层），需要用最低透明度，所以用 0
+            let transparencyIndex = frames.count - 1 - drawIndex
             let alpha = calculateAlphaForScene(
-                index: reverseIndex,
+                index: transparencyIndex,  // 💡 关键修复：使用反向索引计算透明度
                 totalFrames: frames.count,
                 sceneType: sceneType
             )
             
-            // ✨ 关键：反向绘制，最后一帧先绘制（在底层），开始帧后绘制（在上层）
+            // ✨ 效果：最后一帧（drawIndex大）用高透明度在底层，第一帧（drawIndex小）用低透明度在上层
             frame.draw(
                 in: CGRect(origin: .zero, size: canvasSize),
                 blendMode: .normal,
                 alpha: alpha
             )
             
-            print("🎨 \(sceneType.icon) 反向绘制帧 \(reverseIndex + 1)/\(frames.count)，透明度: \(String(format: "%.1f", alpha * 100))%")
+            print("🎨 \(sceneType.icon) 反向绘制帧 \(drawIndex + 1)/\(frames.count)，透明度索引: \(transparencyIndex)，透明度: \(String(format: "%.1f", alpha * 100))%")
         }
         
         // 🎉 完成合成
@@ -1375,19 +1599,18 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
     /// 🏀 运动轨迹场景透明度优化
     private func optimizeForSportsMotion(alpha: CGFloat) -> CGFloat {
         // 运动轨迹：增强对比，突出动作连贯性
-        // 🔧 修复：根据帧数调整透明度算法
+        // 🎯 目标：第1帧(残影) → 第5帧(清晰) 的渐进效果
         let frameCount = extractedFrames.count > 0 ? extractedFrames.count : selectedFrameCount
         
         if frameCount <= 8 {
-            // 少帧模式（3-8帧）：使用保守的透明度增强
-            return pow(alpha, 0.7) // 温和增强，确保每帧都能清晰看到
+            // 🔧 修复：少帧模式（3-8帧）- 加强对比度，让起始帧更透明
+            return pow(alpha, 1.4) // 让前面帧更透明，后面帧保持清晰
         } else if frameCount <= 15 {
             // 中等帧数（9-15帧）：平衡透明度
-            return pow(alpha, 0.6) // 中等增强
+            return pow(alpha, 1.2) // 适中的对比增强
         } else {
-            // 多帧模式（16+帧）：更激进的透明度增强
-            let enhancedAlpha = min(alpha * 1.3, 0.9) // 提高30%，但不超过90%
-            return pow(enhancedAlpha, 0.4) // 更激进的幂函数，确保前面帧可见
+            // 多帧模式（16+帧）：线性处理，避免过度透明
+            return alpha // 直接使用基础透明度，因为帧数多时层次已经足够丰富
         }
     }
     
