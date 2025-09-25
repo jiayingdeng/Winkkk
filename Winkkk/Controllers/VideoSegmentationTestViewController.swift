@@ -870,7 +870,8 @@ extension VideoSegmentationTestViewController: UICollectionViewDataSource, UICol
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         let width = collectionView.bounds.width - 30 // 单列布局，左右各15间距
-        let height: CGFloat = 380 // 增加高度以显示更大的图片
+        // 计算实际需要的高度：headerView(40) + imageStackView(280) + metricsView(50) + spacing(24) + padding(16) = 410
+        let height: CGFloat = 410
         return CGSize(width: width, height: height)
     }
 }
@@ -891,6 +892,12 @@ extension VideoSegmentationTestViewController: FrameSegmentationCellDelegate {
     }
     
     private func showImagePreview(image: UIImage, title: String) {
+        // 检查是否已经有模态视图在展示
+        if presentedViewController != nil {
+            print("⚠️ 已有模态视图在展示，跳过图片预览")
+            return
+        }
+        
         // 创建图片预览视图控制器
         let previewVC = UIViewController()
         previewVC.view.backgroundColor = .systemBackground

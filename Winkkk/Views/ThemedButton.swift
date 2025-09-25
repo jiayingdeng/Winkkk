@@ -43,7 +43,7 @@ class CapsuleButton: UIButton {
         }
     }
     
-    private let buttonStyle: ButtonStyle
+    private var buttonStyle: ButtonStyle
     private let buttonSize: ButtonSize
     private let gradientLayer = CAGradientLayer()
     private var heightConstraint: NSLayoutConstraint?
@@ -76,6 +76,40 @@ class CapsuleButton: UIButton {
         // 设置胶囊形状
         layer.cornerRadius = bounds.height / 2
         gradientLayer.cornerRadius = bounds.height / 2
+    }
+    
+    /// 更新按钮样式
+    func updateStyle(_ newStyle: ButtonStyle) {
+        guard newStyle != buttonStyle else { return }
+        
+        buttonStyle = newStyle
+        
+        // 清除现有样式
+        clearCurrentStyle()
+        
+        // 应用新样式
+        configureAppearance()
+    }
+    
+    /// 清除当前样式设置
+    private func clearCurrentStyle() {
+        // 移除渐变层
+        gradientLayer.removeFromSuperlayer()
+        
+        // 清除背景和边框
+        backgroundColor = UIColor.clear
+        layer.borderWidth = 0
+        layer.borderColor = UIColor.clear.cgColor
+        
+        // 清除阴影
+        layer.shadowOpacity = 0
+        
+        // 清除模糊效果（如果有的话）
+        subviews.forEach { view in
+            if view is UIVisualEffectView {
+                view.removeFromSuperview()
+            }
+        }
     }
     
     private func setupButton() {
