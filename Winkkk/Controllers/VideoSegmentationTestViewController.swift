@@ -65,6 +65,10 @@ class VideoSegmentationTestViewController: UIViewController {
     private var processingStartTime: Date?
     private var currentProcessingIndex = 0
     
+    // 图片预览相关属性
+    private var currentPreviewImage: UIImage?
+    private var currentPreviewTitle: String?
+    
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -887,53 +891,77 @@ extension VideoSegmentationTestViewController: FrameSegmentationCellDelegate {
     }
     
     private func showImagePreview(image: UIImage, title: String) {
-        let alert = UIAlertController(title: title, message: nil, preferredStyle: .actionSheet)
+        // 创建图片预览视图控制器
+        let previewVC = UIViewController()
+        previewVC.view.backgroundColor = .systemBackground
+        previewVC.title = title
         
         // 创建图片视图
         let imageView = UIImageView(image: image)
         imageView.contentMode = .scaleAspectFit
         imageView.translatesAutoresizingMaskIntoConstraints = false
         
-        let containerView = UIView()
-        containerView.addSubview(imageView)
+        previewVC.view.addSubview(imageView)
         
         NSLayoutConstraint.activate([
-            imageView.topAnchor.constraint(equalTo: containerView.topAnchor),
-            imageView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            imageView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-            imageView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
-            imageView.heightAnchor.constraint(equalToConstant: 300),
-            containerView.widthAnchor.constraint(equalToConstant: 280)
+            imageView.topAnchor.constraint(equalTo: previewVC.view.safeAreaLayoutGuide.topAnchor, constant: 20),
+            imageView.leadingAnchor.constraint(equalTo: previewVC.view.leadingAnchor, constant: 20),
+            imageView.trailingAnchor.constraint(equalTo: previewVC.view.trailingAnchor, constant: -20),
+            imageView.bottomAnchor.constraint(equalTo: previewVC.view.safeAreaLayoutGuide.bottomAnchor, constant: -20)
         ])
         
-        alert.setValue(containerView, forKey: "contentViewController")
+        // 添加关闭按钮
+        previewVC.navigationItem.rightBarButtonItem = UIBarButtonItem(
+            title: "关闭",
+            style: .done,
+            target: self,
+            action: #selector(dismissImagePreview)
+        )
         
-        // 添加操作选项
+        // 添加操作按钮
+        var actions: [UIBarButtonItem] = []
+        
         if title.contains("主体图") {
-            alert.addAction(UIAlertAction(title: "💾 保存到相册", style: .default) { _ in
-                self.saveImageToPhotos(image)
-            })
+            let saveButton = UIBarButtonItem(
+                image: UIImage(systemName: "square.and.arrow.down"),
+                style: .plain,
+                target: self,
+                action: #selector(saveCurrentPreviewImage)
+            )
+            saveButton.accessibilityLabel = "保存到相册"
             
-            alert.addAction(UIAlertAction(title: "📤 分享图片", style: .default) { _ in
-                self.shareImage(image)
-            })
+            let shareButton = UIBarButtonItem(
+                image: UIImage(systemName: "square.and.arrow.up"),
+                style: .plain,
+                target: self,
+                action: #selector(shareCurrentPreviewImage)
+            )
+            shareButton.accessibilityLabel = "分享图片"
+            
+            actions.append(contentsOf: [saveButton, shareButton])
         }
         
-        // 添加图片信息选项
-        alert.addAction(UIAlertAction(title: "ℹ️ 图片信息", style: .default) { _ in
-            self.showImageInfo(image, title: title)
-        })
+        let infoButton = UIBarButtonItem(
+            image: UIImage(systemName: "info.circle"),
+            style: .plain,
+            target: self,
+            action: #selector(showCurrentImageInfo)
+        )
+        infoButton.accessibilityLabel = "图片信息"
+        actions.append(infoButton)
         
-        alert.addAction(UIAlertAction(title: "关闭", style: .cancel))
-        
-        // iPad适配
-        if let popover = alert.popoverPresentationController {
-            popover.sourceView = view
-            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
-            popover.permittedArrowDirections = []
+        if !actions.isEmpty {
+            previewVC.navigationItem.leftBarButtonItems = actions
         }
         
-        present(alert, animated: true)
+        // 存储当前预览的图片和标题，供按钮操作使用
+        currentPreviewImage = image
+        currentPreviewTitle = title
+        
+        let navController = UINavigationController(rootViewController: previewVC)
+        navController.modalPresentationStyle = .pageSheet
+        
+        present(navController, animated: true)
     }
     
     private func saveImageToPhotos(_ image: UIImage) {
@@ -1112,5 +1140,27 @@ extension VideoSegmentationTestViewController: FrameSegmentationCellDelegate {
         }
         
         present(alert, animated: true)
+    }
+    
+    // MARK: - Image Preview Actions
+    
+    @objc private func dismissImagePreview() {
+        dismiss(animated: true)
+    }
+    
+    @objc private func saveCurrentPreviewImage() {
+        guard let image = currentPreviewImage else { return }
+        saveImageToPhotos(image)
+    }
+    
+    @objc private func shareCurrentPreviewImage() {
+        guard let image = currentPreviewImage else { return }
+        shareImage(image)
+    }
+    
+    @objc private func showCurrentImageInfo() {
+        guard let image = currentPreviewImage,
+              let title = currentPreviewTitle else { return }
+        showImageInfo(image, title: title)
     }
 }
