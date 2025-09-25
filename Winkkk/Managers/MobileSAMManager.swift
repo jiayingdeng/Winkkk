@@ -106,7 +106,7 @@ class MobileSAMManager: ObservableObject {
         print("📐 padding后图像尺寸: \(paddedImage.size)")
         
         // 2. 转换为MLMultiArray
-        guard let pixelBuffer = paddedImage.mobileSAMPixelBuffer() else {
+        guard let pixelBuffer = paddedImage.pixelBuffer() else {
             print("❌ 无法创建像素缓冲区")
             return nil
         }
@@ -357,16 +357,9 @@ class MobileSAMManager: ObservableObject {
     }
 }
 
-// MARK: - UIImage Extensions
+// MARK: - UIImage Extensions (专用于MobileSAMManager)
 extension UIImage {
-    func mobileSAMResized(to size: CGSize) -> UIImage? {
-        UIGraphicsBeginImageContextWithOptions(size, false, 0.0)
-        defer { UIGraphicsEndImageContext() }
-        
-        draw(in: CGRect(origin: .zero, size: size))
-        return UIGraphicsGetImageFromCurrentImageContext()
-    }
-    
+    // 保留专用的resizedWithPadding方法（MobileSAMCompleteManager中没有此方法）
     func resizedWithPadding(to size: CGSize) -> UIImage? {
         let originalSize = self.size
         let targetSize = size
@@ -395,55 +388,6 @@ extension UIImage {
         draw(in: CGRect(x: x, y: y, width: scaledWidth, height: scaledHeight))
         
         return UIGraphicsGetImageFromCurrentImageContext()
-    }
-    
-    func mobileSAMPixelBuffer() -> CVPixelBuffer? {
-        let attrs = [
-            kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue!,
-            kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue!
-        ] as CFDictionary
-        
-        var pixelBuffer: CVPixelBuffer?
-        let status = CVPixelBufferCreate(
-            kCFAllocatorDefault,
-            Int(size.width),
-            Int(size.height),
-            kCVPixelFormatType_32ARGB,
-            attrs,
-            &pixelBuffer
-        )
-        
-        guard status == kCVReturnSuccess, let buffer = pixelBuffer else {
-            return nil
-        }
-        
-        CVPixelBufferLockBaseAddress(buffer, CVPixelBufferLockFlags(rawValue: 0))
-        let pixelData = CVPixelBufferGetBaseAddress(buffer)
-        
-        let rgbColorSpace = CGColorSpaceCreateDeviceRGB()
-        guard let context = CGContext(
-            data: pixelData,
-            width: Int(size.width),
-            height: Int(size.height),
-            bitsPerComponent: 8,
-            bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
-            space: rgbColorSpace,
-            bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue
-        ) else {
-            CVPixelBufferUnlockBaseAddress(buffer, CVPixelBufferLockFlags(rawValue: 0))
-            return nil
-        }
-        
-        context.translateBy(x: 0, y: size.height)
-        context.scaleBy(x: 1.0, y: -1.0)
-        
-        UIGraphicsPushContext(context)
-        draw(in: CGRect(x: 0, y: 0, width: size.width, height: size.height))
-        UIGraphicsPopContext()
-        
-        CVPixelBufferUnlockBaseAddress(buffer, CVPixelBufferLockFlags(rawValue: 0))
-        
-        return buffer
     }
 }
 

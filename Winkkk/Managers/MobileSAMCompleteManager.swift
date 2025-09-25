@@ -132,7 +132,7 @@ class MobileSAMCompleteManager: ObservableObject {
         print("🔄 开始图像预处理...")
         
         // 1. 调整图像大小到1024x1024
-        guard let resizedImage = image.completeSAMResized(to: CGSize(width: 1024, height: 1024)) else {
+        guard let resizedImage = image.resized(to: CGSize(width: 1024, height: 1024)) else {
             print("❌ 图像尺寸调整失败")
             return nil
         }
@@ -276,9 +276,11 @@ class MobileSAMCompleteManager: ObservableObject {
     }
 }
 
+// MARK: - CoreML类由Xcode自动生成，无需手动定义
+
 // MARK: - UIImage Extensions
 extension UIImage {
-    func completeSAMResized(to newSize: CGSize) -> UIImage? {
+    func resized(to newSize: CGSize) -> UIImage? {
         UIGraphicsBeginImageContextWithOptions(newSize, false, 0.0)
         defer { UIGraphicsEndImageContext() }
         draw(in: CGRect(origin: .zero, size: newSize))
@@ -286,7 +288,7 @@ extension UIImage {
     }
     
     func toMLMultiArray() -> MLMultiArray? {
-        guard let pixelBuffer = completeSAMPixelBuffer() else { return nil }
+        guard let pixelBuffer = pixelBuffer() else { return nil }
         
         let width = CVPixelBufferGetWidth(pixelBuffer)
         let height = CVPixelBufferGetHeight(pixelBuffer)
@@ -328,7 +330,7 @@ extension UIImage {
         return multiArray
     }
     
-    func completeSAMPixelBuffer() -> CVPixelBuffer? {
+    func pixelBuffer() -> CVPixelBuffer? {
         let width = Int(size.width)
         let height = Int(size.height)
         
@@ -369,3 +371,5 @@ extension UIImage {
         return buffer
     }
 }
+
+
