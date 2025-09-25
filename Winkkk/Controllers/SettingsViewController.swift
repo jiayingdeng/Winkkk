@@ -195,8 +195,8 @@ class SettingsViewController: UIViewController {
                     ),
                     SettingsItem(
                         type: .action,
-                        title: "📹 视频分割测试",
-                        subtitle: "上传视频提取关键帧，测试DeepLabV3批量分割效果与一致性",
+                        title: "📹 DeepLabV3视频分割测试",
+                        subtitle: "选择视频文件提取关键帧，测试DeepLabV3批量人物分割效果与一致性",
                         icon: "video.badge.waveform",
                         action: { [weak self] in self?.showVideoSegmentationTest() }
                     ),
