@@ -199,8 +199,8 @@ class ScreenshotEngine {
     ///   - url: 保存路径
     /// - Throws: 保存错误
     private func saveImageToFile(_ image: UIImage, at url: URL) throws {
-        // 使用JPEG格式保存，质量95%
-        guard let imageData = image.jpegData(compressionQuality: 0.95) else {
+        // 🎯 提升清晰度：使用更高质量保存，质量98%
+        guard let imageData = image.jpegData(compressionQuality: 0.98) else {
             throw ScreenshotError.saveFailed("Failed to convert image to JPEG data")
         }
         
@@ -462,8 +462,8 @@ extension ScreenshotEngine {
                 )
                 print("✅ 封面帧生成完成")
                 
-                // 保存封面图片
-                guard let imageData = coverImage.jpegData(compressionQuality: 0.95) else {
+                // 🎯 提升清晰度：使用更高质量保存封面图片
+                guard let imageData = coverImage.jpegData(compressionQuality: 0.98) else {
                     throw ScreenshotError.generationFailed("封面图片保存失败")
                 }
                 try imageData.write(to: tempImageURL)

@@ -50,6 +50,12 @@ class DeepLabV3TestViewController: UIViewController {
     private let frameStackView = UIStackView()
     private var frameImageViews: [UIImageView] = []
     
+    // 批量结果展示区域
+    private let batchResultsView = UIView()
+    private let batchResultsHeaderLabel = UILabel()
+    private let batchResultsStackView = UIStackView()
+    private var batchResultImageViews: [UIImageView] = []
+    
     // 批量处理进度
     private let batchProgressView = UIView()
     private let batchProgressLabel = UILabel()
@@ -175,6 +181,7 @@ class DeepLabV3TestViewController: UIViewController {
         setupMediaSelectionView()
         setupModeSelectionView()
         setupFramesPreviewView()
+        setupBatchResultsView()
         setupBatchProgressView()
         setupControlView()
         setupResultsView()
@@ -183,7 +190,7 @@ class DeepLabV3TestViewController: UIViewController {
         
         // 添加到内容视图
         [titleLabel, subtitleLabel, infoCardView, mediaSelectionView, modeSelectionView,
-         framesPreviewView, batchProgressView, controlView, resultsView, 
+         framesPreviewView, batchResultsView, batchProgressView, controlView, resultsView, 
          timeLapseResultView, actionButtonsView].forEach {
             contentView.addSubview($0)
         }
@@ -342,6 +349,67 @@ class DeepLabV3TestViewController: UIViewController {
         
         [framesHeaderLabel, frameStackView].forEach {
             framesPreviewView.addSubview($0)
+        }
+    }
+    
+    private func setupBatchResultsView() {
+        batchResultsView.backgroundColor = UIColor.white.withAlphaComponent(0.08)
+        batchResultsView.layer.cornerRadius = 20
+        batchResultsView.isHidden = true
+        
+        // 标题
+        batchResultsHeaderLabel.text = "🎯 分割结果预览"
+        batchResultsHeaderLabel.font = .systemFont(ofSize: 20, weight: .bold)
+        batchResultsHeaderLabel.textColor = .white
+        batchResultsHeaderLabel.textAlignment = .center
+        
+        // 结果堆栈视图
+        batchResultsStackView.axis = .horizontal
+        batchResultsStackView.spacing = 12
+        batchResultsStackView.distribution = .fillEqually
+        
+        // 创建5个结果预览视图
+        for i in 0..<5 {
+            let imageView = UIImageView()
+            imageView.contentMode = .scaleAspectFill
+            imageView.clipsToBounds = true
+            imageView.layer.cornerRadius = 8
+            imageView.backgroundColor = UIColor.white.withAlphaComponent(0.05)
+            imageView.layer.borderWidth = 1
+            imageView.layer.borderColor = UIColor.white.withAlphaComponent(0.2).cgColor
+            
+            // 添加标签
+            let label = UILabel()
+            label.text = "帧\(i+1)"
+            label.font = .systemFont(ofSize: 12, weight: .medium)
+            label.textColor = UIColor.white.withAlphaComponent(0.8)
+            label.textAlignment = .center
+            
+            let containerView = UIView()
+            containerView.addSubview(imageView)
+            containerView.addSubview(label)
+            
+            imageView.translatesAutoresizingMaskIntoConstraints = false
+            label.translatesAutoresizingMaskIntoConstraints = false
+            
+            NSLayoutConstraint.activate([
+                imageView.topAnchor.constraint(equalTo: containerView.topAnchor),
+                imageView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+                imageView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+                imageView.heightAnchor.constraint(equalToConstant: 80),
+                
+                label.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 4),
+                label.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+                label.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+                label.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
+            ])
+            
+            batchResultImageViews.append(imageView)
+            batchResultsStackView.addArrangedSubview(containerView)
+        }
+        
+        [batchResultsHeaderLabel, batchResultsStackView].forEach {
+            batchResultsView.addSubview($0)
         }
     }
     
@@ -515,6 +583,7 @@ class DeepLabV3TestViewController: UIViewController {
          mediaSelectionView, selectMediaButton, selectedImageView, videoThumbnailView, 
          imageInfoLabel, videoInfoLabel, modeSelectionView, singleImageModeButton, timeLapseModeButton,
          framesPreviewView, framesHeaderLabel, frameStackView,
+         batchResultsView, batchResultsHeaderLabel, batchResultsStackView,
          batchProgressView, batchProgressLabel, batchProgressBar,
          controlView, processButton, timeLapseButton, statusLabel, progressView,
          resultsView, resultsHeaderLabel, originalImageView, subjectImageView, maskImageView,
@@ -551,6 +620,7 @@ class DeepLabV3TestViewController: UIViewController {
         setupMediaSelectionConstraints()
         setupModeSelectionConstraints()
         setupFramesPreviewConstraints()
+        setupBatchResultsConstraints()
         setupBatchProgressConstraints()
         setupControlConstraints()
         setupResultsConstraints()
@@ -692,10 +762,29 @@ class DeepLabV3TestViewController: UIViewController {
         ])
     }
     
+    private func setupBatchResultsConstraints() {
+        NSLayoutConstraint.activate([
+            // 批量结果展示区域
+            batchResultsView.topAnchor.constraint(equalTo: framesPreviewView.bottomAnchor, constant: 16),
+            batchResultsView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            batchResultsView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
+            batchResultsView.heightAnchor.constraint(equalToConstant: 140),
+            
+            batchResultsHeaderLabel.topAnchor.constraint(equalTo: batchResultsView.topAnchor, constant: 16),
+            batchResultsHeaderLabel.leadingAnchor.constraint(equalTo: batchResultsView.leadingAnchor, constant: 16),
+            batchResultsHeaderLabel.trailingAnchor.constraint(equalTo: batchResultsView.trailingAnchor, constant: -16),
+            
+            batchResultsStackView.topAnchor.constraint(equalTo: batchResultsHeaderLabel.bottomAnchor, constant: 12),
+            batchResultsStackView.leadingAnchor.constraint(equalTo: batchResultsView.leadingAnchor, constant: 16),
+            batchResultsStackView.trailingAnchor.constraint(equalTo: batchResultsView.trailingAnchor, constant: -16),
+            batchResultsStackView.bottomAnchor.constraint(lessThanOrEqualTo: batchResultsView.bottomAnchor, constant: -16),
+        ])
+    }
+    
     private func setupBatchProgressConstraints() {
         NSLayoutConstraint.activate([
             // 批量处理进度区域
-            batchProgressView.topAnchor.constraint(equalTo: framesPreviewView.bottomAnchor, constant: 16),
+            batchProgressView.topAnchor.constraint(equalTo: batchResultsView.bottomAnchor, constant: 16),
             batchProgressView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             batchProgressView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
             batchProgressView.heightAnchor.constraint(equalToConstant: 80),
@@ -1055,6 +1144,35 @@ class DeepLabV3TestViewController: UIViewController {
     
     private func updateBatchResultsUI() {
         timeLapseButton.isHidden = frameSegmentationResults.isEmpty
+        
+        // 显示批量处理结果的预览
+        if !frameSegmentationResults.isEmpty {
+            // 显示批量结果视图
+            batchResultsView.isHidden = false
+            
+            // 更新批量结果图片显示
+            for (index, result) in frameSegmentationResults.enumerated() {
+                if index < batchResultImageViews.count {
+                    batchResultImageViews[index].image = result.subjectImage
+                    batchResultImageViews[index].layer.borderColor = UIColor.systemGreen.cgColor
+                    batchResultImageViews[index].layer.borderWidth = 2
+                }
+                
+                // 同时更新帧预览显示分割结果
+                if index < frameImageViews.count {
+                    frameImageViews[index].image = result.subjectImage
+                    frameImageViews[index].layer.borderColor = UIColor.systemGreen.cgColor
+                    frameImageViews[index].layer.borderWidth = 2
+                }
+            }
+            
+            // 添加处理完成的视觉反馈
+            statusLabel.text = "🎉 批量分割完成！成功处理 \(frameSegmentationResults.count) 帧"
+            statusLabel.textColor = .systemGreen
+        } else {
+            batchResultsView.isHidden = true
+        }
+        
         updateButtonStates()
     }
     
@@ -1064,14 +1182,35 @@ class DeepLabV3TestViewController: UIViewController {
         if let result = timeLapseResult {
             timeLapseImageView.image = result
             
+            // 计算统计信息
+            let avgConfidence = frameSegmentationResults.isEmpty ? 0.0 : 
+                frameSegmentationResults.reduce(0) { $0 + $1.confidence } / Double(frameSegmentationResults.count)
+            let avgSubjectRatio = frameSegmentationResults.isEmpty ? 0.0 : 
+                frameSegmentationResults.reduce(0) { $0 + $1.subjectPixelRatio } / Double(frameSegmentationResults.count)
+            
             let stats = """
-            ✨ 成功合成时光序列！
+            ✨ 时光序列合成完成！
             • 合成帧数: \(frameSegmentationResults.count)
-            • 透明度递增: 20% → 100%
-            • 合成效果: 运动轨迹可视化
+            • 平均置信度: \(String(format: "%.1f%%", avgConfidence * 100))
+            • 平均主体占比: \(String(format: "%.1f%%", avgSubjectRatio * 100))
+            • 合成效果: 运动轨迹叠加
             """
             
             timeLapseStatsLabel.text = stats
+            
+            // 显示时光序列结果视图
+            DispatchQueue.main.async {
+                self.timeLapseResultView.isHidden = false
+                
+                // 添加完成动画效果
+                self.timeLapseResultView.alpha = 0
+                UIView.animate(withDuration: 0.8, delay: 0.2, options: [.curveEaseOut]) {
+                    self.timeLapseResultView.alpha = 1
+                } completion: { _ in
+                    // 滚动到结果区域
+                    self.scrollToTimeLapseResult()
+                }
+            }
         }
     }
     
@@ -1381,16 +1520,24 @@ extension DeepLabV3TestViewController {
                     self?.frameSegmentationResults = successResults
                     
                     if !successResults.isEmpty {
-                        self?.statusLabel.text = "🎉 批量分割完成！成功处理 \(successResults.count) 帧"
-                        self?.statusLabel.textColor = .systemGreen
-                        
                         // 显示批量统计
                         let stats = DeepLabV3Manager.shared.calculateBatchStatistics(results)
                         print(stats.formattedSummary)
                         
+                        // 滚动到帧预览区域显示结果
+                        self?.scrollToFramesPreview()
+                        
+                        // 添加成功的触觉反馈
+                        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+                        impactFeedback.impactOccurred()
+                        
                     } else {
                         self?.statusLabel.text = "❌ 批量分割失败"
                         self?.statusLabel.textColor = .systemRed
+                        
+                        // 添加失败的触觉反馈
+                        let notificationFeedback = UINotificationFeedbackGenerator()
+                        notificationFeedback.notificationOccurred(.error)
                     }
                 }
             }
@@ -1409,6 +1556,10 @@ extension DeepLabV3TestViewController {
                     self?.timeLapseResult = composite
                     self?.statusLabel.text = "✨ 时光序列合成完成！"
                     self?.statusLabel.textColor = .systemGreen
+                    
+                    // 添加成功的触觉反馈
+                    let impactFeedback = UIImpactFeedbackGenerator(style: .heavy)
+                    impactFeedback.impactOccurred()
                 }
                 
             } catch {
@@ -1465,6 +1616,23 @@ extension DeepLabV3TestViewController {
         return compositeImage
     }
     
+    // MARK: - UI Scroll Helper Methods
+    private func scrollToFramesPreview() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let framePreviewY = self.framesPreviewView.frame.origin.y
+            let targetY = max(0, framePreviewY - 50) // 留出一些顶部空间
+            self.scrollView.setContentOffset(CGPoint(x: 0, y: targetY), animated: true)
+        }
+    }
+    
+    private func scrollToTimeLapseResult() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            let timeLapseY = self.timeLapseResultView.frame.origin.y
+            let targetY = max(0, timeLapseY - 50) // 留出一些顶部空间
+            self.scrollView.setContentOffset(CGPoint(x: 0, y: targetY), animated: true)
+        }
+    }
+
     // MARK: - Video Helper Methods
     private func generateVideoThumbnail(from url: URL, completion: @escaping (UIImage?) -> Void) {
         let asset = AVAsset(url: url)

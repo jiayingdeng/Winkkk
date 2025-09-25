@@ -290,11 +290,11 @@ class VideoSegmentExtractor {
         
         switch devicePerformance {
         case .high:
-            maxSize = CGSize(width: 1125, height: 2436) // iPhone屏幕分辨率
+            maxSize = CGSize(width: 6144, height: 6144) // 🎯 高性能设备：6K分辨率
         case .medium:
-            maxSize = CGSize(width: 828, height: 1792)  // 较低分辨率
+            maxSize = CGSize(width: 4096, height: 4096) // 🎯 中等性能设备：4K分辨率  
         case .low:
-            maxSize = CGSize(width: 750, height: 1334)  // 基础分辨率
+            maxSize = CGSize(width: 2048, height: 2048) // 🎯 低性能设备：2K分辨率
         }
         
         imageGenerator.maximumSize = maxSize

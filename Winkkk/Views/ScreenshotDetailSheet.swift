@@ -63,14 +63,19 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
         super.viewDidAppear(animated)
         scrollToCurrentIndex(animated: false)
         
-        // 🎯 增强的Live Photo自动播放策略
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        print("📱 ScreenshotDetailSheet已完全显示")
+        
+        // 🎯 优化的Live Photo自动播放策略
+        // 使用更长的延迟确保所有Live Photo都已加载完成
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            print("🎬 视图显示后尝试自动播放Live Photos...")
             self.tryAutoPlayLivePhotos()
         }
         
-        // 🎯 备用播放尝试
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-            self.manuallyTriggerLivePhotoPlayback()
+        // 🎯 备用机制：再次尝试播放（防止第一次失败）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            print("🔄 备用播放机制触发...")
+            self.tryAutoPlayLivePhotos()
         }
     }
     
@@ -195,10 +200,15 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
                         livePhotoView.livePhoto = livePhoto
                         print("📸 Live Photo已加载到视图")
                         
-                        // 🎯 简化的自动播放逻辑
-                        // 数据加载完成后，等待视图稳定再播放
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                            self.startLivePhotoAutoplay(livePhotoView)
+                        // 🎯 优化的自动播放逻辑
+                        // 确保视图完全加载后再播放，使用更长的延迟确保稳定性
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            // 再次确认Live Photo数据和视图状态
+                            if livePhotoView.livePhoto != nil && 
+                               livePhotoView.superview != nil &&
+                               livePhotoView.window != nil {
+                                self.startLivePhotoAutoplay(livePhotoView)
+                            }
                         }
                     }
                 } catch {
@@ -480,20 +490,31 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
         }
     }
     
-    /// 简化的Live Photo自动播放方法
+    /// 优化的Live Photo自动播放方法
     private func startLivePhotoAutoplay(_ livePhotoView: PHLivePhotoView) {
         print("🎬 开始Live Photo自动播放...")
         
         // 验证必要条件
         guard livePhotoView.livePhoto != nil,
-              livePhotoView.superview != nil else {
+              livePhotoView.superview != nil,
+              livePhotoView.window != nil else {
             print("❌ Live Photo播放条件不满足")
             return
         }
         
-        // 单一可靠的播放方式：使用hint模式开始播放
-        livePhotoView.startPlayback(with: .hint)
-        print("🎥 Live Photo自动播放已启动（hint模式）")
+        // 🎯 关键修复：使用完整播放模式而不是hint模式
+        print("🎥 触发Live Photo完整播放...")
+        livePhotoView.startPlayback(with: .full)
+        
+        // 🎯 备用方案：如果完整播放失败，0.5秒后再次尝试
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if livePhotoView.livePhoto != nil && livePhotoView.superview != nil {
+                print("🔄 备用播放尝试...")
+                livePhotoView.startPlayback(with: .full)
+            }
+        }
+        
+        print("✅ Live Photo自动播放已启动（full模式）")
     }
     
     /// 触发Live Photo播放的核心方法（保留用于手动触发）
