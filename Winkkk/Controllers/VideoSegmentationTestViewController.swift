@@ -10,6 +10,7 @@ import UIKit
 import AVFoundation
 import MobileCoreServices
 import UniformTypeIdentifiers
+import PhotosUI
 
 class VideoSegmentationTestViewController: UIViewController {
     
@@ -75,9 +76,9 @@ class VideoSegmentationTestViewController: UIViewController {
     init() {
         // 设置CollectionView布局
         flowLayout.scrollDirection = .vertical
-        flowLayout.minimumInteritemSpacing = 10
-        flowLayout.minimumLineSpacing = 15
-        flowLayout.sectionInset = UIEdgeInsets(top: 10, left: 15, bottom: 10, right: 15)
+        flowLayout.minimumInteritemSpacing = 0 // 单列布局不需要列间距
+        flowLayout.minimumLineSpacing = 20 // 增加行间距
+        flowLayout.sectionInset = UIEdgeInsets(top: 15, left: 15, bottom: 15, right: 15)
         
         collectionView = UICollectionView(frame: .zero, collectionViewLayout: flowLayout)
         
@@ -93,6 +94,14 @@ class VideoSegmentationTestViewController: UIViewController {
         view.backgroundColor = .systemBackground
         navigationItem.title = "视频分割测试"
         navigationItem.largeTitleDisplayMode = .never
+        
+        // 添加关闭按钮
+        navigationItem.leftBarButtonItem = UIBarButtonItem(
+            title: "关闭",
+            style: .plain,
+            target: self,
+            action: #selector(closeButtonTapped)
+        )
         
         setupScrollView()
         setupHeaderViews()
@@ -118,7 +127,7 @@ class VideoSegmentationTestViewController: UIViewController {
         titleLabel.font = .systemFont(ofSize: 28, weight: .bold)
         titleLabel.textAlignment = .center
         
-        subtitleLabel.text = "选择视频文件，自动提取关键帧并进行DeepLabV3主体分割测试"
+        subtitleLabel.text = "从相册选择视频，自动提取关键帧并进行DeepLabV3主体分割测试"
         subtitleLabel.font = .systemFont(ofSize: 14, weight: .regular)
         subtitleLabel.textColor = .systemGray
         subtitleLabel.textAlignment = .center
@@ -133,7 +142,7 @@ class VideoSegmentationTestViewController: UIViewController {
         videoSelectionView.backgroundColor = .systemGray6
         videoSelectionView.layer.cornerRadius = 12
         
-        selectVideoButton.setTitle("📁 选择视频文件", for: .normal)
+        selectVideoButton.setTitle("📱 从相册选择视频", for: .normal)
         selectVideoButton.titleLabel?.font = .systemFont(ofSize: 18, weight: .semibold)
         selectVideoButton.backgroundColor = .systemBlue
         selectVideoButton.setTitleColor(.white, for: .normal)
@@ -361,7 +370,7 @@ class VideoSegmentationTestViewController: UIViewController {
             collectionView.topAnchor.constraint(equalTo: resultsHeaderView.bottomAnchor, constant: 10),
             collectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            collectionView.heightAnchor.constraint(equalToConstant: 400),
+            collectionView.heightAnchor.constraint(equalToConstant: 600), // 增加高度以适应单列布局
             
             // Bottom Actions
             bottomActionsView.topAnchor.constraint(equalTo: collectionView.bottomAnchor, constant: 20),
@@ -392,11 +401,18 @@ class VideoSegmentationTestViewController: UIViewController {
     }
     
     // MARK: - Actions
+    @objc private func closeButtonTapped() {
+        dismiss(animated: true)
+    }
+    
     @objc private func selectVideoTapped() {
-        let documentPicker = UIDocumentPickerViewController(forOpeningContentTypes: [.movie])
-        documentPicker.delegate = self
-        documentPicker.allowsMultipleSelection = false
-        present(documentPicker, animated: true)
+        var configuration = PHPickerConfiguration()
+        configuration.filter = .videos
+        configuration.selectionLimit = 1
+        
+        let picker = PHPickerViewController(configuration: configuration)
+        picker.delegate = self
+        present(picker, animated: true)
     }
     
     @objc private func startProcessingTapped() {
@@ -665,8 +681,107 @@ class VideoSegmentationTestViewController: UIViewController {
     }
     
     private func exportProcessingResults(_ session: VideoSegmentationSession) {
-        // TODO: 实现结果导出功能
-        showAlert(title: "功能开发中", message: "结果导出功能正在开发中...")
+        let subjectImages = frameResults.compactMap { result -> UIImage? in
+            if case .completed = result.status {
+                return result.subjectImage
+            }
+            return nil
+        }
+        
+        guard !subjectImages.isEmpty else {
+            showAlert(title: "无可导出内容", message: "没有找到已完成的主体图")
+            return
+        }
+        
+        let alert = UIAlertController(
+            title: "导出主体图",
+            message: "发现 \(subjectImages.count) 张主体图，是否全部保存到相册？",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "全部保存", style: .default) { _ in
+            self.batchSaveImages(subjectImages)
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        present(alert, animated: true)
+    }
+    
+    private func batchSaveImages(_ images: [UIImage]) {
+        // 检查权限
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { [weak self] status in
+            DispatchQueue.main.async {
+                switch status {
+                case .authorized, .limited:
+                    self?.performBatchImageSave(images)
+                case .denied, .restricted:
+                    self?.showPermissionDeniedAlert()
+                case .notDetermined:
+                    self?.showAlert(title: "权限未确定", message: "请在设置中允许访问相册权限")
+                @unknown default:
+                    self?.showAlert(title: "未知错误", message: "无法获取相册权限状态")
+                }
+            }
+        }
+    }
+    
+    private func performBatchImageSave(_ images: [UIImage]) {
+        let totalCount = images.count
+        var successCount = 0
+        var errorCount = 0
+        
+        // 创建进度提示
+        let alert = UIAlertController(title: "正在保存...", message: "0/\(totalCount)", preferredStyle: .alert)
+        present(alert, animated: true)
+        
+        let dispatchGroup = DispatchGroup()
+        
+        for (index, image) in images.enumerated() {
+            dispatchGroup.enter()
+            
+            PHPhotoLibrary.shared().performChanges({
+                PHAssetCreationRequest.creationRequestForAsset(from: image)
+            }) { success, error in
+                DispatchQueue.main.async {
+                    if success {
+                        successCount += 1
+                    } else {
+                        errorCount += 1
+                    }
+                    
+                    // 更新进度
+                    alert.message = "\(successCount + errorCount)/\(totalCount)"
+                    
+                    dispatchGroup.leave()
+                }
+            }
+        }
+        
+        dispatchGroup.notify(queue: .main) {
+            alert.dismiss(animated: true) {
+                self.showBatchSaveResult(successCount: successCount, errorCount: errorCount, totalCount: totalCount)
+            }
+        }
+    }
+    
+    private func showBatchSaveResult(successCount: Int, errorCount: Int, totalCount: Int) {
+        let title: String
+        let message: String
+        
+        if errorCount == 0 {
+            title = "全部保存成功 ✅"
+            message = "已成功保存 \(successCount) 张主体图到相册"
+        } else if successCount == 0 {
+            title = "保存失败 ❌"
+            message = "所有图片保存失败"
+        } else {
+            title = "部分保存成功 ⚠️"
+            message = "成功保存 \(successCount) 张，失败 \(errorCount) 张"
+        }
+        
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
     }
     
     private func showAlert(title: String, message: String) {
@@ -676,23 +791,45 @@ class VideoSegmentationTestViewController: UIViewController {
     }
 }
 
-// MARK: - UIDocumentPickerDelegate
-extension VideoSegmentationTestViewController: UIDocumentPickerDelegate {
-    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-        guard let videoURL = urls.first else { return }
+// MARK: - PHPickerViewControllerDelegate
+extension VideoSegmentationTestViewController: PHPickerViewControllerDelegate {
+    func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
+        picker.dismiss(animated: true)
         
-        // 获取视频访问权限
-        _ = videoURL.startAccessingSecurityScopedResource()
+        guard let result = results.first else { return }
         
-        currentVideoURL = videoURL
-        
-        // 获取视频信息
-        Task {
-            if let videoInfo = await frameExtractor.getVideoInfo(from: videoURL) {
-                await MainActor.run {
-                    self.currentVideoInfo = videoInfo
-                    self.updateVideoInfo(videoInfo)
-                    self.updateUIState()
+        // 获取视频文件
+        result.itemProvider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { [weak self] url, error in
+            guard let url = url, error == nil else {
+                DispatchQueue.main.async {
+                    self?.showAlert(title: "错误", message: "无法加载选择的视频文件")
+                }
+                return
+            }
+            
+            // 复制到临时目录
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mov")
+            
+            do {
+                try FileManager.default.copyItem(at: url, to: tempURL)
+                
+                DispatchQueue.main.async {
+                    self?.currentVideoURL = tempURL
+                    
+                    // 获取视频信息
+                    Task {
+                        if let videoInfo = await self?.frameExtractor.getVideoInfo(from: tempURL) {
+                            await MainActor.run {
+                                self?.currentVideoInfo = videoInfo
+                                self?.updateVideoInfo(videoInfo)
+                                self?.updateUIState()
+                            }
+                        }
+                    }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self?.showAlert(title: "错误", message: "无法处理选择的视频文件：\(error.localizedDescription)")
                 }
             }
         }
@@ -700,7 +837,7 @@ extension VideoSegmentationTestViewController: UIDocumentPickerDelegate {
     
     private func updateVideoInfo(_ info: ExtractedVideoInfo) {
         videoInfoLabel.text = """
-        📁 \(currentVideoURL?.lastPathComponent ?? "")
+        📱 从相册选择的视频
         🎬 时长: \(info.formattedDuration) | 分辨率: \(info.formattedResolution)
         📊 大小: \(info.formattedFileSize) | 帧率: \(String(format: "%.1f fps", info.frameRate))
         """
@@ -722,13 +859,258 @@ extension VideoSegmentationTestViewController: UICollectionViewDataSource, UICol
         
         let result = frameResults[indexPath.item]
         cell.configure(with: result)
+        cell.delegate = self
         
         return cell
     }
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        let width = (collectionView.bounds.width - 45) / 2 // 2列布局，考虑间距
-        let height: CGFloat = 220
+        let width = collectionView.bounds.width - 30 // 单列布局，左右各15间距
+        let height: CGFloat = 380 // 增加高度以显示更大的图片
         return CGSize(width: width, height: height)
+    }
+}
+
+// MARK: - FrameSegmentationCellDelegate
+extension VideoSegmentationTestViewController: FrameSegmentationCellDelegate {
+    
+    func frameSegmentationCell(_ cell: FrameSegmentationCollectionViewCell, didTapOriginalImage image: UIImage, frameIndex: Int) {
+        showImagePreview(image: image, title: "原图 - 帧 \(frameIndex + 1)")
+    }
+    
+    func frameSegmentationCell(_ cell: FrameSegmentationCollectionViewCell, didTapSubjectImage image: UIImage, frameIndex: Int) {
+        showImagePreview(image: image, title: "主体图 - 帧 \(frameIndex + 1)")
+    }
+    
+    func frameSegmentationCell(_ cell: FrameSegmentationCollectionViewCell, didLongPressSubjectImage image: UIImage, frameIndex: Int, at location: CGPoint) {
+        showContextMenu(for: image, frameIndex: frameIndex, at: location, in: cell)
+    }
+    
+    private func showImagePreview(image: UIImage, title: String) {
+        let alert = UIAlertController(title: title, message: nil, preferredStyle: .actionSheet)
+        
+        // 创建图片视图
+        let imageView = UIImageView(image: image)
+        imageView.contentMode = .scaleAspectFit
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        
+        let containerView = UIView()
+        containerView.addSubview(imageView)
+        
+        NSLayoutConstraint.activate([
+            imageView.topAnchor.constraint(equalTo: containerView.topAnchor),
+            imageView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            imageView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            imageView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
+            imageView.heightAnchor.constraint(equalToConstant: 300),
+            containerView.widthAnchor.constraint(equalToConstant: 280)
+        ])
+        
+        alert.setValue(containerView, forKey: "contentViewController")
+        
+        // 添加操作选项
+        if title.contains("主体图") {
+            alert.addAction(UIAlertAction(title: "💾 保存到相册", style: .default) { _ in
+                self.saveImageToPhotos(image)
+            })
+            
+            alert.addAction(UIAlertAction(title: "📤 分享图片", style: .default) { _ in
+                self.shareImage(image)
+            })
+        }
+        
+        // 添加图片信息选项
+        alert.addAction(UIAlertAction(title: "ℹ️ 图片信息", style: .default) { _ in
+            self.showImageInfo(image, title: title)
+        })
+        
+        alert.addAction(UIAlertAction(title: "关闭", style: .cancel))
+        
+        // iPad适配
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+        
+        present(alert, animated: true)
+    }
+    
+    private func saveImageToPhotos(_ image: UIImage) {
+        // 检查权限
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { [weak self] status in
+            DispatchQueue.main.async {
+                switch status {
+                case .authorized, .limited:
+                    self?.performImageSave(image)
+                case .denied, .restricted:
+                    self?.showPermissionDeniedAlert()
+                case .notDetermined:
+                    self?.showAlert(title: "权限未确定", message: "请在设置中允许访问相册权限")
+                @unknown default:
+                    self?.showAlert(title: "未知错误", message: "无法获取相册权限状态")
+                }
+            }
+        }
+    }
+    
+    private func performImageSave(_ image: UIImage) {
+        PHPhotoLibrary.shared().performChanges({
+            PHAssetCreationRequest.creationRequestForAsset(from: image)
+        }) { [weak self] success, error in
+            DispatchQueue.main.async {
+                if success {
+                    self?.showSuccessAlert()
+                } else {
+                    self?.showAlert(title: "保存失败", message: error?.localizedDescription ?? "未知错误")
+                }
+            }
+        }
+    }
+    
+    private func showPermissionDeniedAlert() {
+        let alert = UIAlertController(
+            title: "需要相册权限",
+            message: "请在设置中允许Winkkk访问相册，以保存主体图片",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "去设置", style: .default) { _ in
+            if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(settingsURL)
+            }
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        present(alert, animated: true)
+    }
+    
+    private func showSuccessAlert() {
+        let alert = UIAlertController(
+            title: "保存成功 ✅",
+            message: "主体图已成功保存到相册",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
+    }
+    
+    private func shareImage(_ image: UIImage) {
+        let activityVC = UIActivityViewController(activityItems: [image], applicationActivities: nil)
+        
+        // iPad适配
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+        
+        present(activityVC, animated: true)
+    }
+    
+    private func showImageInfo(_ image: UIImage, title: String) {
+        let size = image.size
+        let scale = image.scale
+        let pixelSize = CGSize(width: size.width * scale, height: size.height * scale)
+        
+        // 计算图片大小（字节）
+        guard let imageData = image.jpegData(compressionQuality: 1.0) else { return }
+        let sizeInBytes = imageData.count
+        let sizeInKB = Double(sizeInBytes) / 1024.0
+        let sizeInMB = sizeInKB / 1024.0
+        
+        let sizeString: String
+        if sizeInMB >= 1.0 {
+            sizeString = String(format: "%.2f MB", sizeInMB)
+        } else {
+            sizeString = String(format: "%.1f KB", sizeInKB)
+        }
+        
+        // 尝试获取处理信息
+        var processingInfo = ""
+        if title.contains("帧") {
+            let frameNumber = extractFrameNumber(from: title)
+            if frameNumber > 0 && frameNumber <= frameResults.count {
+                let result = frameResults[frameNumber - 1]
+                if case .completed = result.status {
+                    let processingTime = result.processingTime
+                    let timeString = processingTime < 1.0 ? 
+                        String(format: "%.0fms", processingTime * 1000) : 
+                        String(format: "%.2fs", processingTime)
+                    
+                    processingInfo = """
+                    
+                    🔬 处理信息:
+                    ⏱ 处理时间: \(timeString)
+                    🎯 置信度: \(Int(result.confidence * 100))%
+                    📊 主体占比: \(String(format: "%.1f%%", result.subjectPixelRatio * 100))
+                    ⭐ 质量评级: \(result.quality.displayText)
+                    """
+                }
+            }
+        }
+        
+        let info = """
+        📸 图片信息
+        
+        🏷 标题: \(title)
+        📐 显示尺寸: \(Int(size.width)) × \(Int(size.height))
+        🔍 像素尺寸: \(Int(pixelSize.width)) × \(Int(pixelSize.height))
+        📊 文件大小: \(sizeString)
+        🎨 色彩空间: \(image.cgImage?.colorSpace?.name.map { String($0) } ?? "未知")
+        📱 缩放比例: \(scale)x\(processingInfo)
+        """
+        
+        let alert = UIAlertController(title: "图片信息", message: info, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
+    }
+    
+    private func extractFrameNumber(from title: String) -> Int {
+        let pattern = "帧\\s*(\\d+)"
+        if let regex = try? NSRegularExpression(pattern: pattern),
+           let match = regex.firstMatch(in: title, range: NSRange(title.startIndex..., in: title)) {
+            let numberRange = match.range(at: 1)
+            if let range = Range(numberRange, in: title) {
+                return Int(String(title[range])) ?? 0
+            }
+        }
+        return 0
+    }
+    
+    private func showContextMenu(for image: UIImage, frameIndex: Int, at location: CGPoint, in cell: UICollectionViewCell) {
+        let alert = UIAlertController(title: "主体图 - 帧 \(frameIndex + 1)", message: "选择操作", preferredStyle: .actionSheet)
+        
+        // 快速保存
+        alert.addAction(UIAlertAction(title: "💾 保存到相册", style: .default) { _ in
+            self.saveImageToPhotos(image)
+        })
+        
+        // 快速分享
+        alert.addAction(UIAlertAction(title: "📤 分享图片", style: .default) { _ in
+            self.shareImage(image)
+        })
+        
+        // 查看大图
+        alert.addAction(UIAlertAction(title: "🔍 查看大图", style: .default) { _ in
+            self.showImagePreview(image: image, title: "主体图 - 帧 \(frameIndex + 1)")
+        })
+        
+        // 图片信息
+        alert.addAction(UIAlertAction(title: "ℹ️ 图片信息", style: .default) { _ in
+            self.showImageInfo(image, title: "主体图 - 帧 \(frameIndex + 1)")
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        // iPad适配
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = cell
+            popover.sourceRect = CGRect(x: location.x, y: location.y, width: 1, height: 1)
+            popover.permittedArrowDirections = .any
+        }
+        
+        present(alert, animated: true)
     }
 }
