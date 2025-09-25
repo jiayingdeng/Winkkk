@@ -115,12 +115,16 @@ class DeepLabV3TestViewController: UIViewController {
     private var extractedFrames: [UIImage] = [] {
         didSet {
             updateFramesUI()
+            // 立即更新处理模式UI和按钮状态
+            updateProcessingModeUI()
         }
     }
     
     private var frameSegmentationResults: [DeepLabSegmentationResult] = [] {
         didSet {
             updateBatchResultsUI()
+            // 立即更新处理模式UI和按钮状态
+            updateProcessingModeUI()
         }
     }
     
@@ -644,10 +648,10 @@ class DeepLabV3TestViewController: UIViewController {
     private func setupInfoCardConstraints() {
         NSLayoutConstraint.activate([
             // 信息卡片
-            infoCardView.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 24),
+            infoCardView.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 16),
             infoCardView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             infoCardView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            infoCardView.heightAnchor.constraint(equalToConstant: 100),
+            infoCardView.heightAnchor.constraint(equalToConstant: 80),
             
             // 信息卡片内容
             infoIconView.leadingAnchor.constraint(equalTo: infoCardView.leadingAnchor, constant: 20),
@@ -668,10 +672,10 @@ class DeepLabV3TestViewController: UIViewController {
     private func setupMediaSelectionConstraints() {
         NSLayoutConstraint.activate([
             // 媒体选择区域
-            mediaSelectionView.topAnchor.constraint(equalTo: infoCardView.bottomAnchor, constant: 24),
+            mediaSelectionView.topAnchor.constraint(equalTo: infoCardView.bottomAnchor, constant: 16),
             mediaSelectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             mediaSelectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            mediaSelectionView.heightAnchor.constraint(equalToConstant: 240),
+            mediaSelectionView.heightAnchor.constraint(equalToConstant: 200),
             
             selectMediaButton.centerXAnchor.constraint(equalTo: mediaSelectionView.centerXAnchor),
             selectMediaButton.centerYAnchor.constraint(equalTo: mediaSelectionView.centerYAnchor),
@@ -679,12 +683,12 @@ class DeepLabV3TestViewController: UIViewController {
             selectedImageView.topAnchor.constraint(equalTo: mediaSelectionView.topAnchor, constant: 16),
             selectedImageView.leadingAnchor.constraint(equalTo: mediaSelectionView.leadingAnchor, constant: 16),
             selectedImageView.trailingAnchor.constraint(equalTo: mediaSelectionView.trailingAnchor, constant: -16),
-            selectedImageView.heightAnchor.constraint(equalToConstant: 180),
+            selectedImageView.heightAnchor.constraint(equalToConstant: 140),
             
             videoThumbnailView.topAnchor.constraint(equalTo: mediaSelectionView.topAnchor, constant: 16),
             videoThumbnailView.leadingAnchor.constraint(equalTo: mediaSelectionView.leadingAnchor, constant: 16),
             videoThumbnailView.trailingAnchor.constraint(equalTo: mediaSelectionView.trailingAnchor, constant: -16),
-            videoThumbnailView.heightAnchor.constraint(equalToConstant: 180),
+            videoThumbnailView.heightAnchor.constraint(equalToConstant: 140),
             
             imageInfoLabel.topAnchor.constraint(equalTo: selectedImageView.bottomAnchor, constant: 8),
             imageInfoLabel.leadingAnchor.constraint(equalTo: mediaSelectionView.leadingAnchor, constant: 16),
@@ -701,10 +705,10 @@ class DeepLabV3TestViewController: UIViewController {
     private func setupControlConstraints() {
         NSLayoutConstraint.activate([
             // 控制区域
-            controlView.topAnchor.constraint(equalTo: batchProgressView.bottomAnchor, constant: 20),
+            controlView.topAnchor.constraint(equalTo: batchProgressView.bottomAnchor, constant: 12),
             controlView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             controlView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            controlView.heightAnchor.constraint(equalToConstant: 160),
+            controlView.heightAnchor.constraint(equalToConstant: 140),
             
             processButton.topAnchor.constraint(equalTo: controlView.topAnchor, constant: 20),
             processButton.leadingAnchor.constraint(equalTo: controlView.leadingAnchor, constant: 20),
@@ -746,10 +750,10 @@ class DeepLabV3TestViewController: UIViewController {
     private func setupFramesPreviewConstraints() {
         NSLayoutConstraint.activate([
             // 帧预览区域
-            framesPreviewView.topAnchor.constraint(equalTo: modeSelectionView.bottomAnchor, constant: 16),
+            framesPreviewView.topAnchor.constraint(equalTo: modeSelectionView.bottomAnchor, constant: 12),
             framesPreviewView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             framesPreviewView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            framesPreviewView.heightAnchor.constraint(equalToConstant: 120),
+            framesPreviewView.heightAnchor.constraint(equalToConstant: 100),
             
             framesHeaderLabel.topAnchor.constraint(equalTo: framesPreviewView.topAnchor, constant: 16),
             framesHeaderLabel.leadingAnchor.constraint(equalTo: framesPreviewView.leadingAnchor, constant: 16),
@@ -765,10 +769,10 @@ class DeepLabV3TestViewController: UIViewController {
     private func setupBatchResultsConstraints() {
         NSLayoutConstraint.activate([
             // 批量结果展示区域
-            batchResultsView.topAnchor.constraint(equalTo: framesPreviewView.bottomAnchor, constant: 16),
+            batchResultsView.topAnchor.constraint(equalTo: framesPreviewView.bottomAnchor, constant: 12),
             batchResultsView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             batchResultsView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            batchResultsView.heightAnchor.constraint(equalToConstant: 140),
+            batchResultsView.heightAnchor.constraint(equalToConstant: 120),
             
             batchResultsHeaderLabel.topAnchor.constraint(equalTo: batchResultsView.topAnchor, constant: 16),
             batchResultsHeaderLabel.leadingAnchor.constraint(equalTo: batchResultsView.leadingAnchor, constant: 16),
@@ -784,10 +788,10 @@ class DeepLabV3TestViewController: UIViewController {
     private func setupBatchProgressConstraints() {
         NSLayoutConstraint.activate([
             // 批量处理进度区域
-            batchProgressView.topAnchor.constraint(equalTo: batchResultsView.bottomAnchor, constant: 16),
+            batchProgressView.topAnchor.constraint(equalTo: batchResultsView.bottomAnchor, constant: 12),
             batchProgressView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             batchProgressView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            batchProgressView.heightAnchor.constraint(equalToConstant: 80),
+            batchProgressView.heightAnchor.constraint(equalToConstant: 70),
             
             batchProgressLabel.topAnchor.constraint(equalTo: batchProgressView.topAnchor, constant: 16),
             batchProgressLabel.leadingAnchor.constraint(equalTo: batchProgressView.leadingAnchor, constant: 16),
@@ -803,10 +807,10 @@ class DeepLabV3TestViewController: UIViewController {
     private func setupResultsConstraints() {
         NSLayoutConstraint.activate([
             // 结果区域
-            resultsView.topAnchor.constraint(equalTo: controlView.bottomAnchor, constant: 20),
+            resultsView.topAnchor.constraint(equalTo: controlView.bottomAnchor, constant: 12),
             resultsView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             resultsView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            resultsView.heightAnchor.constraint(equalToConstant: 400),
+            resultsView.heightAnchor.constraint(equalToConstant: 320),
             
             // 结果标题
             resultsHeaderLabel.topAnchor.constraint(equalTo: resultsView.topAnchor, constant: 20),
@@ -817,17 +821,17 @@ class DeepLabV3TestViewController: UIViewController {
             originalImageView.topAnchor.constraint(equalTo: resultsHeaderLabel.bottomAnchor, constant: 20),
             originalImageView.leadingAnchor.constraint(equalTo: resultsView.leadingAnchor, constant: 16),
             originalImageView.widthAnchor.constraint(equalTo: resultsView.widthAnchor, multiplier: 0.28),
-            originalImageView.heightAnchor.constraint(equalToConstant: 140),
+            originalImageView.heightAnchor.constraint(equalToConstant: 120),
             
             subjectImageView.topAnchor.constraint(equalTo: resultsHeaderLabel.bottomAnchor, constant: 20),
             subjectImageView.centerXAnchor.constraint(equalTo: resultsView.centerXAnchor),
             subjectImageView.widthAnchor.constraint(equalTo: resultsView.widthAnchor, multiplier: 0.28),
-            subjectImageView.heightAnchor.constraint(equalToConstant: 140),
+            subjectImageView.heightAnchor.constraint(equalToConstant: 120),
             
             maskImageView.topAnchor.constraint(equalTo: resultsHeaderLabel.bottomAnchor, constant: 20),
             maskImageView.trailingAnchor.constraint(equalTo: resultsView.trailingAnchor, constant: -16),
             maskImageView.widthAnchor.constraint(equalTo: resultsView.widthAnchor, multiplier: 0.28),
-            maskImageView.heightAnchor.constraint(equalToConstant: 140),
+            maskImageView.heightAnchor.constraint(equalToConstant: 120),
             
             // 标签
             originalLabel.topAnchor.constraint(equalTo: originalImageView.bottomAnchor, constant: 8),
@@ -843,7 +847,7 @@ class DeepLabV3TestViewController: UIViewController {
             metricsView.topAnchor.constraint(equalTo: originalLabel.bottomAnchor, constant: 16),
             metricsView.leadingAnchor.constraint(equalTo: resultsView.leadingAnchor, constant: 16),
             metricsView.trailingAnchor.constraint(equalTo: resultsView.trailingAnchor, constant: -16),
-            metricsView.heightAnchor.constraint(equalToConstant: 80),
+            metricsView.heightAnchor.constraint(equalToConstant: 70),
         ])
         
         // 指标标签约束
@@ -865,10 +869,10 @@ class DeepLabV3TestViewController: UIViewController {
     private func setupTimeLapseResultConstraints() {
         NSLayoutConstraint.activate([
             // 时光序列结果区域
-            timeLapseResultView.topAnchor.constraint(equalTo: resultsView.bottomAnchor, constant: 20),
+            timeLapseResultView.topAnchor.constraint(equalTo: resultsView.bottomAnchor, constant: 12),
             timeLapseResultView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             timeLapseResultView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            timeLapseResultView.heightAnchor.constraint(equalToConstant: 300),
+            timeLapseResultView.heightAnchor.constraint(equalToConstant: 260),
             
             timeLapseHeaderLabel.topAnchor.constraint(equalTo: timeLapseResultView.topAnchor, constant: 20),
             timeLapseHeaderLabel.leadingAnchor.constraint(equalTo: timeLapseResultView.leadingAnchor, constant: 20),
@@ -877,7 +881,7 @@ class DeepLabV3TestViewController: UIViewController {
             timeLapseImageView.topAnchor.constraint(equalTo: timeLapseHeaderLabel.bottomAnchor, constant: 16),
             timeLapseImageView.leadingAnchor.constraint(equalTo: timeLapseResultView.leadingAnchor, constant: 20),
             timeLapseImageView.trailingAnchor.constraint(equalTo: timeLapseResultView.trailingAnchor, constant: -20),
-            timeLapseImageView.heightAnchor.constraint(equalToConstant: 180),
+            timeLapseImageView.heightAnchor.constraint(equalToConstant: 150),
             
             timeLapseStatsLabel.topAnchor.constraint(equalTo: timeLapseImageView.bottomAnchor, constant: 12),
             timeLapseStatsLabel.leadingAnchor.constraint(equalTo: timeLapseResultView.leadingAnchor, constant: 20),
@@ -889,11 +893,11 @@ class DeepLabV3TestViewController: UIViewController {
     private func setupActionButtonsConstraints() {
         NSLayoutConstraint.activate([
             // 操作按钮
-            actionButtonsView.topAnchor.constraint(equalTo: timeLapseResultView.bottomAnchor, constant: 20),
+            actionButtonsView.topAnchor.constraint(equalTo: timeLapseResultView.bottomAnchor, constant: 12),
             actionButtonsView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             actionButtonsView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            actionButtonsView.heightAnchor.constraint(equalToConstant: 60),
-            actionButtonsView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
+            actionButtonsView.heightAnchor.constraint(equalToConstant: 50),
+            actionButtonsView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -16),
             
             saveResultButton.leadingAnchor.constraint(equalTo: actionButtonsView.leadingAnchor, constant: 20),
             saveResultButton.centerYAnchor.constraint(equalTo: actionButtonsView.centerYAnchor),
@@ -977,6 +981,11 @@ class DeepLabV3TestViewController: UIViewController {
         // 如果有视频，自动提取帧
         if let videoURL = selectedVideoURL {
             extractFramesFromVideo(videoURL)
+        }
+        
+        // 强制更新按钮状态
+        DispatchQueue.main.async {
+            self.updateButtonStates()
         }
     }
     
@@ -1429,6 +1438,10 @@ extension DeepLabV3TestViewController {
                     // 重置相关状态
                     self?.frameSegmentationResults = []
                     self?.timeLapseResult = nil
+                    
+                    // 强制更新UI状态
+                    self?.updateProcessingModeUI()
+                    self?.updateButtonStates()
                 }
                 
             } catch {
@@ -1580,39 +1593,37 @@ extension DeepLabV3TestViewController {
         // 使用第一帧的尺寸作为画布尺寸
         let baseImage = results.first!.originalImage
         let canvasSize = baseImage.size
+        let scale = baseImage.scale
         
-        // 创建图形上下文
-        UIGraphicsBeginImageContextWithOptions(canvasSize, false, baseImage.scale)
-        guard let context = UIGraphicsGetCurrentContext() else {
-            UIGraphicsEndImageContext()
-            throw TimeLapseError.contextCreationFailed
-        }
+        // 使用UIGraphicsImageRenderer来避免坐标系翻转问题
+        let renderer = UIGraphicsImageRenderer(size: canvasSize)
         
-        // 透明度递增：0.2, 0.35, 0.5, 0.65, 1.0
-        let alphaValues: [CGFloat] = [0.2, 0.35, 0.5, 0.65, 1.0]
-        
-        // 按透明度从低到高叠加（最后一帧作为底图）
-        for (index, result) in results.enumerated().reversed() {
-            let alpha = alphaValues[min(index, alphaValues.count - 1)]
+        let compositeImage = renderer.image { context in
+            let cgContext = context.cgContext
             
-            // 绘制主体图像
-            context.saveGState()
-            context.setAlpha(alpha)
-            
-            if let cgImage = result.subjectImage.cgImage {
-                context.draw(cgImage, in: CGRect(origin: .zero, size: canvasSize))
+            // 首先绘制背景 - 使用最后一帧的原始图像作为背景
+            if let lastFrame = results.last {
+                lastFrame.originalImage.draw(in: CGRect(origin: .zero, size: canvasSize))
             }
             
-            context.restoreGState()
+            // 透明度递增：0.15, 0.25, 0.4, 0.6, 0.85
+            let alphaValues: [CGFloat] = [0.15, 0.25, 0.4, 0.6, 0.85]
+            
+            // 按透明度从低到高叠加人物主体（反向绘制：最早帧最透明）
+            for (index, result) in results.enumerated().reversed() {
+                let alpha = alphaValues[min(index, alphaValues.count - 1)]
+                
+                // 绘制人物主体图像
+                cgContext.saveGState()
+                cgContext.setAlpha(alpha)
+                
+                // 使用UIImage的draw方法，避免坐标系问题
+                result.subjectImage.draw(in: CGRect(origin: .zero, size: canvasSize), blendMode: .normal, alpha: alpha)
+                
+                cgContext.restoreGState()
+            }
         }
         
-        // 获取合成结果
-        guard let compositeImage = UIGraphicsGetImageFromCurrentImageContext() else {
-            UIGraphicsEndImageContext()
-            throw TimeLapseError.compositeCreationFailed
-        }
-        
-        UIGraphicsEndImageContext()
         return compositeImage
     }
     
