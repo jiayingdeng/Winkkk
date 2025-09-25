@@ -47,7 +47,7 @@ Invalid redeclaration of 'pixelBuffer()'
 
 ### 步骤1：删除手动定义的CoreML类
 
-**文件：** `MobileSAMManager.swift`
+**文件：** `Winkkk/Managers/MobileSAMManager.swift`
 
 **删除内容：**
 ```swift
@@ -77,11 +77,11 @@ class MobileSAM_MaskDecoderInput: MLFeatureProvider {
 ### 步骤2：解决UIImage扩展方法冲突
 
 **策略：**
-- 保留 `MobileSAMCompleteManager.swift` 中的完整UIImage扩展
-- 删除 `MobileSAMManager.swift` 中的重复方法
+- 保留 `Winkkk/Managers/MobileSAMCompleteManager.swift` 中的完整UIImage扩展
+- 删除 `Winkkk/Managers/MobileSAMManager.swift` 中的重复方法
 - 保留各文件独有的方法
 
-**MobileSAMCompleteManager.swift - 保留：**
+**Winkkk/Managers/MobileSAMCompleteManager.swift - 保留：**
 ```swift
 extension UIImage {
     func resized(to newSize: CGSize) -> UIImage? { ... }     // ✅ 保留
@@ -90,7 +90,7 @@ extension UIImage {
 }
 ```
 
-**MobileSAMManager.swift - 修改：**
+**Winkkk/Managers/MobileSAMManager.swift - 修改：**
 ```swift
 extension UIImage {
     // ❌ 删除重复方法：resized(to:) 和 pixelBuffer()
@@ -145,13 +145,34 @@ extension UIImage {
 
 ### 3. 大型项目代码组织
 
-**推荐结构：**
+**修复后的实际文件结构：**
 ```
-Managers/
-├── MobileSAMCompleteManager.swift    # 完整功能实现
-├── MobileSAMManager.swift           # 测试/实验性功能
-└── 共享扩展/
-    └── UIImage+CoreML.swift         # 统一的扩展方法
+Winkkk/
+├── Managers/                        # 管理器目录 (新组织结构)
+│   ├── MobileSAMCompleteManager.swift    # 完整功能实现
+│   └── MobileSAMManager.swift           # 基础/实验性功能
+├── Controllers/                     # 控制器目录
+├── Views/                          # 视图目录
+└── MobileSAM_ImageEncoder.mlpackage # CoreML模型文件
+```
+
+**文件组织改进：**
+- ✅ **统一管理器位置** - 所有Manager类放在`Managers/`目录
+- ✅ **清晰职责分离** - Complete版本包含完整功能，基础版本用于测试
+- ✅ **符合iOS项目规范** - 按功能模块组织代码结构
+- ✅ **便于维护扩展** - 新的MobileSAM相关功能可直接添加到Managers目录
+
+**推荐的进一步优化结构：**
+```
+Winkkk/
+├── Managers/
+│   ├── MobileSAMCompleteManager.swift
+│   ├── MobileSAMManager.swift
+│   └── Extensions/                  # 扩展方法 (建议)
+│       └── UIImage+CoreML.swift     # 统一的扩展方法
+├── Models/                         # 数据模型 (建议)
+└── CoreML/                         # CoreML模型 (建议)
+    └── MobileSAM_ImageEncoder.mlpackage
 ```
 
 ## 🚨 常见陷阱与预防
@@ -214,4 +235,5 @@ grep -r "func pixelBuffer" .
 
 ---
 *文档创建时间: 2025年9月25日*  
-*修复涉及文件: MobileSAMManager.swift, MobileSAMCompleteManager.swift*
+*修复涉及文件: Winkkk/Managers/MobileSAMManager.swift, Winkkk/Managers/MobileSAMCompleteManager.swift*  
+*文件组织: 已移动到Managers目录进行规范化管理*
