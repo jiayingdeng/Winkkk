@@ -1463,10 +1463,38 @@ extension DeepLabV3TestViewController {
             throw VideoProcessingError.invalidDuration
         }
         
+        // 获取视频轨道信息以确定原始分辨率
+        guard let videoTrack = asset.tracks(withMediaType: .video).first else {
+            throw VideoProcessingError.noVideoTrack
+        }
+        
+        let naturalSize = videoTrack.naturalSize.applying(videoTrack.preferredTransform)
+        let videoSize = CGSize(width: abs(naturalSize.width), height: abs(naturalSize.height))
+        
         let generator = AVAssetImageGenerator(asset: asset)
         generator.appliesPreferredTrackTransform = true
         generator.requestedTimeToleranceAfter = .zero
         generator.requestedTimeToleranceBefore = .zero
+        
+        // 🎯 关键优化1：保持高分辨率，最大支持到2K以避免内存问题
+        let maxDimension: CGFloat = 2048
+        if max(videoSize.width, videoSize.height) > maxDimension {
+            let scale = maxDimension / max(videoSize.width, videoSize.height)
+            generator.maximumSize = CGSize(
+                width: videoSize.width * scale,
+                height: videoSize.height * scale
+            )
+        } else {
+            // 保持原始分辨率
+            generator.maximumSize = videoSize
+        }
+        
+        // 🎯 关键优化2：设置高质量参数
+        generator.apertureMode = .cleanAperture
+        if #available(iOS 16.0, *) {
+            generator.requestedTimeToleranceAfter = .zero
+            generator.requestedTimeToleranceBefore = .zero
+        }
         
         var frames: [UIImage] = []
         let interval = durationInSeconds / Double(frameCount)
@@ -1489,7 +1517,15 @@ extension DeepLabV3TestViewController {
             throw VideoProcessingError.noFramesExtracted
         }
         
-        return frames
+        // 🎯 关键优化3：智能帧选择 - 选择清晰度最高的帧
+        let selectedFrames = selectHighQualityFrames(from: frames, targetCount: frameCount)
+        
+        // 🎯 关键优化4：图像预处理增强
+        let enhancedFrames = selectedFrames.compactMap { frame in
+            return enhanceImageQuality(frame)
+        }
+        
+        return enhancedFrames.isEmpty ? selectedFrames : enhancedFrames
     }
     
     /// 批量处理帧分割
@@ -1667,6 +1703,201 @@ extension DeepLabV3TestViewController {
         let durationInSeconds = CMTimeGetSeconds(duration)
         completion(durationInSeconds)
     }
+    
+    // MARK: - 🎯 智能帧选择和图像增强
+    
+    /// 智能选择高质量帧
+    private func selectHighQualityFrames(from frames: [UIImage], targetCount: Int) -> [UIImage] {
+        guard frames.count > targetCount else { return frames }
+        
+        // 计算每帧的清晰度分数
+        var frameScores: [(frame: UIImage, score: Double)] = []
+        
+        for frame in frames {
+            let sharpnessScore = calculateImageSharpness(frame)
+            let contrastScore = calculateImageContrast(frame)
+            let brightnessScore = calculateImageBrightness(frame)
+            
+            // 综合评分：清晰度权重最高
+            let totalScore = sharpnessScore * 0.6 + contrastScore * 0.3 + brightnessScore * 0.1
+            frameScores.append((frame: frame, score: totalScore))
+        }
+        
+        // 按分数排序，选择最高质量的帧
+        frameScores.sort { $0.score > $1.score }
+        let selectedFrames = Array(frameScores.prefix(targetCount)).map { $0.frame }
+        
+        print("📊 帧选择统计: 原始\(frames.count)帧 → 选择\(selectedFrames.count)帧")
+        
+        return selectedFrames
+    }
+    
+    /// 计算图像清晰度（基于拉普拉斯算子）
+    private func calculateImageSharpness(_ image: UIImage) -> Double {
+        guard let cgImage = image.cgImage else { return 0.0 }
+        
+        let width = cgImage.width
+        let height = cgImage.height
+        let bytesPerPixel = 4
+        let bytesPerRow = width * bytesPerPixel
+        let bitsPerComponent = 8
+        
+        guard let pixelData = cgImage.dataProvider?.data,
+              let data = CFDataGetBytePtr(pixelData) else { return 0.0 }
+        
+        var sharpnessSum: Double = 0.0
+        let sampleStep = max(1, min(width, height) / 100) // 采样优化
+        
+        for y in stride(from: sampleStep, to: height - sampleStep, by: sampleStep) {
+            for x in stride(from: sampleStep, to: width - sampleStep, by: sampleStep) {
+                let pixelIndex = (y * bytesPerRow) + (x * bytesPerPixel)
+                
+                let r = Double(data[pixelIndex])
+                let g = Double(data[pixelIndex + 1])
+                let b = Double(data[pixelIndex + 2])
+                let gray = (r + g + b) / 3.0
+                
+                // 简化的拉普拉斯算子
+                let rightIndex = pixelIndex + bytesPerPixel
+                let bottomIndex = ((y + sampleStep) * bytesPerRow) + (x * bytesPerPixel)
+                
+                if rightIndex < CFDataGetLength(pixelData) && bottomIndex < CFDataGetLength(pixelData) {
+                    let rightGray = (Double(data[rightIndex]) + Double(data[rightIndex + 1]) + Double(data[rightIndex + 2])) / 3.0
+                    let bottomGray = (Double(data[bottomIndex]) + Double(data[bottomIndex + 1]) + Double(data[bottomIndex + 2])) / 3.0
+                    
+                    let gradient = abs(rightGray - gray) + abs(bottomGray - gray)
+                    sharpnessSum += gradient
+                }
+            }
+        }
+        
+        return sharpnessSum / Double((width / sampleStep) * (height / sampleStep))
+    }
+    
+    /// 计算图像对比度
+    private func calculateImageContrast(_ image: UIImage) -> Double {
+        guard let cgImage = image.cgImage else { return 0.0 }
+        
+        let width = cgImage.width
+        let height = cgImage.height
+        
+        guard let pixelData = cgImage.dataProvider?.data,
+              let data = CFDataGetBytePtr(pixelData) else { return 0.0 }
+        
+        var values: [Double] = []
+        let sampleStep = max(1, min(width, height) / 50)
+        
+        for y in stride(from: 0, to: height, by: sampleStep) {
+            for x in stride(from: 0, to: width, by: sampleStep) {
+                let pixelIndex = (y * width * 4) + (x * 4)
+                if pixelIndex + 2 < CFDataGetLength(pixelData) {
+                    let r = Double(data[pixelIndex])
+                    let g = Double(data[pixelIndex + 1])
+                    let b = Double(data[pixelIndex + 2])
+                    let gray = (r + g + b) / 3.0
+                    values.append(gray)
+                }
+            }
+        }
+        
+        guard !values.isEmpty else { return 0.0 }
+        
+        let mean = values.reduce(0, +) / Double(values.count)
+        let variance = values.map { pow($0 - mean, 2) }.reduce(0, +) / Double(values.count)
+        
+        return sqrt(variance) // 标准差作为对比度指标
+    }
+    
+    /// 计算图像亮度
+    private func calculateImageBrightness(_ image: UIImage) -> Double {
+        guard let cgImage = image.cgImage else { return 0.0 }
+        
+        let width = cgImage.width
+        let height = cgImage.height
+        
+        guard let pixelData = cgImage.dataProvider?.data,
+              let data = CFDataGetBytePtr(pixelData) else { return 0.0 }
+        
+        var brightnessSum: Double = 0.0
+        let sampleStep = max(1, min(width, height) / 50)
+        var sampleCount = 0
+        
+        for y in stride(from: 0, to: height, by: sampleStep) {
+            for x in stride(from: 0, to: width, by: sampleStep) {
+                let pixelIndex = (y * width * 4) + (x * 4)
+                if pixelIndex + 2 < CFDataGetLength(pixelData) {
+                    let r = Double(data[pixelIndex])
+                    let g = Double(data[pixelIndex + 1])
+                    let b = Double(data[pixelIndex + 2])
+                    let brightness = (r + g + b) / 3.0
+                    brightnessSum += brightness
+                    sampleCount += 1
+                }
+            }
+        }
+        
+        let averageBrightness = sampleCount > 0 ? brightnessSum / Double(sampleCount) : 0.0
+        
+        // 返回接近理想亮度(128)的评分
+        return 1.0 - abs(averageBrightness - 128.0) / 128.0
+    }
+    
+    /// 图像质量增强
+    private func enhanceImageQuality(_ image: UIImage) -> UIImage? {
+        guard let cgImage = image.cgImage else { return nil }
+        
+        let width = cgImage.width
+        let height = cgImage.height
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
+        
+        guard let context = CGContext(data: nil,
+                                     width: width,
+                                     height: height,
+                                     bitsPerComponent: 8,
+                                     bytesPerRow: width * 4,
+                                     space: colorSpace,
+                                     bitmapInfo: bitmapInfo.rawValue) else { return nil }
+        
+        // 🎯 关键优化5：设置高质量渲染
+        context.setAllowsAntialiasing(true)
+        context.setShouldAntialias(true)
+        context.interpolationQuality = .high
+        
+        // 绘制原始图像
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        
+        guard let enhancedCGImage = context.makeImage() else { return nil }
+        
+        // 🎯 关键优化6：应用锐化滤镜
+        return applySharpnessFilter(to: UIImage(cgImage: enhancedCGImage))
+    }
+    
+    /// 应用锐化滤镜
+    private func applySharpnessFilter(to image: UIImage) -> UIImage? {
+        guard let cgImage = image.cgImage else { return nil }
+        
+        let ciImage = CIImage(cgImage: cgImage)
+        
+        // 创建锐化滤镜
+        guard let sharpnessFilter = CIFilter(name: "CISharpenLuminance") else { return image }
+        sharpnessFilter.setValue(ciImage, forKey: kCIInputImageKey)
+        sharpnessFilter.setValue(0.4, forKey: kCIInputSharpnessKey) // 适度锐化
+        
+        // 创建对比度增强滤镜
+        guard let contrastFilter = CIFilter(name: "CIColorControls") else { return image }
+        contrastFilter.setValue(sharpnessFilter.outputImage, forKey: kCIInputImageKey)
+        contrastFilter.setValue(1.1, forKey: kCIInputContrastKey) // 轻微增强对比度
+        contrastFilter.setValue(1.0, forKey: kCIInputBrightnessKey)
+        contrastFilter.setValue(1.05, forKey: kCIInputSaturationKey) // 轻微增强饱和度
+        
+        guard let outputImage = contrastFilter.outputImage else { return image }
+        
+        let context = CIContext(options: [.useSoftwareRenderer: false])
+        guard let finalCGImage = context.createCGImage(outputImage, from: outputImage.extent) else { return image }
+        
+        return UIImage(cgImage: finalCGImage)
+    }
 }
 
 // MARK: - Error Types
@@ -1674,6 +1905,7 @@ enum VideoProcessingError: LocalizedError {
     case invalidDuration
     case noFramesExtracted
     case extractionFailed(Error)
+    case noVideoTrack
     
     var errorDescription: String? {
         switch self {
@@ -1683,6 +1915,8 @@ enum VideoProcessingError: LocalizedError {
             return "无法提取视频帧"
         case .extractionFailed(let error):
             return "帧提取失败: \(error.localizedDescription)"
+        case .noVideoTrack:
+            return "视频文件中未找到视频轨道"
         }
     }
 }

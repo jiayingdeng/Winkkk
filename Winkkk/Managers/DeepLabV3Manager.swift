@@ -75,8 +75,15 @@ class DeepLabV3Manager {
             return
         }
         
+        // 🎯 关键优化10：质量检测机制
+        let qualityScore = evaluateImageQuality(image)
+        print("📊 输入图像质量评分: \(String(format: "%.1f", qualityScore * 100))%")
+        
+        // 🎯 关键优化11：多分辨率处理策略
+        let optimizedImage = applyResolutionStrategy(image, qualityScore: qualityScore)
+        
         // 预处理图片
-        guard let inputImage = preprocessImage(image) else {
+        guard let inputImage = preprocessImage(optimizedImage) else {
             completion(.failure(.imagePreprocessingFailed))
             return
         }
@@ -297,22 +304,173 @@ class DeepLabV3Manager {
         // DeepLabV3通常使用513x513的输入尺寸
         let targetSize = CGSize(width: 513, height: 513)
         
-        // 创建上下文
+        // 🎯 关键优化7：智能裁剪策略
+        let processedImage = applyIntelligentCropping(image)
+        guard let processedCGImage = processedImage.cgImage else { return nil }
+        
+        // 🎯 关键优化8：色彩空间优化
         let colorSpace = CGColorSpaceCreateDeviceRGB()
         guard let context = CGContext(
             data: nil,
             width: Int(targetSize.width),
             height: Int(targetSize.height),
             bitsPerComponent: 8,
-            bytesPerRow: 0,
+            bytesPerRow: Int(targetSize.width) * 4, // 明确指定字节行数
             space: colorSpace,
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else { return nil }
         
+        // 🎯 关键优化9：高质量缩放设置
+        context.setAllowsAntialiasing(true)
+        context.setShouldAntialias(true)
+        context.interpolationQuality = .high
+        
         // 绘制缩放后的图片
-        context.draw(cgImage, in: CGRect(origin: .zero, size: targetSize))
+        context.draw(processedCGImage, in: CGRect(origin: .zero, size: targetSize))
         
         return context.makeImage()
+    }
+    
+    /// 🎯 智能裁剪策略 - 尽可能保持人物特征
+    private func applyIntelligentCropping(_ image: UIImage) -> UIImage {
+        guard let cgImage = image.cgImage else { return image }
+        
+        let originalSize = CGSize(width: cgImage.width, height: cgImage.height)
+        
+        // 如果图像已经接近正方形，直接返回
+        let aspectRatio = originalSize.width / originalSize.height
+        if aspectRatio > 0.8 && aspectRatio < 1.25 {
+            return image
+        }
+        
+        // 🎯 策略1：中心裁剪，保持更多细节
+        let cropSize: CGFloat
+        if aspectRatio > 1.0 {
+            // 宽图：以高度为准
+            cropSize = originalSize.height
+        } else {
+            // 高图：以宽度为准
+            cropSize = originalSize.width
+        }
+        
+        let cropRect = CGRect(
+            x: (originalSize.width - cropSize) / 2,
+            y: (originalSize.height - cropSize) / 2,
+            width: cropSize,
+            height: cropSize
+        )
+        
+        guard let croppedCGImage = cgImage.cropping(to: cropRect) else { return image }
+        return UIImage(cgImage: croppedCGImage)
+    }
+    
+    /// 🎯 图像质量评估
+    private func evaluateImageQuality(_ image: UIImage) -> Double {
+        guard let cgImage = image.cgImage else { return 0.0 }
+        
+        let width = cgImage.width
+        let height = cgImage.height
+        let pixelCount = width * height
+        
+        // 分辨率评分 (0.0-1.0)
+        let resolutionScore = min(1.0, Double(pixelCount) / (1920 * 1080)) // 以1080p为满分
+        
+        // 长宽比评分 (接近正方形得分更高，因为DeepLabV3喜欢正方形输入)
+        let aspectRatio = Double(width) / Double(height)
+        let aspectScore = 1.0 - abs(aspectRatio - 1.0) / max(aspectRatio, 1.0)
+        
+        // 综合评分
+        let totalScore = resolutionScore * 0.7 + aspectScore * 0.3
+        
+        return max(0.0, min(1.0, totalScore))
+    }
+    
+    /// 🎯 多分辨率处理策略
+    private func applyResolutionStrategy(_ image: UIImage, qualityScore: Double) -> UIImage {
+        guard let cgImage = image.cgImage else { return image }
+        
+        let originalWidth = cgImage.width
+        let originalHeight = cgImage.height
+        let originalPixels = originalWidth * originalHeight
+        
+        // 策略选择基于质量评分和原始分辨率
+        if qualityScore >= 0.8 {
+            // 高质量图像：保持原分辨率
+            print("📊 分辨率策略: 保持原分辨率 (\(originalWidth)×\(originalHeight))")
+            return image
+        } else if qualityScore >= 0.5 {
+            // 中等质量：适度提升
+            let scaleFactor: CGFloat = qualityScore < 0.6 ? 1.2 : 1.1
+            return scaleImage(image, scaleFactor: scaleFactor)
+        } else {
+            // 低质量图像：需要更多预处理
+            print("📊 分辨率策略: 低质量图像增强")
+            return enhanceLowQualityImage(image)
+        }
+    }
+    
+    /// 缩放图像
+    private func scaleImage(_ image: UIImage, scaleFactor: CGFloat) -> UIImage {
+        guard let cgImage = image.cgImage else { return image }
+        
+        let newWidth = Int(CGFloat(cgImage.width) * scaleFactor)
+        let newHeight = Int(CGFloat(cgImage.height) * scaleFactor)
+        
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: nil,
+            width: newWidth,
+            height: newHeight,
+            bitsPerComponent: 8,
+            bytesPerRow: newWidth * 4,
+            space: colorSpace,
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return image }
+        
+        context.setAllowsAntialiasing(true)
+        context.setShouldAntialias(true)
+        context.interpolationQuality = .high
+        
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: newWidth, height: newHeight))
+        
+        guard let scaledCGImage = context.makeImage() else { return image }
+        
+        print("📊 图像缩放: \(cgImage.width)×\(cgImage.height) → \(newWidth)×\(newHeight)")
+        return UIImage(cgImage: scaledCGImage)
+    }
+    
+    /// 低质量图像增强
+    private func enhanceLowQualityImage(_ image: UIImage) -> UIImage {
+        guard let cgImage = image.cgImage else { return image }
+        
+        let ciImage = CIImage(cgImage: cgImage)
+        
+        // 应用降噪滤镜
+        guard let noiseReductionFilter = CIFilter(name: "CINoiseReduction") else { return image }
+        noiseReductionFilter.setValue(ciImage, forKey: kCIInputImageKey)
+        noiseReductionFilter.setValue(0.02, forKey: "inputNoiseLevel")
+        noiseReductionFilter.setValue(0.40, forKey: "inputSharpness")
+        
+        // 应用锐化滤镜
+        guard let sharpenFilter = CIFilter(name: "CISharpenLuminance"),
+              let intermediateImage = noiseReductionFilter.outputImage else { return image }
+        sharpenFilter.setValue(intermediateImage, forKey: kCIInputImageKey)
+        sharpenFilter.setValue(0.6, forKey: kCIInputSharpnessKey)
+        
+        // 应用对比度增强
+        guard let colorControlsFilter = CIFilter(name: "CIColorControls"),
+              let sharpenedImage = sharpenFilter.outputImage else { return image }
+        colorControlsFilter.setValue(sharpenedImage, forKey: kCIInputImageKey)
+        colorControlsFilter.setValue(1.15, forKey: kCIInputContrastKey)
+        colorControlsFilter.setValue(1.05, forKey: kCIInputSaturationKey)
+        colorControlsFilter.setValue(0.05, forKey: kCIInputBrightnessKey)
+        
+        guard let finalImage = colorControlsFilter.outputImage else { return image }
+        
+        guard let enhancedCGImage = context.createCGImage(finalImage, from: finalImage.extent) else { return image }
+        
+        print("📊 低质量图像增强完成")
+        return UIImage(cgImage: enhancedCGImage)
     }
     
     /// 处理分割结果
