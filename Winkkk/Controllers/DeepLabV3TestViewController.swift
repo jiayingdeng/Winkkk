@@ -1184,9 +1184,9 @@ class DeepLabV3TestViewController: UIViewController {
             
             // 计算统计信息
             let avgConfidence = frameSegmentationResults.isEmpty ? 0.0 : 
-                frameSegmentationResults.reduce(0) { $0 + $1.confidence } / Double(frameSegmentationResults.count)
+                frameSegmentationResults.reduce(0.0) { $0 + Double($1.confidence) } / Double(frameSegmentationResults.count)
             let avgSubjectRatio = frameSegmentationResults.isEmpty ? 0.0 : 
-                frameSegmentationResults.reduce(0) { $0 + $1.subjectPixelRatio } / Double(frameSegmentationResults.count)
+                frameSegmentationResults.reduce(0.0) { $0 + Double($1.subjectPixelRatio) } / Double(frameSegmentationResults.count)
             
             let stats = """
             ✨ 时光序列合成完成！
