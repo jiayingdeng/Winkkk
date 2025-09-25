@@ -1302,7 +1302,7 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
             // 🔧 修复：反向绘制时，需要反向计算透明度
             // 原理：最后一帧先绘制（底层），需要用最高透明度，所以用 (totalFrames - 1)
             //      第一帧后绘制（上层），需要用最低透明度，所以用 0
-            let transparencyIndex = frames.count - 1 - drawIndex
+            let transparencyIndex = drawIndex // frames.count - 1 - drawIndex
             let alpha = calculateAlphaForScene(
                 index: transparencyIndex,  // 💡 关键修复：使用反向索引计算透明度
                 totalFrames: frames.count,
@@ -1616,20 +1616,33 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
     
     /// 计算场景特定的透明度
     private func calculateAlphaForScene(index: Int, totalFrames: Int, sceneType: SceneType) -> CGFloat {
-        // 🔧 修复：根据帧数动态调整透明度范围
-        let (minAlpha, maxAlpha) = getAlphaRangeForFrameCount(totalFrames, sceneType: sceneType)
-        let baseAlpha = (CGFloat(index + 1) / CGFloat(totalFrames)) * (maxAlpha - minAlpha) + minAlpha
+        guard totalFrames > 1 else { return 1.0 }
         
-        print("📊 帧\(index+1)/\(totalFrames): 基础透明度=\(String(format: "%.2f", baseAlpha))")
+        let progress = CGFloat(index) / CGFloat(totalFrames - 1)
         
-        // 根据场景类型应用优化策略
+        // 根据场景类型应用不同的透明度策略
         switch sceneType {
-        case .objectChange:
-            return optimizeForObjectChange(alpha: baseAlpha)
-        case .personAction:
-            return optimizeForHumanAction(alpha: baseAlpha)
+        case .objectChange, .personAction:
+            // 其他场景保持原有逻辑
+            let (minAlpha, maxAlpha) = getAlphaRangeForFrameCount(totalFrames, sceneType: sceneType)
+            let baseAlpha = (CGFloat(index + 1) / CGFloat(totalFrames)) * (maxAlpha - minAlpha) + minAlpha
+            
+            print("📊 帧\(index+1)/\(totalFrames): 基础透明度=\(String(format: "%.2f", baseAlpha))")
+            
+            if sceneType == .objectChange {
+                return optimizeForObjectChange(alpha: baseAlpha)
+            } else {
+                return optimizeForHumanAction(alpha: baseAlpha)
+            }
+            
         case .sportMotion:
-            return optimizeForSportsMotion(alpha: baseAlpha)
+            // 🆕 运动轨迹场景：使用指数缓动曲线，增强视觉层次
+            let easedProgress = pow(progress, 2.5) // 指数因子2.5，产生"慢→快"的加速曲线
+            let baseAlpha = 0.15 + (0.95 - 0.15) * easedProgress // 扩大透明度范围：15%-95%
+            
+            print("📊 帧\(index+1)/\(totalFrames): 进度=\(String(format: "%.2f", progress)), 缓动进度=\(String(format: "%.2f", easedProgress)), 透明度=\(String(format: "%.2f", baseAlpha))")
+            
+            return baseAlpha // 直接返回，不再经过optimizeForSportsMotion的二次压缩
         }
     }
     

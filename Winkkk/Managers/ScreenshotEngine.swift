@@ -131,11 +131,11 @@ class ScreenshotEngine {
         
         switch devicePerformance {
         case .high:
-            maxSize = CGSize(width: 4096, height: 4096) // 支持4K截图
+            maxSize = CGSize(width: 6144, height: 6144) // 支持6K截图
         case .medium:
-            maxSize = CGSize(width: 2048, height: 2048) // 2K截图
+            maxSize = CGSize(width: 4096, height: 4096) // 4K截图
         case .low:
-            maxSize = CGSize(width: 1280, height: 1280) // HD截图
+            maxSize = CGSize(width: 2048, height: 2048) // 2K截图
         }
         
         imageGenerator.maximumSize = maxSize
@@ -463,7 +463,7 @@ extension ScreenshotEngine {
                 print("✅ 封面帧生成完成")
                 
                 // 保存封面图片
-                guard let imageData = coverImage.jpegData(compressionQuality: 0.9) else {
+                guard let imageData = coverImage.jpegData(compressionQuality: 0.95) else {
                     throw ScreenshotError.generationFailed("封面图片保存失败")
                 }
                 try imageData.write(to: tempImageURL)

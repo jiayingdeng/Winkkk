@@ -204,10 +204,10 @@ class LivePhotoMaker {
         let presetName: String
         if audioTracks.isEmpty {
             print("   ⚠️ 检测到无音频轨道，使用视频专用预设")
-            presetName = AVAssetExportPresetMediumQuality
+            presetName = AVAssetExportPresetHighestQuality
         } else {
             print("   ✅ 检测到音频轨道，使用标准预设")
-            presetName = AVAssetExportPresetMediumQuality
+            presetName = AVAssetExportPresetHighestQuality
         }
         
         guard let exportSession = AVAssetExportSession(
@@ -422,7 +422,7 @@ class LivePhotoMaker {
 extension UIImage {
     
     /// 将图片转换为HEIC格式数据
-    func heicData(quality: CGFloat = 0.8) -> Data? {
+    func heicData(quality: CGFloat = 0.9) -> Data? {
         guard let cgImage = self.cgImage else { return nil }
         
         let mutableData = NSMutableData()

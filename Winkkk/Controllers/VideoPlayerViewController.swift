@@ -766,7 +766,7 @@ class VideoPlayerViewController: UIViewController {
         let imagePath = screenshotsDirectory.appendingPathComponent(imageFileName)
         
         // 保存图片到文件系统
-        guard let imageData = image.jpegData(compressionQuality: 0.9) else {
+        guard let imageData = image.jpegData(compressionQuality: 0.95) else {
             handleScreenshotError(ScreenshotError.imageProcessingFailed)
             return
         }

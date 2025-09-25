@@ -195,51 +195,10 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
                         livePhotoView.livePhoto = livePhoto
                         print("📸 Live Photo已加载到视图")
                         
-                        // 🎯 关键修复：在视图完全准备好后自动播放
-                        // 使用多层延迟确保所有条件都满足
-                        DispatchQueue.main.async {
-                            print("🔍 检查Live Photo自动播放条件...")
-                            print("   - 视图是否在层次结构中: \(livePhotoView.superview != nil)")
-                            print("   - Live Photo是否已加载: \(livePhotoView.livePhoto != nil)")
-                            print("   - 视图是否可见: \(livePhotoView.window != nil)")
-                            
-                            // 检查所有必要条件
-                            if livePhotoView.superview != nil && 
-                               livePhotoView.livePhoto != nil {
-                                
-                                // 🎯 增加更长的延迟，确保sheet完全展示并且视图在窗口层次结构中
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                                    // 再次检查条件（防止用户快速关闭sheet）
-                                    if livePhotoView.superview != nil && 
-                                       livePhotoView.livePhoto != nil &&
-                                       livePhotoView.window != nil {
-                                        
-                                        // 🎯 尝试多种播放方式
-                                        print("🎬 尝试Live Photo自动播放...")
-                                        
-                                        // 方法1：使用hint播放风格（更温和的自动播放）
-                                        livePhotoView.startPlayback(with: .hint)
-                                        print("🎥 Live Photo hint播放已启动")
-                                        
-                                        // 方法2：0.5秒后尝试完整播放
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                                            if livePhotoView.superview != nil && 
-                                               livePhotoView.livePhoto != nil &&
-                                               livePhotoView.window != nil {
-                                                livePhotoView.startPlayback(with: .full)
-                                                print("🎥 Live Photo完整播放已启动")
-                                            }
-                                        }
-                                    } else {
-                                        print("❌ Live Photo播放条件已不满足")
-                                        print("   - superview: \(livePhotoView.superview != nil)")
-                                        print("   - livePhoto: \(livePhotoView.livePhoto != nil)")
-                                        print("   - window: \(livePhotoView.window != nil)")
-                                    }
-                                }
-                            } else {
-                                print("❌ Live Photo视图或数据未准备好")
-                            }
+                        // 🎯 简化的自动播放逻辑
+                        // 数据加载完成后，等待视图稳定再播放
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                            self.startLivePhotoAutoplay(livePhotoView)
                         }
                     }
                 } catch {
@@ -521,56 +480,34 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
         }
     }
     
-    /// 触发Live Photo播放的核心方法
+    /// 简化的Live Photo自动播放方法
+    private func startLivePhotoAutoplay(_ livePhotoView: PHLivePhotoView) {
+        print("🎬 开始Live Photo自动播放...")
+        
+        // 验证必要条件
+        guard livePhotoView.livePhoto != nil,
+              livePhotoView.superview != nil else {
+            print("❌ Live Photo播放条件不满足")
+            return
+        }
+        
+        // 单一可靠的播放方式：使用hint模式开始播放
+        livePhotoView.startPlayback(with: .hint)
+        print("🎥 Live Photo自动播放已启动（hint模式）")
+    }
+    
+    /// 触发Live Photo播放的核心方法（保留用于手动触发）
     private func triggerLivePhotoPlayback(_ livePhotoView: PHLivePhotoView) {
-        print("🔍 找到Live Photo视图，详细状态检查:")
-        print("   - livePhoto存在: \(livePhotoView.livePhoto != nil)")
-        print("   - 视图在窗口中: \(livePhotoView.window != nil)")
-        print("   - 视图可见: \(!livePhotoView.isHidden)")
-        print("   - 视图alpha: \(livePhotoView.alpha)")
-        print("   - 手势识别器启用: \(livePhotoView.playbackGestureRecognizer.isEnabled)")
+        print("🔍 手动触发Live Photo播放")
         
         guard livePhotoView.livePhoto != nil else {
             print("❌ Live Photo数据不存在")
             return
         }
         
-        // 🎯 强制播放策略
-        print("🎬 开始强制播放Live Photo...")
-        
-        // 策略1：hint播放
-        livePhotoView.startPlayback(with: .hint)
-        print("🎥 hint播放已触发")
-        
-        // 策略2：延迟完整播放
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            livePhotoView.startPlayback(with: .full)
-            print("🎥 完整播放已触发")
-        }
-        
-        // 策略3：模拟手势触发
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.simulateLivePhotoGesture(livePhotoView)
-        }
-        
-        // 策略4：持续尝试播放
-        var attemptCount = 0
-        let timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { timer in
-            attemptCount += 1
-            if attemptCount > 3 {
-                timer.invalidate()
-                print("⏰ Live Photo播放尝试超时")
-                return
-            }
-            
-            print("🔄 第\(attemptCount)次尝试播放Live Photo")
-            livePhotoView.startPlayback(with: .full)
-        }
-        
-        // 5秒后停止尝试
-        DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-            timer.invalidate()
-        }
+        // 手动触发时使用完整播放模式
+        livePhotoView.startPlayback(with: .full)
+        print("🎥 Live Photo手动播放已启动（full模式）")
     }
     
     /// 模拟Live Photo手势触发

@@ -135,10 +135,10 @@ class VideoSegmentExtractor {
         let presetName: String
         if audioTracks.isEmpty {
             print("   ⚠️ 检测到无音频轨道，使用视频专用预设")
-            presetName = AVAssetExportPresetMediumQuality
+            presetName = AVAssetExportPresetHighestQuality
         } else {
             print("   ✅ 检测到音频轨道，使用标准预设")
-            presetName = AVAssetExportPresetMediumQuality
+            presetName = AVAssetExportPresetHighestQuality
         }
         
         guard let exportSession = AVAssetExportSession(

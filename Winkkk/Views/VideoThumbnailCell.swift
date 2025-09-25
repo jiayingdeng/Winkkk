@@ -251,7 +251,7 @@ class VideoThumbnailCell: UICollectionViewCell {
     }
     
     private func saveThumbnailCache(_ image: UIImage, for videoItem: VideoItem) {
-        guard let imageData = image.jpegData(compressionQuality: 0.8) else { return }
+        guard let imageData = image.jpegData(compressionQuality: 0.95) else { return }
         
         let fileName = "\(videoItem.id.uuidString)_thumbnail.jpg"
         let thumbnailURL = FileManagerHelper.thumbnailsDirectory.appendingPathComponent(fileName)
