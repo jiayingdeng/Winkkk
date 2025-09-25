@@ -1359,7 +1359,7 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
     private func optimizeForSportsMotion(alpha: CGFloat) -> CGFloat {
         // 运动轨迹：增强对比，突出动作连贯性
         // 结合参数：每0.1秒一帧，最多20帧，密集时间分布提取，锐度增强
-        return pow(alpha, 0.8) // 稍微增强中间帧的可见度，突出运动细节
+        return pow(alpha, 0.6) // 🔥 优化：从0.8改为0.6，显著增强中间帧可见度，突出运动轨迹连贯性
     }
     
     /// 计算场景特定的透明度

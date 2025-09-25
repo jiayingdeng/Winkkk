@@ -32,6 +32,7 @@ class DETRSegmentationTestViewController: UIViewController {
     @IBOutlet private weak var confidenceLabel: UILabel!
     @IBOutlet private weak var detectedClassesTextView: UITextView!
     @IBOutlet private weak var processingTimeLabel: UILabel!
+    @IBOutlet private weak var navigationHintLabel: UILabel!
     
     // MARK: - Properties
     
@@ -57,6 +58,7 @@ class DETRSegmentationTestViewController: UIViewController {
         setupUI()
         initializeSegmentationManager()
         startModelStatusTimer()
+        showWelcomeHint()
     }
     
     deinit {
@@ -69,12 +71,7 @@ class DETRSegmentationTestViewController: UIViewController {
         title = "DETR分割测试"
         
         // 设置导航栏
-        navigationItem.rightBarButtonItem = UIBarButtonItem(
-            title: "清除",
-            style: .plain,
-            target: self,
-            action: #selector(clearResults)
-        )
+        setupNavigationBar()
         
         // 设置分类选择器
         setupCategorySegmentedControl()
@@ -90,6 +87,43 @@ class DETRSegmentationTestViewController: UIViewController {
         
         // 初始状态
         updateUIState(isProcessing: false, hasImage: false)
+    }
+    
+    private func setupNavigationBar() {
+        // 左侧按钮 - 返回设置
+        let settingsButton = UIBarButtonItem(
+            image: UIImage(systemName: "gearshape.fill"),
+            style: .plain,
+            target: self,
+            action: #selector(returnToSettings)
+        )
+        settingsButton.tintColor = .systemBlue
+        
+        // 中间按钮 - 返回主页
+        let homeButton = UIBarButtonItem(
+            image: UIImage(systemName: "house.fill"),
+            style: .plain,
+            target: self,
+            action: #selector(returnToHome)
+        )
+        homeButton.tintColor = .systemGreen
+        
+        // 右侧按钮 - 清除结果
+        let clearButton = UIBarButtonItem(
+            title: "清除",
+            style: .plain,
+            target: self,
+            action: #selector(clearResults)
+        )
+        clearButton.tintColor = .systemRed
+        
+        // 设置导航栏按钮
+        navigationItem.leftBarButtonItem = settingsButton
+        navigationItem.rightBarButtonItems = [clearButton, homeButton]
+        
+        // 添加导航栏标题样式
+        navigationController?.navigationBar.prefersLargeTitles = false
+        navigationController?.navigationBar.tintColor = .label
     }
     
     private func setupCategorySegmentedControl() {
@@ -185,6 +219,13 @@ class DETRSegmentationTestViewController: UIViewController {
         detectedClassesTextView?.layer.cornerRadius = 8
         detectedClassesTextView?.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         detectedClassesTextView?.text = "检测结果将在这里显示..."
+        
+        // 设置导航提示
+        navigationHintLabel?.text = "💡 提示：点击左上角齿轮图标返回设置，点击右上角房子图标返回主页"
+        navigationHintLabel?.textColor = .systemGray
+        navigationHintLabel?.font = .systemFont(ofSize: 12, weight: .regular)
+        navigationHintLabel?.textAlignment = .center
+        navigationHintLabel?.numberOfLines = 0
     }
     
     private func initializeSegmentationManager() {
@@ -318,6 +359,125 @@ class DETRSegmentationTestViewController: UIViewController {
         detectedClassesTextView?.text = "检测结果将在这里显示..."
         
         updateUIState(isProcessing: false, hasImage: false)
+    }
+    
+    @objc private func returnToSettings() {
+        // 添加触觉反馈
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        
+        // 添加按钮动画
+        if let settingsButton = navigationItem.leftBarButtonItem {
+            animateButtonTap(settingsButton)
+        }
+        
+        // 返回到设置页面
+        if let settingsVC = findSettingsViewController() {
+            dismiss(animated: true) {
+                // 如果设置页面是模态展示的，直接dismiss
+                if settingsVC.presentingViewController != nil {
+                    settingsVC.dismiss(animated: true)
+                } else {
+                    // 如果设置页面在导航栈中，pop到设置页面
+                    settingsVC.navigationController?.popToViewController(settingsVC, animated: true)
+                }
+            }
+        } else {
+            // 如果找不到设置页面，直接dismiss当前页面
+            dismiss(animated: true)
+        }
+    }
+    
+    @objc private func returnToHome() {
+        // 添加触觉反馈
+        let impactFeedback = UIImpactFeedbackGenerator(style: .medium)
+        impactFeedback.impactOccurred()
+        
+        // 添加按钮动画
+        if let homeButton = navigationItem.rightBarButtonItems?.last {
+            animateButtonTap(homeButton)
+        }
+        
+        // 返回到主界面
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first,
+           let rootVC = window.rootViewController {
+            
+            // 关闭所有模态视图
+            rootVC.dismiss(animated: true) {
+                // 如果根视图是导航控制器，pop到根视图
+                if let navController = rootVC as? UINavigationController {
+                    navController.popToRootViewController(animated: true)
+                }
+            }
+        }
+    }
+    
+    private func findSettingsViewController() -> SettingsViewController? {
+        // 在当前导航栈中查找设置页面
+        if let navController = navigationController {
+            for viewController in navController.viewControllers {
+                if let settingsVC = viewController as? SettingsViewController {
+                    return settingsVC
+                }
+            }
+        }
+        
+        // 在presented视图控制器中查找
+        var currentVC = presentingViewController
+        while let vc = currentVC {
+            if let settingsVC = vc as? SettingsViewController {
+                return settingsVC
+            }
+            if let navController = vc as? UINavigationController {
+                for viewController in navController.viewControllers {
+                    if let settingsVC = viewController as? SettingsViewController {
+                        return settingsVC
+                    }
+                }
+            }
+            currentVC = vc.presentingViewController
+        }
+        
+        return nil
+    }
+    
+    private func animateButtonTap(_ button: UIBarButtonItem) {
+        // 创建按钮动画效果
+        UIView.animate(withDuration: 0.1, animations: {
+            // 这里可以添加按钮的视觉反馈动画
+            // 由于UIBarButtonItem没有直接的视图属性，我们通过改变tintColor来实现反馈
+            let originalColor = button.tintColor
+            button.tintColor = .systemOrange
+            
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                button.tintColor = originalColor
+            }
+        })
+    }
+    
+    private func showWelcomeHint() {
+        // 延迟显示欢迎提示，让用户注意到导航按钮
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            self?.displayNavigationHint()
+        }
+    }
+    
+    private func displayNavigationHint() {
+        let alert = UIAlertController(
+            title: "🎯 DETR分割测试",
+            message: "欢迎使用DETR智能分割测试！\n\n📱 导航提示：\n• 左上角齿轮图标：返回设置页面\n• 右上角房子图标：返回主界面\n• 右上角清除按钮：清空测试结果\n\n现在请选择一张图片开始测试吧！",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "开始测试", style: .default) { [weak self] _ in
+            // 用户点击开始测试后，可以自动触发图片选择
+            self?.selectImageTapped()
+        })
+        
+        alert.addAction(UIAlertAction(title: "我知道了", style: .cancel))
+        
+        present(alert, animated: true)
     }
     
     // MARK: - Helper Methods

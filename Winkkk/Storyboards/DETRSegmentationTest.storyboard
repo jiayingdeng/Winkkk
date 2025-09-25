@@ -59,7 +59,7 @@
                                                         </subviews>
                                                     </stackView>
                                                     <stackView opaque="NO" contentMode="scaleToFill" axis="vertical" spacing="8" translatesAutoresizingMaskIntoConstraints="NO" id="zfG-4h-Nts">
-                                                        <rect key="frame" x="0.0" y="107" width="361" height="33"/>
+                                                        <rect key="frame" x="0.0" y="107" width="361" height="60"/>
                                                         <subviews>
                                                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="请选择图片开始测试" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="8JD-2h-qfI">
                                                                 <rect key="frame" x="0.0" y="0.0" width="361" height="20.333333333333332"/>
@@ -68,22 +68,28 @@
                                                                 <nil key="highlightedColor"/>
                                                             </label>
                                                             <stackView opaque="NO" contentMode="scaleToFill" distribution="fillEqually" translatesAutoresizingMaskIntoConstraints="NO" id="jXJ-7e-Xh9">
-                                                                <rect key="frame" x="0.0" y="28.333333333333314" width="361" height="4.6666666666666856"/>
+                                                                <rect key="frame" x="0.0" y="28.333333333333314" width="361" height="20.333333333333332"/>
                                                                 <subviews>
                                                                     <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="置信度: --" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="Lxd-cq-6Qd">
-                                                                        <rect key="frame" x="0.0" y="0.0" width="180.5" height="4.6666666666666856"/>
+                                                                        <rect key="frame" x="0.0" y="0.0" width="180.5" height="20.333333333333332"/>
                                                                         <fontDescription key="fontDescription" type="system" pointSize="14"/>
                                                                         <color key="textColor" systemColor="systemGrayColor"/>
                                                                         <nil key="highlightedColor"/>
                                                                     </label>
                                                                     <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="处理时间: --" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="vgm-fC-fOT">
-                                                                        <rect key="frame" x="180.5" y="0.0" width="180.5" height="4.6666666666666856"/>
+                                                                        <rect key="frame" x="180.5" y="0.0" width="180.5" height="20.333333333333332"/>
                                                                         <fontDescription key="fontDescription" type="system" pointSize="14"/>
                                                                         <color key="textColor" systemColor="systemGrayColor"/>
                                                                         <nil key="highlightedColor"/>
                                                                     </label>
                                                                 </subviews>
                                                             </stackView>
+                                                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="💡 提示：点击左上角齿轮图标返回设置，点击右上角房子图标返回主页" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="navigation-hint-label">
+                                                                <rect key="frame" x="0.0" y="48.666666666666657" width="361" height="11.333333333333343"/>
+                                                                <fontDescription key="fontDescription" type="system" pointSize="12"/>
+                                                                <color key="textColor" systemColor="systemGrayColor"/>
+                                                                <nil key="highlightedColor"/>
+                                                            </label>
                                                         </subviews>
                                                     </stackView>
                                                 </subviews>
@@ -178,6 +184,7 @@
                         <outlet property="segmentedImageView" destination="Yco-Vl-nJr" id="z7j-Zy-xOI"/>
                         <outlet property="selectImageButton" destination="xTz-Mh-9gP" id="zrv-Nh-CUh"/>
                         <outlet property="statusLabel" destination="8JD-2h-qfI" id="2z7-hL-MaG"/>
+                        <outlet property="navigationHintLabel" destination="navigation-hint-label" id="nav-hint-connection"/>
                     </connections>
                 </viewController>
                 <placeholder placeholderIdentifier="IBFirstResponder" id="dkx-z0-nzz" sceneMemberID="firstResponder"/>

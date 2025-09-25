@@ -380,7 +380,43 @@ class CameraManager {
 let session = cameraManager.previewSession
 ```
 
-### 17. 不可变属性赋值错误 (Immutable property assignment)
+### 17. 数值类型运算错误 (Numeric type operation error)
+
+**错误类型**: `Binary operator 'X' cannot be applied to operands of type 'Y' and 'Z'`
+
+**产生原因**:
+- CGFloat和Float之间的类型不匹配运算
+- Double、Float、Int等数值类型混用
+- 特别是在Core Graphics和Core Image API交互时常见
+- UIKit使用CGFloat但ML模型通常使用Float
+
+**解决方案**:
+```swift
+// ❌ 错误 - CGFloat和Float混合运算
+let clickPoint: CGPoint = CGPoint(x: 100, y: 200)
+let imageSize: CGSize = CGSize(width: 1024, height: 1024)
+let maskSize = 256
+let centerX = Int(clickPoint.x / imageSize.width * Float(maskSize)) // 类型不匹配!
+
+// ✅ 正确 - 显式类型转换
+let centerX = Int(Float(clickPoint.x) / Float(imageSize.width) * Float(maskSize))
+let centerY = Int(Float(clickPoint.y) / Float(imageSize.height) * Float(maskSize))
+
+// ✅ 另一种解决方案 - 保持CGFloat运算
+let centerX = Int(clickPoint.x / imageSize.width * CGFloat(maskSize))
+let centerY = Int(clickPoint.y / imageSize.height * CGFloat(maskSize))
+
+// ✅ 使用扩展简化转换
+extension CGFloat {
+    var float: Float { Float(self) }
+}
+extension Float {
+    var cgFloat: CGFloat { CGFloat(self) }
+}
+let centerX = Int(clickPoint.x.float / imageSize.width.float * Float(maskSize))
+```
+
+### 18. 不可变属性赋值错误 (Immutable property assignment)
 
 **错误类型**: `Cannot assign to property: 'XXX' is a 'let' constant`
 
@@ -434,7 +470,13 @@ let newStyle = WatermarkStyle(position: .bottomRight)
 - 注意iOS版本兼容性
 - 正确import所需框架
 
-### 4. 代码组织
+### 4. 数值类型管理
+- 在iOS开发中明确区分CGFloat、Float、Double的使用场景
+- UIKit/Core Graphics使用CGFloat，ML模型通常使用Float
+- 建立类型转换的扩展方法简化代码
+- 在数学运算前统一数值类型
+
+### 5. 代码组织
 - 避免在多个文件中定义相同类型
 - 使用Extension合理扩展功能
 - 保持文件和类型职责单一

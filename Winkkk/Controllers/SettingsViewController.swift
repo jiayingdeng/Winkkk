@@ -8,6 +8,7 @@
 
 import UIKit
 import AVFoundation
+import SwiftUI
 
 class SettingsViewController: UIViewController {
     
@@ -170,6 +171,13 @@ class SettingsViewController: UIViewController {
                         subtitle: "测试Vision框架+Core Image三阶段智能主体提取算法",
                         icon: "magnifyingglass.circle",
                         action: { [weak self] in self?.showSubjectExtractionDebug() }
+                    ),
+                    SettingsItem(
+                        type: .action,
+                        title: "🎯 MobileSAM智能分割",
+                        subtitle: "AI驱动的物体精确分割（支持任意点击物体）",
+                        icon: "scissors.badge.ellipsis",
+                        action: { [weak self] in self?.showSAMSegmentationTest() }
                     ),
                     SettingsItem(
                         type: .action,
@@ -429,6 +437,14 @@ class SettingsViewController: UIViewController {
         print("🔍 启动主体提取调试页面...")
         let debugVC = SubjectExtractionDebugViewController()
         let navController = UINavigationController(rootViewController: debugVC)
+        navController.modalPresentationStyle = .fullScreen
+        present(navController, animated: true)
+    }
+    
+    private func showSAMSegmentationTest() {
+        print("🎯 启动MobileSAM分割页面...")
+        let mobileSAMVC = MobileSAMHostingController()
+        let navController = UINavigationController(rootViewController: mobileSAMVC)
         navController.modalPresentationStyle = .fullScreen
         present(navController, animated: true)
     }

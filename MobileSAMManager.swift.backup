@@ -1,0 +1,254 @@
+
+//
+//  MobileSAMManager.swift
+//  图像分割管理器 - 使用MobileSAM进行物体分割
+//
+
+import Foundation
+import CoreML
+import Vision
+import UIKit
+import CoreImage
+
+class MobileSAMManager: ObservableObject {
+    
+    // MARK: - Properties
+    private var imageEncoder: MLModel?
+    @Published var isLoading = false
+    @Published var segmentationResult: UIImage?
+    
+    // MARK: - Initialization
+    init() {
+        loadModel()
+    }
+    
+    // MARK: - Model Loading
+    private func loadModel() {
+        guard let modelURL = Bundle.main.url(forResource: "MobileSAM_ImageEncoder", withExtension: "mlpackage") else {
+            print("❌ 找不到MobileSAM模型文件")
+            return
+        }
+        
+        do {
+            imageEncoder = try MLModel(contentsOf: modelURL)
+            print("✅ MobileSAM模型加载成功")
+        } catch {
+            print("❌ 模型加载失败: \(error)")
+        }
+    }
+    
+    // MARK: - Image Preprocessing
+    private func preprocessImage(_ image: UIImage) -> MLMultiArray? {
+        // 1. 调整图像大小到1024x1024
+        guard let resizedImage = image.resized(to: CGSize(width: 1024, height: 1024)) else {
+            print("❌ 图像预处理失败")
+            return nil
+        }
+        
+        // 2. 转换为MLMultiArray
+        guard let pixelBuffer = resizedImage.pixelBuffer() else {
+            print("❌ 无法创建像素缓冲区")
+            return nil
+        }
+        
+        return pixelBuffer.toMLMultiArray()
+    }
+    
+    // MARK: - Segmentation
+    func segmentObject(in image: UIImage, at point: CGPoint) {
+        isLoading = true
+        
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            
+            // 1. 预处理图像
+            guard let inputArray = self.preprocessImage(image) else {
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                }
+                return
+            }
+            
+            // 2. 运行图像编码器
+            guard let encoder = self.imageEncoder else {
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                }
+                return
+            }
+            
+            do {
+                let input = try MLDictionaryFeatureProvider(dictionary: ["image": inputArray])
+                let output = try encoder.prediction(from: input)
+                
+                // 3. 提取特征
+                guard let features = output.featureValue(for: "features")?.multiArrayValue else {
+                    throw NSError(domain: "MobileSAM", code: -1, userInfo: [NSLocalizedDescriptionKey: "无法提取特征"])
+                }
+                
+                // 4. 简单的点击分割（这里需要实现掩码解码器）
+                let mask = self.generateMask(from: features, clickPoint: point, imageSize: image.size)
+                
+                // 5. 生成分割结果
+                let resultImage = self.applyMask(mask, to: image)
+                
+                DispatchQueue.main.async {
+                    self.segmentationResult = resultImage
+                    self.isLoading = false
+                }
+                
+            } catch {
+                print("❌ 分割失败: \(error)")
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                }
+            }
+        }
+    }
+    
+    // MARK: - Mask Generation (简化版本)
+    private func generateMask(from features: MLMultiArray, clickPoint: CGPoint, imageSize: CGSize) -> [[Float]] {
+        // 这是一个简化的掩码生成方法
+        // 在实际应用中，需要实现完整的掩码解码器
+        
+        let maskSize = 256 // 简化掩码尺寸
+        var mask: [[Float]] = Array(repeating: Array(repeating: 0.0, count: maskSize), count: maskSize)
+        
+        // 基于点击位置创建简单的圆形掩码
+        let centerX = Int(clickPoint.x / imageSize.width * Float(maskSize))
+        let centerY = Int(clickPoint.y / imageSize.height * Float(maskSize))
+        let radius = 50
+        
+        for y in 0..<maskSize {
+            for x in 0..<maskSize {
+                let distance = sqrt(pow(Float(x - centerX), 2) + pow(Float(y - centerY), 2))
+                if distance < Float(radius) {
+                    mask[y][x] = 1.0
+                }
+            }
+        }
+        
+        return mask
+    }
+    
+    // MARK: - Mask Application
+    private func applyMask(_ mask: [[Float]], to image: UIImage) -> UIImage? {
+        guard let cgImage = image.cgImage else { return nil }
+        
+        let width = cgImage.width
+        let height = cgImage.height
+        
+        guard let context = CGContext(
+            data: nil,
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+        ) else { return nil }
+        
+        // 绘制原图
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
+        
+        // 应用掩码（绿色覆盖）
+        context.setFillColor(UIColor.green.withAlphaComponent(0.5).cgColor)
+        
+        let maskHeight = mask.count
+        let maskWidth = mask[0].count
+        let scaleX = Float(width) / Float(maskWidth)
+        let scaleY = Float(height) / Float(maskHeight)
+        
+        for y in 0..<maskHeight {
+            for x in 0..<maskWidth {
+                if mask[y][x] > 0.5 {
+                    let rect = CGRect(
+                        x: CGFloat(Float(x) * scaleX),
+                        y: CGFloat(Float(y) * scaleY),
+                        width: CGFloat(scaleX),
+                        height: CGFloat(scaleY)
+                    )
+                    context.fill(rect)
+                }
+            }
+        }
+        
+        guard let resultCGImage = context.makeImage() else { return nil }
+        return UIImage(cgImage: resultCGImage)
+    }
+}
+
+// MARK: - UIImage Extensions
+extension UIImage {
+    func resized(to size: CGSize) -> UIImage? {
+        UIGraphicsBeginImageContextWithOptions(size, false, 0.0)
+        defer { UIGraphicsEndImageContext() }
+        
+        draw(in: CGRect(origin: .zero, size: size))
+        return UIGraphicsGetImageFromCurrentImageContext()
+    }
+    
+    func pixelBuffer() -> CVPixelBuffer? {
+        let attrs = [
+            kCVPixelBufferCGImageCompatibilityKey: kCFBooleanTrue!,
+            kCVPixelBufferCGBitmapContextCompatibilityKey: kCFBooleanTrue!
+        ] as CFDictionary
+        
+        var pixelBuffer: CVPixelBuffer?
+        let status = CVPixelBufferCreate(
+            kCFAllocatorDefault,
+            Int(size.width),
+            Int(size.height),
+            kCVPixelFormatType_32ARGB,
+            attrs,
+            &pixelBuffer
+        )
+        
+        guard status == kCVReturnSuccess, let buffer = pixelBuffer else {
+            return nil
+        }
+        
+        CVPixelBufferLockBaseAddress(buffer, CVPixelBufferLockFlags(rawValue: 0))
+        let pixelData = CVPixelBufferGetBaseAddress(buffer)
+        
+        let rgbColorSpace = CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(
+            data: pixelData,
+            width: Int(size.width),
+            height: Int(size.height),
+            bitsPerComponent: 8,
+            bytesPerRow: CVPixelBufferGetBytesPerRow(buffer),
+            space: rgbColorSpace,
+            bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue
+        ) else {
+            CVPixelBufferUnlockBaseAddress(buffer, CVPixelBufferLockFlags(rawValue: 0))
+            return nil
+        }
+        
+        context.translateBy(x: 0, y: size.height)
+        context.scaleBy(x: 1.0, y: -1.0)
+        
+        UIGraphicsPushContext(context)
+        draw(in: CGRect(x: 0, y: 0, width: size.width, height: size.height))
+        UIGraphicsPopContext()
+        
+        CVPixelBufferUnlockBaseAddress(buffer, CVPixelBufferLockFlags(rawValue: 0))
+        
+        return buffer
+    }
+}
+
+// CVPixelBuffer到MLMultiArray转换
+extension CVPixelBuffer {
+    func toMLMultiArray() -> MLMultiArray? {
+        // 简化实现，实际应用中需要更复杂的转换
+        guard let mlArray = try? MLMultiArray(shape: [1, 3, 1024, 1024], dataType: .float32) else {
+            return nil
+        }
+        
+        // 这里应该实现像素缓冲区到MLMultiArray的转换
+        // 暂时返回零填充的数组作为占位符
+        
+        return mlArray
+    }
+}

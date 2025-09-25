@@ -214,6 +214,7 @@ class MainCameraViewController: UIViewController {
         settingsButton.addTarget(self, action: #selector(buttonReleased(_:)), for: [.touchUpInside, .touchUpOutside])
     }
     
+    
     private func setupModeSwitcher() {
         // 配置主容器按钮
         modeSwitcherButton.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.8)
@@ -331,9 +332,10 @@ class MainCameraViewController: UIViewController {
             galleryButton.heightAnchor.constraint(equalToConstant: 50),
             
             settingsButton.centerYAnchor.constraint(equalTo: recordButton.centerYAnchor),
-            settingsButton.leadingAnchor.constraint(equalTo: recordButton.trailingAnchor, constant: 60),
+            settingsButton.leadingAnchor.constraint(equalTo: recordButton.trailingAnchor, constant: 40),
             settingsButton.widthAnchor.constraint(equalToConstant: 50),
             settingsButton.heightAnchor.constraint(equalToConstant: 50),
+            
             
             // 模式切换器约束已在 setupModeSwitcher() 中设置
         ])
@@ -442,6 +444,7 @@ extension MainCameraViewController {
         let navController = UINavigationController(rootViewController: settingsVC)
         present(navController, animated: true)
     }
+    
     
     @objc private func buttonPressed(_ button: UIButton) {
         let buttonName = getButtonName(button)
