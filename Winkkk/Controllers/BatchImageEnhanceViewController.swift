@@ -942,6 +942,42 @@ extension BatchImageEnhanceViewController {
         alert.addAction(UIAlertAction(title: "确定", style: .default))
         present(alert, animated: true)
     }
+    
+    /// 显示单图详细查看页面
+    private func showDetailView(for item: BatchEnhanceItem, at index: Int) {
+        guard let enhancedImage = item.enhancedImage else { return }
+        
+        let imageEnhanceVC = ImageEnhanceViewController(
+            image: item.originalImage,
+            timestamp: Date().timeIntervalSince1970
+        )
+        
+        // 设置来源类型
+        imageEnhanceVC.sourceType = .fromBatch
+        
+        // 预设已修复的图片
+        imageEnhanceVC.setEnhancedImage(enhancedImage)
+        
+        // 设置完成回调（用户在详细页面重新修复后）
+        imageEnhanceVC.onEnhancementComplete = { [weak self] newEnhancedImage in
+            self?.enhanceItems[index].enhancedImage = newEnhancedImage
+            self?.collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
+        }
+        
+        navigationController?.pushViewController(imageEnhanceVC, animated: true)
+    }
+    
+    /// 切换图片选择状态
+    private func toggleSelection(at index: Int) {
+        if selectedIndices.contains(index) {
+            selectedIndices.remove(index)
+        } else {
+            selectedIndices.insert(index)
+        }
+        
+        // 更新UI
+        updateSelectionUI()
+    }
 }
 
 // MARK: - UICollectionViewDataSource
@@ -965,32 +1001,14 @@ extension BatchImageEnhanceViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let item = enhanceItems[indexPath.item]
         
-        // 在处理前，点击可以切换选择状态
-        if !isProcessing {
-            // 切换选择状态
-            if selectedIndices.contains(indexPath.item) {
-                selectedIndices.remove(indexPath.item)
-            } else {
-                selectedIndices.insert(indexPath.item)
-            }
-            
-            // 更新UI
-            updateSelectionUI()
-            
-        } else if item.processingState == .completed {
-            // 处理完成后，点击跳转到单图调整
-            guard let enhancedImage = item.enhancedImage else { return }
-            
-            let imageEnhanceVC = ImageEnhanceViewController(
-                image: item.originalImage,
-                timestamp: Date().timeIntervalSince1970
-            )
-            
-            // 设置已修复的图片
-            imageEnhanceVC.setEnhancedImage(enhancedImage)
-            
-            navigationController?.pushViewController(imageEnhanceVC, animated: true)
+        // 优先检查是否可以查看详细（已完成的图片随时可以查看详细）
+        if item.processingState == .completed {
+            showDetailView(for: item, at: indexPath.item)
+        } else if !isProcessing {
+            // 未完成且非处理状态时，切换选择状态
+            toggleSelection(at: indexPath.item)
         }
+        // 处理中的图片不响应点击
         
         HapticFeedbackManager.shared.lightImpact()
     }
