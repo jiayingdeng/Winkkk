@@ -187,7 +187,10 @@ class SceneSelectionViewController: UIViewController {
     
     // MARK: - 创建场景卡片
     private func createSceneCards() {
-        for sceneType in SceneType.allCases {
+        // 只显示运动轨迹选项，隐藏物体变化和人物动作
+        let availableScenes: [SceneType] = [.sportMotion]
+        
+        for sceneType in availableScenes {
             let cardView = createSceneCard(for: sceneType)
             stackView.addArrangedSubview(cardView)
         }

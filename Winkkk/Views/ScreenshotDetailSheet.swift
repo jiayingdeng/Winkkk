@@ -75,8 +75,8 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     
     // MARK: - UI Setup
     private func setupUI() {
-        // 使用app主题的粉紫色背景
-        view.backgroundColor = ThemeManager.cardBackground
+        // 使用app主题的粉紫色背景 - 不透明版本确保颜色明显
+        view.backgroundColor = UIColor(red: 252/255, green: 240/255, blue: 255/255, alpha: 1.0) // #FCF0FF 不透明版本
         
         setupNavigationBar()
         setupScrollView()
