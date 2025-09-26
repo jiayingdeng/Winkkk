@@ -39,6 +39,9 @@ class CollageViewController: UIViewController {
     private let previewImageView = UIImageView()
     private let previewPlaceholder = UILabel()
     
+    // 动态约束引用
+    private var previewHeightConstraint: NSLayoutConstraint!
+    
     // 布局选择区域
     private let layoutSectionView = UIView()
     private let layoutTitleLabel = UILabel()
@@ -74,6 +77,7 @@ class CollageViewController: UIViewController {
     private let saveButton = UIButton()
     private let shareButton = UIButton()
     private let resetButton = UIButton()
+    private let enhanceButton = UIButton() // 新增画质修复按钮
     
     // MARK: - Initialization
     init(images: [UIImage]) {
@@ -118,6 +122,15 @@ class CollageViewController: UIViewController {
         
         // 进入拼图页面的触感反馈
         HapticFeedbackManager.shared.lightImpact()
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        
+        // 当视图布局改变时（比如屏幕旋转），更新预览框高度
+        if view.bounds.width > 0 && previewHeightConstraint != nil {
+            updatePreviewContainerHeight(animated: false)
+        }
     }
     
     // MARK: - UI Setup
@@ -380,6 +393,17 @@ class CollageViewController: UIViewController {
         shareButton.isEnabled = false
         shareButton.alpha = 0.5
         bottomButtonsView.addSubview(shareButton)
+        
+        // 画质修复按钮
+        enhanceButton.setTitle("🎨 画质修复", for: .normal)
+        enhanceButton.titleLabel?.font = ThemeManager.buttonFont
+        enhanceButton.setTitleColor(.white, for: .normal)
+        enhanceButton.backgroundColor = UIColor.systemPurple.withAlphaComponent(0.8)
+        enhanceButton.layer.cornerRadius = ThemeManager.standardCornerRadius
+        enhanceButton.addTarget(self, action: #selector(enhanceCollageTapped), for: .touchUpInside)
+        enhanceButton.isEnabled = false
+        enhanceButton.alpha = 0.5
+        bottomButtonsView.addSubview(enhanceButton)
     }
     
     private func setupConstraints() {
@@ -415,6 +439,7 @@ class CollageViewController: UIViewController {
         resetButton.translatesAutoresizingMaskIntoConstraints = false
         saveButton.translatesAutoresizingMaskIntoConstraints = false
         shareButton.translatesAutoresizingMaskIntoConstraints = false
+        enhanceButton.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
             // 渐变背景
@@ -456,7 +481,6 @@ class CollageViewController: UIViewController {
             previewContainerView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 16),
             previewContainerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             previewContainerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            previewContainerView.heightAnchor.constraint(equalTo: contentView.widthAnchor, multiplier: 0.6),
             
             previewImageView.topAnchor.constraint(equalTo: previewContainerView.topAnchor, constant: 16),
             previewImageView.leadingAnchor.constraint(equalTo: previewContainerView.leadingAnchor, constant: 16),
@@ -580,19 +604,84 @@ class CollageViewController: UIViewController {
             
             resetButton.leadingAnchor.constraint(equalTo: bottomButtonsView.leadingAnchor),
             resetButton.centerYAnchor.constraint(equalTo: bottomButtonsView.centerYAnchor),
-            resetButton.widthAnchor.constraint(equalTo: bottomButtonsView.widthAnchor, multiplier: 0.25),
+            resetButton.widthAnchor.constraint(equalTo: bottomButtonsView.widthAnchor, multiplier: 0.2),
             resetButton.heightAnchor.constraint(equalToConstant: 52),
             
-            saveButton.centerXAnchor.constraint(equalTo: bottomButtonsView.centerXAnchor),
+            saveButton.leadingAnchor.constraint(equalTo: resetButton.trailingAnchor, constant: 8),
             saveButton.centerYAnchor.constraint(equalTo: bottomButtonsView.centerYAnchor),
-            saveButton.widthAnchor.constraint(equalTo: bottomButtonsView.widthAnchor, multiplier: 0.35),
+            saveButton.widthAnchor.constraint(equalTo: bottomButtonsView.widthAnchor, multiplier: 0.25),
             saveButton.heightAnchor.constraint(equalToConstant: 52),
             
-            shareButton.trailingAnchor.constraint(equalTo: bottomButtonsView.trailingAnchor),
+            shareButton.leadingAnchor.constraint(equalTo: saveButton.trailingAnchor, constant: 8),
             shareButton.centerYAnchor.constraint(equalTo: bottomButtonsView.centerYAnchor),
-            shareButton.widthAnchor.constraint(equalTo: bottomButtonsView.widthAnchor, multiplier: 0.35),
-            shareButton.heightAnchor.constraint(equalToConstant: 52)
+            shareButton.widthAnchor.constraint(equalTo: bottomButtonsView.widthAnchor, multiplier: 0.25),
+            shareButton.heightAnchor.constraint(equalToConstant: 52),
+            
+            enhanceButton.leadingAnchor.constraint(equalTo: shareButton.trailingAnchor, constant: 8),
+            enhanceButton.trailingAnchor.constraint(equalTo: bottomButtonsView.trailingAnchor),
+            enhanceButton.centerYAnchor.constraint(equalTo: bottomButtonsView.centerYAnchor),
+            enhanceButton.heightAnchor.constraint(equalToConstant: 52)
         ])
+        
+        // 设置初始预览框高度约束
+        updatePreviewContainerHeight(animated: false)
+    }
+    
+    // MARK: - Preview Container Height Management
+    private func updatePreviewContainerHeight(animated: Bool = true) {
+        // 移除现有的高度约束（如果存在）
+        if previewHeightConstraint != nil {
+            previewHeightConstraint.isActive = false
+        }
+        
+        // 计算新的高度
+        let containerWidth = view.bounds.width - 32 // 左右各16的边距
+        let targetSize = calculatePreviewSize(containerWidth: containerWidth)
+        
+        // 创建新的高度约束
+        previewHeightConstraint = previewContainerView.heightAnchor.constraint(equalToConstant: targetSize.height)
+        previewHeightConstraint.isActive = true
+        
+        // 执行布局更新
+        if animated {
+            UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseInOut], animations: {
+                self.view.layoutIfNeeded()
+            })
+        } else {
+            view.layoutIfNeeded()
+        }
+    }
+    
+    private func calculatePreviewSize(containerWidth: CGFloat) -> CGSize {
+        let contentWidth = containerWidth - 32 // 内部左右各16的边距
+        let aspectRatio = getAspectRatioValue()
+        
+        let targetHeight: CGFloat
+        if aspectRatio > 1.0 {
+            // 横向比例，宽度优先
+            targetHeight = contentWidth / aspectRatio + 32 // 加上内部上下边距
+        } else {
+            // 纵向或正方形比例，限制最大高度
+            let maxHeight = containerWidth * 0.8 // 最大高度限制
+            targetHeight = min(contentWidth / aspectRatio + 32, maxHeight)
+        }
+        
+        return CGSize(width: containerWidth, height: max(200, targetHeight)) // 最小高度200
+    }
+    
+    private func getAspectRatioValue() -> CGFloat {
+        switch selectedAspectRatio {
+        case .square1_1:
+            return 1.0
+        case .portrait3_4:
+            return 3.0/4.0
+        case .landscape4_3:
+            return 4.0/3.0
+        case .widescreen16_9:
+            return 16.0/9.0
+        case .full:
+            return view.bounds.width / view.bounds.height
+        }
     }
     
     private func configureNavigationBar() {
@@ -776,6 +865,23 @@ class CollageViewController: UIViewController {
         present(activityVC, animated: true)
     }
     
+    @objc private func enhanceCollageTapped() {
+        guard let collageImage = collageImage else {
+            showAlert(title: "提示", message: "请先生成拼图")
+            return
+        }
+        
+        HapticFeedbackManager.shared.buttonTap()
+        
+        // 跳转到画质修复页面，传入拼图结果
+        let imageEnhanceVC = ImageEnhanceViewController(
+            image: collageImage,
+            timestamp: Date().timeIntervalSince1970
+        )
+        
+        navigationController?.pushViewController(imageEnhanceVC, animated: true)
+    }
+    
     // MARK: - Helper Methods
     private func updatePreview() {
         // 自动生成预览拼图
@@ -839,10 +945,12 @@ class CollageViewController: UIViewController {
         resetButton.isEnabled = enabled
         saveButton.isEnabled = enabled
         shareButton.isEnabled = enabled
+        enhanceButton.isEnabled = enabled
         
         resetButton.alpha = enabled ? 1.0 : 0.5
         saveButton.alpha = enabled ? 1.0 : 0.5
         shareButton.alpha = enabled ? 1.0 : 0.5
+        enhanceButton.alpha = enabled ? 1.0 : 0.5
     }
     
     @objc private func image(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
@@ -1535,6 +1643,8 @@ extension CollageViewController: UICollectionViewDataSource, UICollectionViewDel
                 selectedLayoutTemplate = template
                 HapticFeedbackManager.shared.buttonTap()
                 collectionView.reloadData()
+                // 更新预览框高度（布局模板变化可能影响最佳显示尺寸）
+                updatePreviewContainerHeight(animated: true)
                 updatePreview()
             }
         } else if collectionView == imageSelectionCollectionView {
@@ -1561,6 +1671,9 @@ extension CollageViewController: UICollectionViewDataSource, UICollectionViewDel
             if previousAspectRatio != selectedAspectRatio {
                 HapticFeedbackManager.shared.buttonTap()
                 collectionView.reloadData()
+                // 更新预览框高度
+                updatePreviewContainerHeight(animated: true)
+                // 更新预览内容
                 updatePreview()
             }
         }

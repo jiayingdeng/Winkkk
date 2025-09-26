@@ -72,6 +72,7 @@ class BatchImageEnhanceViewController: UIViewController {
     private let saveAllButton = UIButton()
     private let shareAllButton = UIButton()
     private let selectModeButton = UIButton()
+    private let createCollageButton = UIButton() // 新增拼图创建按钮
     
     // MARK: - Dependencies
     private let imageEnhancer = ImageEnhancer()
@@ -150,6 +151,7 @@ class BatchImageEnhanceViewController: UIViewController {
         saveAllButton.translatesAutoresizingMaskIntoConstraints = false
         shareAllButton.translatesAutoresizingMaskIntoConstraints = false
         selectModeButton.translatesAutoresizingMaskIntoConstraints = false
+        createCollageButton.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
             // 渐变背景
@@ -271,19 +273,25 @@ class BatchImageEnhanceViewController: UIViewController {
             // 保存全部按钮
             saveAllButton.leadingAnchor.constraint(equalTo: bottomActionView.leadingAnchor, constant: 16),
             saveAllButton.centerYAnchor.constraint(equalTo: bottomActionView.centerYAnchor),
-            saveAllButton.widthAnchor.constraint(equalToConstant: 100),
+            saveAllButton.widthAnchor.constraint(equalToConstant: 80),
             saveAllButton.heightAnchor.constraint(equalToConstant: 44),
             
+            // 拼图创建按钮
+            createCollageButton.leadingAnchor.constraint(equalTo: saveAllButton.trailingAnchor, constant: 8),
+            createCollageButton.centerYAnchor.constraint(equalTo: bottomActionView.centerYAnchor),
+            createCollageButton.widthAnchor.constraint(equalToConstant: 80),
+            createCollageButton.heightAnchor.constraint(equalToConstant: 44),
+            
             // 分享全部按钮
-            shareAllButton.centerXAnchor.constraint(equalTo: bottomActionView.centerXAnchor),
+            shareAllButton.leadingAnchor.constraint(equalTo: createCollageButton.trailingAnchor, constant: 8),
             shareAllButton.centerYAnchor.constraint(equalTo: bottomActionView.centerYAnchor),
-            shareAllButton.widthAnchor.constraint(equalToConstant: 100),
+            shareAllButton.widthAnchor.constraint(equalToConstant: 80),
             shareAllButton.heightAnchor.constraint(equalToConstant: 44),
             
             // 选择模式按钮
+            selectModeButton.leadingAnchor.constraint(equalTo: shareAllButton.trailingAnchor, constant: 8),
             selectModeButton.trailingAnchor.constraint(equalTo: bottomActionView.trailingAnchor, constant: -16),
             selectModeButton.centerYAnchor.constraint(equalTo: bottomActionView.centerYAnchor),
-            selectModeButton.widthAnchor.constraint(equalToConstant: 80),
             selectModeButton.heightAnchor.constraint(equalToConstant: 44)
         ])
     }
@@ -446,6 +454,17 @@ class BatchImageEnhanceViewController: UIViewController {
         shareAllButton.alpha = 0.6
         bottomActionView.addSubview(shareAllButton)
         
+        // 拼图创建按钮
+        createCollageButton.setTitle("🧩 拼图", for: .normal)
+        createCollageButton.backgroundColor = UIColor.systemTeal.withAlphaComponent(0.8)
+        createCollageButton.setTitleColor(.white, for: .normal)
+        createCollageButton.titleLabel?.font = ThemeManager.buttonFont
+        createCollageButton.layer.cornerRadius = ThemeManager.standardCornerRadius
+        createCollageButton.addTarget(self, action: #selector(createCollageButtonTapped), for: .touchUpInside)
+        createCollageButton.isEnabled = false
+        createCollageButton.alpha = 0.6
+        bottomActionView.addSubview(createCollageButton)
+        
         // 选择模式按钮（改为全选/反选按钮）
         selectModeButton.setTitle("全选", for: .normal)
         selectModeButton.setTitle("反选", for: .selected)
@@ -514,6 +533,25 @@ extension BatchImageEnhanceViewController {
     @objc private func shareAllButtonTapped() {
         HapticFeedbackManager.shared.buttonTap()
         shareCompletedImages()
+    }
+    
+    @objc private func createCollageButtonTapped() {
+        // 获取所有修复完成的图片
+        let completedImages = enhanceItems.compactMap { item in
+            return item.processingState == .completed ? item.enhancedImage : nil
+        }
+        
+        guard completedImages.count > 1 else {
+            showAlert(title: "无法创建拼图", message: "至少需要2张修复完成的图片才能创建拼图")
+            HapticFeedbackManager.shared.notificationWarning()
+            return
+        }
+        
+        HapticFeedbackManager.shared.buttonTap()
+        
+        // 跳转到拼图创建页面
+        let collageVC = CollageViewController(images: completedImages)
+        navigationController?.pushViewController(collageVC, animated: true)
     }
     
     @objc private func selectModeButtonTapped() {
@@ -659,6 +697,12 @@ extension BatchImageEnhanceViewController {
             shareAllButton.alpha = 1.0
         }
         
+        // 检查是否可以创建拼图（至少需要2张修复完成的图片）
+        if successCount > 1 {
+            createCollageButton.isEnabled = true
+            createCollageButton.alpha = 1.0
+        }
+        
         // 更新保存分享按钮文案
         updateBottomButtonsForCompletion()
     }
@@ -734,6 +778,12 @@ extension BatchImageEnhanceViewController {
         
         saveAllButton.setTitle("保存已完成(\(completedCount))", for: .normal)
         shareAllButton.setTitle("分享已完成(\(completedCount))", for: .normal)
+        
+        if completedCount > 1 {
+            createCollageButton.setTitle("🧩 拼图(\(completedCount))", for: .normal)
+        } else {
+            createCollageButton.setTitle("🧩 拼图", for: .normal)
+        }
     }
 }
 
@@ -880,6 +930,8 @@ extension BatchImageEnhanceViewController {
         saveAllButton.alpha = 0.6
         shareAllButton.isEnabled = false
         shareAllButton.alpha = 0.6
+        createCollageButton.isEnabled = false
+        createCollageButton.alpha = 0.6
         
         // 更新选择UI
         updateSelectionUI()

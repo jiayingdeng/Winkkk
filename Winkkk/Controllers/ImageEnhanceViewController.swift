@@ -21,6 +21,24 @@ enum PhotoLibraryError: Error {
     }
 }
 
+// MARK: - 修复来源类型
+enum EnhanceSourceType {
+    case fromScreenshots    // 来自截图
+    case fromCollage       // 来自拼图
+    case fromBatch         // 来自批量修复
+    
+    var displayName: String {
+        switch self {
+        case .fromScreenshots:
+            return "截图修复"
+        case .fromCollage:
+            return "拼图修复"
+        case .fromBatch:
+            return "批量修复"
+        }
+    }
+}
+
 class ImageEnhanceViewController: UIViewController {
     
     // MARK: - Properties
@@ -28,6 +46,8 @@ class ImageEnhanceViewController: UIViewController {
     private let timestamp: Double
     private var enhancedImage: UIImage?
     private var currentLevel: EnhanceLevel = .medium
+    var sourceType: EnhanceSourceType = .fromScreenshots // 修复来源类型
+    var onEnhancementComplete: ((UIImage) -> Void)? // 完成回调
     
     // MARK: - UI Components
     private let gradientBackgroundView = GradientBackgroundView()

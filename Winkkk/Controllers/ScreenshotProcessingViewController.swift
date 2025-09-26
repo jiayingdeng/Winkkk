@@ -33,8 +33,18 @@ class ScreenshotProcessingViewController: UIViewController {
     private let collectionView: UICollectionView
     private let collectionFlowLayout = UICollectionViewFlowLayout()
     
+    // 智能推荐区域
+    private let recommendationCardView = UIView()
+    private let recommendationBlurView = BlurEffectView(style: .regular, intensity: 0.9)
+    private let recommendationTitleLabel = UILabel()
+    private let recommendationDescriptionLabel = UILabel()
+    private let recommendationActionButton = UIButton()
+    
     // 操作选项区域
     private let optionsTableView = UITableView()
+    
+    // MARK: - Dependencies
+    private let workflowManager = WorkflowManager.shared
     
     // MARK: - Initialization
     init(screenshots: [ScreenshotItem], mode: CaptureMode) {
@@ -65,8 +75,18 @@ class ScreenshotProcessingViewController: UIViewController {
         setupProcessingOptions()
         configureNavigationBar()
         
+        // 初始化工作流
+        workflowManager.startNewWorkflow(with: screenshots)
+        
         // 进入处理中心的触感反馈
         HapticFeedbackManager.shared.lightImpact()
+    }
+    
+    @objc private func executeRecommendedWorkflow() {
+        guard let recommendation = objc_getAssociatedObject(recommendationActionButton, "recommendation") as? WorkflowRecommendation else { return }
+        
+        HapticFeedbackManager.shared.buttonTap()
+        recommendation.execute(self, screenshots)
     }
     
     // MARK: - UI Setup
@@ -87,12 +107,16 @@ class ScreenshotProcessingViewController: UIViewController {
         // 预览区域
         setupPreviewArea()
         
+        // 智能推荐区域
+        setupRecommendationCard()
+        
         // 操作选项表格
         setupOptionsTableView()
         
         // 添加到内容视图
         contentView.addSubview(headerView)
         contentView.addSubview(previewContainerView)
+        contentView.addSubview(recommendationCardView)
         contentView.addSubview(optionsTableView)
     }
     
@@ -139,6 +163,44 @@ class ScreenshotProcessingViewController: UIViewController {
         previewContainerView.addSubview(collectionView)
     }
     
+    private func setupRecommendationCard() {
+        recommendationCardView.backgroundColor = .clear
+        recommendationCardView.layer.cornerRadius = ThemeManager.standardCornerRadius
+        recommendationCardView.clipsToBounds = true
+        
+        // 模糊背景
+        recommendationCardView.addSubview(recommendationBlurView)
+        
+        // 获取智能推荐
+        let recommendation = workflowManager.getBestRecommendation(for: screenshots)
+        
+        // 推荐标题
+        recommendationTitleLabel.font = ThemeManager.buttonFont
+        recommendationTitleLabel.textColor = .white
+        recommendationTitleLabel.text = "💡 " + recommendation.title
+        recommendationTitleLabel.numberOfLines = 1
+        recommendationCardView.addSubview(recommendationTitleLabel)
+        
+        // 推荐描述
+        recommendationDescriptionLabel.font = ThemeManager.captionFont
+        recommendationDescriptionLabel.textColor = UIColor.white.withAlphaComponent(0.8)
+        recommendationDescriptionLabel.text = recommendation.description
+        recommendationDescriptionLabel.numberOfLines = 2
+        recommendationCardView.addSubview(recommendationDescriptionLabel)
+        
+        // 推荐操作按钮
+        recommendationActionButton.setTitle(recommendation.actionTitle, for: .normal)
+        recommendationActionButton.titleLabel?.font = ThemeManager.buttonFont
+        recommendationActionButton.setTitleColor(.white, for: .normal)
+        recommendationActionButton.backgroundColor = recommendation.priority.color
+        recommendationActionButton.layer.cornerRadius = 8
+        recommendationActionButton.addTarget(self, action: #selector(executeRecommendedWorkflow), for: .touchUpInside)
+        recommendationCardView.addSubview(recommendationActionButton)
+        
+        // 存储推荐以供执行使用
+        objc_setAssociatedObject(recommendationActionButton, "recommendation", recommendation, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+    }
+    
     private func setupOptionsTableView() {
         optionsTableView.backgroundColor = .clear
         optionsTableView.separatorStyle = .none
@@ -158,6 +220,11 @@ class ScreenshotProcessingViewController: UIViewController {
         countLabel.translatesAutoresizingMaskIntoConstraints = false
         previewContainerView.translatesAutoresizingMaskIntoConstraints = false
         collectionView.translatesAutoresizingMaskIntoConstraints = false
+        recommendationCardView.translatesAutoresizingMaskIntoConstraints = false
+        recommendationBlurView.translatesAutoresizingMaskIntoConstraints = false
+        recommendationTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        recommendationDescriptionLabel.translatesAutoresizingMaskIntoConstraints = false
+        recommendationActionButton.translatesAutoresizingMaskIntoConstraints = false
         optionsTableView.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
@@ -210,8 +277,38 @@ class ScreenshotProcessingViewController: UIViewController {
             collectionView.trailingAnchor.constraint(equalTo: previewContainerView.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: previewContainerView.bottomAnchor, constant: -10),
             
+            // 智能推荐卡片
+            recommendationCardView.topAnchor.constraint(equalTo: previewContainerView.bottomAnchor, constant: 16),
+            recommendationCardView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            recommendationCardView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            recommendationCardView.heightAnchor.constraint(equalToConstant: 100),
+            
+            // 推荐卡片模糊背景
+            recommendationBlurView.topAnchor.constraint(equalTo: recommendationCardView.topAnchor),
+            recommendationBlurView.leadingAnchor.constraint(equalTo: recommendationCardView.leadingAnchor),
+            recommendationBlurView.trailingAnchor.constraint(equalTo: recommendationCardView.trailingAnchor),
+            recommendationBlurView.bottomAnchor.constraint(equalTo: recommendationCardView.bottomAnchor),
+            
+            // 推荐标题
+            recommendationTitleLabel.topAnchor.constraint(equalTo: recommendationCardView.topAnchor, constant: 12),
+            recommendationTitleLabel.leadingAnchor.constraint(equalTo: recommendationCardView.leadingAnchor, constant: 16),
+            recommendationTitleLabel.trailingAnchor.constraint(equalTo: recommendationActionButton.leadingAnchor, constant: -12),
+            recommendationTitleLabel.heightAnchor.constraint(equalToConstant: 24),
+            
+            // 推荐描述
+            recommendationDescriptionLabel.topAnchor.constraint(equalTo: recommendationTitleLabel.bottomAnchor, constant: 4),
+            recommendationDescriptionLabel.leadingAnchor.constraint(equalTo: recommendationCardView.leadingAnchor, constant: 16),
+            recommendationDescriptionLabel.trailingAnchor.constraint(equalTo: recommendationActionButton.leadingAnchor, constant: -12),
+            recommendationDescriptionLabel.bottomAnchor.constraint(lessThanOrEqualTo: recommendationCardView.bottomAnchor, constant: -12),
+            
+            // 推荐操作按钮
+            recommendationActionButton.centerYAnchor.constraint(equalTo: recommendationCardView.centerYAnchor),
+            recommendationActionButton.trailingAnchor.constraint(equalTo: recommendationCardView.trailingAnchor, constant: -16),
+            recommendationActionButton.widthAnchor.constraint(equalToConstant: 100),
+            recommendationActionButton.heightAnchor.constraint(equalToConstant: 36),
+            
             // 操作选项表格
-            optionsTableView.topAnchor.constraint(equalTo: previewContainerView.bottomAnchor, constant: 20),
+            optionsTableView.topAnchor.constraint(equalTo: recommendationCardView.bottomAnchor, constant: 20),
             optionsTableView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             optionsTableView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             optionsTableView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
