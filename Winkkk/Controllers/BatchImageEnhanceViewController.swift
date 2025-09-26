@@ -80,7 +80,7 @@ class BatchImageEnhanceViewController: UIViewController {
     
     // MARK: - State Management
     private var selectedIndices = Set<Int>()
-    private var isSelectMode = false
+    private var isSelectMode = true  // 默认启用选择模式
     private var completedCount = 0
     private var failedCount = 0
     
@@ -103,6 +103,9 @@ class BatchImageEnhanceViewController: UIViewController {
             guard let image = screenshot.image else { return nil }
             return BatchEnhanceItem(originalImage: image)
         }
+        
+        // 默认全选所有图片
+        selectedIndices = Set(0..<enhanceItems.count)
     }
     
     required init?(coder: NSCoder) {
@@ -116,6 +119,9 @@ class BatchImageEnhanceViewController: UIViewController {
         setupConstraints()
         configureNavigationBar()
         updateUI()
+        
+        // 初始化选择状态UI
+        updateSelectionUI()
         
         // 进入批量修复的触感反馈
         HapticFeedbackManager.shared.lightImpact()
@@ -344,7 +350,7 @@ class BatchImageEnhanceViewController: UIViewController {
         controlPanelView.addSubview(levelSegmentedControl)
         
         // 开始按钮
-        startButton.setTitle("开始批量修复", for: .normal)
+        startButton.setTitle("开始修复选中图片", for: .normal)
         startButton.setTitle("处理中...", for: .disabled)
         startButton.backgroundColor = ThemeManager.buttonPrimary
         startButton.setTitleColor(.white, for: .normal)
@@ -440,16 +446,16 @@ class BatchImageEnhanceViewController: UIViewController {
         shareAllButton.alpha = 0.6
         bottomActionView.addSubview(shareAllButton)
         
-        // 选择模式按钮
-        selectModeButton.setTitle("选择", for: .normal)
-        selectModeButton.setTitle("取消", for: .selected)
+        // 选择模式按钮（改为全选/反选按钮）
+        selectModeButton.setTitle("全选", for: .normal)
+        selectModeButton.setTitle("反选", for: .selected)
         selectModeButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
         selectModeButton.setTitleColor(.white, for: .normal)
         selectModeButton.titleLabel?.font = ThemeManager.buttonFont
         selectModeButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         selectModeButton.addTarget(self, action: #selector(selectModeButtonTapped), for: .touchUpInside)
-        selectModeButton.isEnabled = false
-        selectModeButton.alpha = 0.6
+        selectModeButton.isEnabled = true  // 默认启用
+        selectModeButton.alpha = 1.0
         bottomActionView.addSubview(selectModeButton)
     }
     
@@ -477,6 +483,14 @@ extension BatchImageEnhanceViewController {
     
     @objc private func startButtonTapped() {
         guard !isProcessing else { return }
+        
+        // 验证是否至少选择了一张图片
+        guard selectedIndices.count > 0 else {
+            showAlert(title: "无法开始", message: "请至少选择一张图片进行修复")
+            HapticFeedbackManager.shared.notificationWarning()
+            return
+        }
+        
         HapticFeedbackManager.shared.buttonTap()
         startBatchProcessing()
     }
@@ -504,7 +518,22 @@ extension BatchImageEnhanceViewController {
     
     @objc private func selectModeButtonTapped() {
         HapticFeedbackManager.shared.buttonTap()
-        toggleSelectMode()
+        toggleSelectAll()
+    }
+    
+    private func toggleSelectAll() {
+        let allSelected = selectedIndices.count == enhanceItems.count
+        
+        if allSelected {
+            // 当前全选，执行反选（清空选择）
+            selectedIndices.removeAll()
+        } else {
+            // 当前非全选，执行全选
+            selectedIndices = Set(0..<enhanceItems.count)
+        }
+        
+        updateSelectionUI()
+        HapticFeedbackManager.shared.selectionChanged()
     }
     
     @objc private func cancelButtonTapped() {
@@ -531,12 +560,14 @@ extension BatchImageEnhanceViewController {
         // 显示进度视图
         progressContainerView.isHidden = false
         
-        // 重置所有项目状态
-        for item in enhanceItems {
-            item.processingState = .pending
-            item.progress = 0.0
-            item.error = nil
-            item.enhancedImage = nil
+        // 只重置选中项目的状态
+        for (index, item) in enhanceItems.enumerated() {
+            if selectedIndices.contains(index) {
+                item.processingState = .pending
+                item.progress = 0.0
+                item.error = nil
+                item.enhancedImage = nil
+            }
         }
         
         collectionView.reloadData()
@@ -546,14 +577,18 @@ extension BatchImageEnhanceViewController {
     }
     
     private func processBatchItems() {
-        let itemsToProcess = enhanceItems.enumerated().filter { $0.element.processingState == .pending }
+        // 只处理选中的图片
+        let itemsToProcess = enhanceItems.enumerated().filter { index, item in
+            selectedIndices.contains(index) && item.processingState == .pending
+        }
         
         guard !itemsToProcess.isEmpty else {
             finishBatchProcessing()
             return
         }
         
-        statusLabel.text = "正在处理图片..."
+        let selectedCount = selectedIndices.count
+        statusLabel.text = "正在处理\(selectedCount)张选中图片..."
         
         // 逐个处理图片（避免内存过载）
         for (index, item) in itemsToProcess {
@@ -622,15 +657,16 @@ extension BatchImageEnhanceViewController {
             saveAllButton.alpha = 1.0
             shareAllButton.isEnabled = true
             shareAllButton.alpha = 1.0
-            selectModeButton.isEnabled = true
-            selectModeButton.alpha = 1.0
         }
+        
+        // 更新保存分享按钮文案
+        updateBottomButtonsForCompletion()
     }
     
     private func updateOverallProgress() {
-        let totalItems = enhanceItems.count
+        let totalSelectedItems = selectedIndices.count
         let processedItems = completedCount + failedCount
-        let progress = Float(processedItems) / Float(totalItems)
+        let progress = totalSelectedItems > 0 ? Float(processedItems) / Float(totalSelectedItems) : 0
         
         overallProgressView.progress = progress
         progressLabel.text = "\(Int(progress * 100))%"
@@ -652,33 +688,52 @@ extension BatchImageEnhanceViewController {
 extension BatchImageEnhanceViewController {
     
     private func updateUI() {
-        countLabel.text = "共 \(enhanceItems.count) 张图片待处理"
+        updateCountLabel()
+        updateStartButtonText()
     }
     
-    private func toggleSelectMode() {
-        isSelectMode.toggle()
-        selectModeButton.isSelected = isSelectMode
-        
-        if !isSelectMode {
-            selectedIndices.removeAll()
-            for indexPath in collectionView.indexPathsForSelectedItems ?? [] {
-                collectionView.deselectItem(at: indexPath, animated: true)
-            }
-        }
-        
-        updateBottomButtons()
+    private func updateCountLabel() {
+        let totalCount = enhanceItems.count
+        let selectedCount = selectedIndices.count
+        countLabel.text = "共\(totalCount)张图片，已选择\(selectedCount)张"
     }
     
-    private func updateBottomButtons() {
-        if isSelectMode {
-            let selectedCount = selectedIndices.count
-            saveAllButton.setTitle("保存选中(\(selectedCount))", for: .normal)
-            shareAllButton.setTitle("分享选中(\(selectedCount))", for: .normal)
+    private func updateStartButtonText() {
+        let selectedCount = selectedIndices.count
+        if selectedCount > 0 {
+            startButton.setTitle("开始修复选中图片(\(selectedCount))", for: .normal)
+            startButton.isEnabled = true
+            startButton.alpha = 1.0
         } else {
-            let completedItems = enhanceItems.filter { $0.processingState == .completed }
-            saveAllButton.setTitle("保存全部(\(completedItems.count))", for: .normal)
-            shareAllButton.setTitle("分享全部(\(completedItems.count))", for: .normal)
+            startButton.setTitle("请至少选择一张图片", for: .normal)
+            startButton.isEnabled = false
+            startButton.alpha = 0.6
         }
+    }
+    
+    private func updateSelectionUI() {
+        // 更新全选/反选按钮状态
+        let allSelected = selectedIndices.count == enhanceItems.count
+        selectModeButton.isSelected = allSelected
+        selectModeButton.setTitle(allSelected ? "反选" : "全选", for: .normal)
+        
+        // 刷新集合视图显示选择状态
+        collectionView.reloadData()
+        
+        // 更新计数和按钮
+        updateCountLabel()
+        updateStartButtonText()
+    }
+    
+    // 移除原来的toggleSelectMode方法，已被toggleSelectAll替代
+    
+    private func updateBottomButtonsForCompletion() {
+        // 处理完成后，按钮文案基于实际完成的图片数量
+        let completedItems = enhanceItems.filter { $0.processingState == .completed }
+        let completedCount = completedItems.count
+        
+        saveAllButton.setTitle("保存已完成(\(completedCount))", for: .normal)
+        shareAllButton.setTitle("分享已完成(\(completedCount))", for: .normal)
     }
 }
 
@@ -686,17 +741,9 @@ extension BatchImageEnhanceViewController {
 extension BatchImageEnhanceViewController {
     
     private func saveCompletedImages() {
-        let imagesToSave: [UIImage]
-        
-        if isSelectMode {
-            imagesToSave = selectedIndices.compactMap { index in
-                let item = enhanceItems[index]
-                return item.processingState == .completed ? item.enhancedImage : nil
-            }
-        } else {
-            imagesToSave = enhanceItems.compactMap { item in
-                return item.processingState == .completed ? item.enhancedImage : nil
-            }
+        // 保存所有已完成的图片，不区分选择状态
+        let imagesToSave = enhanceItems.compactMap { item in
+            return item.processingState == .completed ? item.enhancedImage : nil
         }
         
         guard !imagesToSave.isEmpty else {
@@ -709,17 +756,9 @@ extension BatchImageEnhanceViewController {
     }
     
     private func shareCompletedImages() {
-        let imagesToShare: [UIImage]
-        
-        if isSelectMode {
-            imagesToShare = selectedIndices.compactMap { index in
-                let item = enhanceItems[index]
-                return item.processingState == .completed ? item.enhancedImage : nil
-            }
-        } else {
-            imagesToShare = enhanceItems.compactMap { item in
-                return item.processingState == .completed ? item.enhancedImage : nil
-            }
+        // 分享所有已完成的图片，不区分选择状态
+        let imagesToShare = enhanceItems.compactMap { item in
+            return item.processingState == .completed ? item.enhancedImage : nil
         }
         
         guard !imagesToShare.isEmpty else {
@@ -828,8 +867,9 @@ extension BatchImageEnhanceViewController {
         
         completedCount = 0
         failedCount = 0
-        selectedIndices.removeAll()
-        isSelectMode = false
+        
+        // 重置为默认全选状态
+        selectedIndices = Set(0..<enhanceItems.count)
         
         progressContainerView.isHidden = true
         overallProgressView.progress = 0.0
@@ -840,12 +880,9 @@ extension BatchImageEnhanceViewController {
         saveAllButton.alpha = 0.6
         shareAllButton.isEnabled = false
         shareAllButton.alpha = 0.6
-        selectModeButton.isEnabled = false
-        selectModeButton.alpha = 0.6
-        selectModeButton.isSelected = false
         
-        collectionView.reloadData()
-        updateBottomButtons()
+        // 更新选择UI
+        updateSelectionUI()
     }
     
     private func showAlert(title: String, message: String) {
@@ -876,20 +913,20 @@ extension BatchImageEnhanceViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         let item = enhanceItems[indexPath.item]
         
-        if isSelectMode {
-            // 选择模式
+        // 在处理前，点击可以切换选择状态
+        if !isProcessing {
+            // 切换选择状态
             if selectedIndices.contains(indexPath.item) {
                 selectedIndices.remove(indexPath.item)
-                collectionView.deselectItem(at: indexPath, animated: true)
             } else {
                 selectedIndices.insert(indexPath.item)
             }
             
-            collectionView.reloadItems(at: [indexPath])
-            updateBottomButtons()
+            // 更新UI
+            updateSelectionUI()
             
         } else if item.processingState == .completed {
-            // 跳转到单图调整
+            // 处理完成后，点击跳转到单图调整
             guard let enhancedImage = item.enhancedImage else { return }
             
             let imageEnhanceVC = ImageEnhanceViewController(
@@ -1161,8 +1198,10 @@ class BatchEnhanceCell: UICollectionViewCell {
             configureForFailedState(error: item.error)
         }
         
-        // 选择状态
-        selectionIndicatorView.isHidden = !isSelected
+        // 总是显示选择状态（不需要等处理完成）
+        selectionIndicatorView.isHidden = false
+        selectionIndicatorView.backgroundColor = isSelected ? ThemeManager.buttonPrimary : UIColor.white.withAlphaComponent(0.3)
+        checkmarkImageView.isHidden = !isSelected
         overlayView.isHidden = !isSelected
     }
     
