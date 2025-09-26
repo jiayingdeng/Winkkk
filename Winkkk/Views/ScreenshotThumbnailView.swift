@@ -13,11 +13,8 @@ class ScreenshotThumbnailView: UIView {
     // MARK: - Properties
     var onDeleteTap: (() -> Void)?
     var onTap: (() -> Void)?
-    var onLongPress: (() -> Void)?
-    var onSelectionToggle: (() -> Void)?  // 多选模式下的选择切换回调
     
     private var screenshot: ScreenshotItem?
-    private var isInSelectionMode: Bool = false  // 是否处于多选模式
     
     // MARK: - UI Components
     private let imageView = UIImageView()
@@ -31,9 +28,6 @@ class ScreenshotThumbnailView: UIView {
     // Live Photo专用组件
     private let livePhotoIndicator = UIImageView()
     
-    // 多选模式专用组件
-    private let selectionOverlay = UIView()  // 选择状态覆盖层
-    private let checkmarkView = UIImageView()  // 选中标记
     
     // MARK: - Initialization
     override init(frame: CGRect) {
@@ -86,9 +80,6 @@ class ScreenshotThumbnailView: UIView {
         // Live Photo指示器
         setupLivePhotoIndicator()
         
-        // 多选模式组件
-        setupSelectionOverlay()
-        setupCheckmarkView()
         
         // 添加到视图
         addSubview(imageView)
@@ -98,8 +89,6 @@ class ScreenshotThumbnailView: UIView {
         addSubview(processingIndicator)
         addSubview(statusBadge)
         addSubview(livePhotoIndicator)
-        addSubview(selectionOverlay)
-        addSubview(checkmarkView)
     }
     
     private func setupImageView() {
@@ -198,26 +187,6 @@ class ScreenshotThumbnailView: UIView {
         livePhotoIndicator.layer.add(pulseAnimation, forKey: "livePhotoPulse")
     }
     
-    private func setupSelectionOverlay() {
-        selectionOverlay.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.3)
-        selectionOverlay.layer.cornerRadius = 8
-        selectionOverlay.isHidden = true
-        selectionOverlay.alpha = 0
-    }
-    
-    private func setupCheckmarkView() {
-        let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .bold)
-        checkmarkView.image = UIImage(systemName: "checkmark.circle.fill", withConfiguration: config)
-        checkmarkView.tintColor = .white
-        checkmarkView.backgroundColor = UIColor.systemBlue
-        checkmarkView.layer.cornerRadius = 12
-        checkmarkView.layer.borderWidth = 2
-        checkmarkView.layer.borderColor = UIColor.white.cgColor
-        checkmarkView.clipsToBounds = true
-        checkmarkView.contentMode = .center
-        checkmarkView.isHidden = true
-        checkmarkView.alpha = 0
-    }
     
     private func setupConstraints() {
         imageView.translatesAutoresizingMaskIntoConstraints = false
@@ -227,8 +196,6 @@ class ScreenshotThumbnailView: UIView {
         processingIndicator.translatesAutoresizingMaskIntoConstraints = false
         statusBadge.translatesAutoresizingMaskIntoConstraints = false
         livePhotoIndicator.translatesAutoresizingMaskIntoConstraints = false
-        selectionOverlay.translatesAutoresizingMaskIntoConstraints = false
-        checkmarkView.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
             // 图片视图 - 填满整个视图
@@ -273,17 +240,6 @@ class ScreenshotThumbnailView: UIView {
             livePhotoIndicator.widthAnchor.constraint(equalToConstant: 16),
             livePhotoIndicator.heightAnchor.constraint(equalToConstant: 16),
             
-            // 选择覆盖层 - 填满整个视图
-            selectionOverlay.topAnchor.constraint(equalTo: topAnchor),
-            selectionOverlay.leadingAnchor.constraint(equalTo: leadingAnchor),
-            selectionOverlay.trailingAnchor.constraint(equalTo: trailingAnchor),
-            selectionOverlay.bottomAnchor.constraint(equalTo: bottomAnchor),
-            
-            // 选中标记 - 右上角
-            checkmarkView.topAnchor.constraint(equalTo: topAnchor, constant: 4),
-            checkmarkView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
-            checkmarkView.widthAnchor.constraint(equalToConstant: 24),
-            checkmarkView.heightAnchor.constraint(equalToConstant: 24)
         ])
     }
     
@@ -291,11 +247,6 @@ class ScreenshotThumbnailView: UIView {
         // 点击手势
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(thumbnailTapped))
         addGestureRecognizer(tapGesture)
-        
-        // 长按手势
-        let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(thumbnailLongPressed))
-        longPressGesture.minimumPressDuration = 0.5  // 0.5秒长按
-        addGestureRecognizer(longPressGesture)
         
         isUserInteractionEnabled = true
     }
@@ -384,102 +335,6 @@ class ScreenshotThumbnailView: UIView {
         imageView.layer.borderColor = borderColor.cgColor
     }
     
-    // MARK: - Selection State Management
-    func setSelected(_ selected: Bool, animated: Bool) {
-        let duration = animated ? 0.3 : 0.0
-        
-        UIView.animate(withDuration: duration) {
-            self.selectionIndicator.isHidden = !selected
-            
-            if selected {
-                // 选中状态：添加蓝色边框和选择指示器
-                self.layer.borderColor = UIColor.systemBlue.cgColor
-                self.layer.borderWidth = 2.0
-                self.selectionIndicator.alpha = 1.0
-            } else {
-                // 未选中状态：恢复原始边框
-                self.layer.borderColor = UIColor.white.cgColor
-                self.layer.borderWidth = 1.0
-                self.selectionIndicator.alpha = 0.0
-            }
-        }
-    }
-    
-    // MARK: - Multi-Selection Support
-    /// 设置多选模式状态
-    func setSelectionMode(_ enabled: Bool, animated: Bool = true) {
-        isInSelectionMode = enabled
-        
-        let duration = animated ? 0.25 : 0.0
-        
-        UIView.animate(withDuration: duration) {
-            if enabled {
-                // 进入多选模式：显示删除按钮，为选择做准备
-                self.deleteButton.alpha = 0.6
-                self.alpha = 0.9
-            } else {
-                // 退出多选模式：隐藏多选UI，恢复正常状态
-                self.deleteButton.alpha = 1.0
-                self.alpha = 1.0
-                self.selectionOverlay.alpha = 0
-                self.checkmarkView.alpha = 0
-            }
-        } completion: { _ in
-            if !enabled {
-                self.selectionOverlay.isHidden = true
-                self.checkmarkView.isHidden = true
-            }
-        }
-    }
-    
-    /// 设置多选模式下的选中状态
-    func setMultiSelected(_ selected: Bool, animated: Bool = true) {
-        guard isInSelectionMode else { return }
-        
-        let duration = animated ? 0.25 : 0.0
-        
-        if selected {
-            selectionOverlay.isHidden = false
-            checkmarkView.isHidden = false
-        }
-        
-        UIView.animate(withDuration: duration, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5, options: .curveEaseOut) {
-            if selected {
-                // 选中状态：显示覆盖层和选中标记
-                self.selectionOverlay.alpha = 1.0
-                self.checkmarkView.alpha = 1.0
-                self.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
-                
-                // 添加蓝色发光边框
-                self.imageView.layer.borderColor = UIColor.systemBlue.cgColor
-                self.imageView.layer.borderWidth = 3.0
-                self.layer.shadowColor = UIColor.systemBlue.cgColor
-                self.layer.shadowOffset = CGSize(width: 0, height: 0)
-                self.layer.shadowRadius = 8
-                self.layer.shadowOpacity = 0.4
-            } else {
-                // 未选中状态：隐藏覆盖层和选中标记
-                self.selectionOverlay.alpha = 0.0
-                self.checkmarkView.alpha = 0.0
-                self.transform = .identity
-                
-                // 恢复正常边框
-                self.imageView.layer.borderColor = UIColor.white.cgColor
-                self.imageView.layer.borderWidth = 2.0
-                self.layer.shadowOpacity = 0.0
-            }
-        } completion: { _ in
-            if !selected {
-                self.selectionOverlay.isHidden = true
-                self.checkmarkView.isHidden = true
-            }
-        }
-        
-        // 触觉反馈
-        if selected {
-            HapticFeedbackManager.shared.selectionChanged()
-        }
-    }
     
     // MARK: - Actions
     @objc private func deleteButtonTapped() {
@@ -496,55 +351,20 @@ class ScreenshotThumbnailView: UIView {
     }
     
     @objc private func thumbnailTapped() {
-        // 检查是否处于多选模式
-        if isInSelectionMode {
-            // 多选模式：切换选择状态
-            onSelectionToggle?()
-            
-            // 选择切换动画
-            UIView.animate(withDuration: 0.15, animations: {
-                self.transform = CGAffineTransform(scaleX: 0.98, y: 0.98)
-            }) { _ in
-                UIView.animate(withDuration: 0.15) {
-                    self.transform = .identity
-                }
-            }
-        } else {
-            // 普通模式：添加点击反馈动画
-            UIView.animate(withDuration: 0.1, animations: {
-                self.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
-            }) { _ in
-                UIView.animate(withDuration: 0.1) {
-                    self.transform = .identity
-                }
-            }
-            
-            // 普通点击回调
-            onTap?()
-        }
-        
-        // 触觉反馈
-        HapticFeedbackManager.shared.lightImpact()
-    }
-    
-    @objc private func thumbnailLongPressed(_ gesture: UILongPressGestureRecognizer) {
-        // 只在长按开始时触发，避免重复触发
-        guard gesture.state == .began else { return }
-        
-        // 添加长按反馈动画
-        UIView.animate(withDuration: 0.2, animations: {
-            self.transform = CGAffineTransform(scaleX: 1.05, y: 1.05)
+        // 添加点击反馈动画
+        UIView.animate(withDuration: 0.1, animations: {
+            self.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
         }) { _ in
-            UIView.animate(withDuration: 0.2) {
+            UIView.animate(withDuration: 0.1) {
                 self.transform = .identity
             }
         }
         
-        // 长按触觉反馈 (比普通点击更强)
-        HapticFeedbackManager.shared.mediumImpact()
+        // 普通点击回调
+        onTap?()
         
-        // 回调
-        onLongPress?()
+        // 触觉反馈
+        HapticFeedbackManager.shared.lightImpact()
     }
 }
 
@@ -585,62 +405,3 @@ extension ScreenshotThumbnailView {
     }
 }
 
-// MARK: - 选中状态扩展
-extension ScreenshotThumbnailView {
-    
-    /// 增强的选中状态设置（带视觉反馈）
-    func setSelectedWithFeedback(_ selected: Bool, animated: Bool = true) {
-        let updateUI = {
-            self.selectionIndicator.isHidden = !selected
-            
-            if selected {
-                // 选中状态：蓝色指示器，边框高亮，轻微缩放
-                self.selectionIndicator.backgroundColor = UIColor.systemBlue
-                self.selectionIndicator.alpha = 1.0
-                self.layer.borderColor = UIColor.systemBlue.cgColor
-                self.layer.borderWidth = 2.0
-                self.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
-                
-                // 添加发光效果
-                self.layer.shadowColor = UIColor.systemBlue.cgColor
-                self.layer.shadowOffset = CGSize(width: 0, height: 0)
-                self.layer.shadowRadius = 8
-                self.layer.shadowOpacity = 0.3
-            } else {
-                // 未选中状态：恢复原始样式
-                self.selectionIndicator.alpha = 0.0
-                self.layer.borderColor = UIColor.white.cgColor
-                self.layer.borderWidth = 1.0
-                self.transform = .identity
-                
-                // 移除发光效果
-                self.layer.shadowOpacity = 0.0
-            }
-        }
-        
-        if animated {
-            UIView.animate(withDuration: 0.25, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5, options: .curveEaseOut) {
-                updateUI()
-            }
-        } else {
-            updateUI()
-        }
-        
-        // 触觉反馈
-        if selected {
-            HapticFeedbackManager.shared.selectionChanged()
-        }
-    }
-    
-    /// 显示选中动画（多选时的视觉提示）
-    func showSelectionPulse() {
-        let pulseAnimation = CABasicAnimation(keyPath: "transform.scale")
-        pulseAnimation.fromValue = 1.0
-        pulseAnimation.toValue = 1.05
-        pulseAnimation.duration = 0.15
-        pulseAnimation.autoreverses = true
-        pulseAnimation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        
-        layer.add(pulseAnimation, forKey: "selectionPulse")
-    }
-}

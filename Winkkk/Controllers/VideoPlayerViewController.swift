@@ -67,8 +67,6 @@ class VideoPlayerViewController: UIViewController {
     
     // 🆕 批量操作面板 - 已移除，功能集成到ScreenshotPreviewBar中
     
-    // 🆕 多选状态管理 - 使用统一的MultiSelectionManager
-    private let multiSelectionManager = MultiSelectionManager.shared
     
     // 状态变量 - 🎯 编辑器模式重构
     private var isFlowing = false {  // 从isPlaying改为isFlowing
@@ -462,16 +460,12 @@ class VideoPlayerViewController: UIViewController {
         // 设置初始模式
         captureModeSwitcher.setCurrentMode(CaptureMode.stillImage)
         
-        // 设置MultiSelectionManager给ScreenshotPreviewBar
-        screenshotPreviewBar.setMultiSelectionManager(multiSelectionManager)
         
         // 订阅截图状态变化
         screenshotManager.$screenshots
             .receive(on: DispatchQueue.main)
             .sink { [weak self] screenshots in
                 self?.updatePreviewBarVisibility(screenshots: screenshots)
-                // 验证MultiSelectionManager的选中项目是否仍然有效
-                self?.multiSelectionManager.validateSelection(validItems: screenshots)
             }
             .store(in: &cancellables)
         
@@ -843,9 +837,8 @@ class VideoPlayerViewController: UIViewController {
         )
         
         alert.addAction(UIAlertAction(title: "查看截图", style: .default) { _ in
-            // 进入多选模式查看所有截图
-            self.multiSelectionManager.enterSelectionMode()
-            self.multiSelectionManager.selectAll(self.screenshotManager.screenshots)
+            // 直接查看所有截图（移除多选模式）
+            // 可以在这里添加其他查看逻辑
             
             // 跳转到处理中心
             let screenshots = self.screenshotManager.screenshots
@@ -1341,9 +1334,8 @@ extension VideoPlayerViewController: CaptureModeSwitcherDelegate {
 extension VideoPlayerViewController: ScreenshotPreviewBarDelegate {
     
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didTapScreenshot screenshot: ScreenshotItem, at index: Int) {
-        if multiSelectionManager.isInSelectionMode {
-            // 多选模式：切换选中状态
-            multiSelectionManager.selectItem(screenshot)
+        // 移除多选模式逐阐，直接进入详情页面
+        // 使用原有的详情页面展示逻辑
             HapticFeedbackManager.shared.lightImpact()
         } else {
             // 🎯 固定三分屏设计：单击截图时不弹出界面，保持界面连续性
@@ -1427,63 +1419,6 @@ extension VideoPlayerViewController: ScreenshotPreviewBarDelegate {
         present(alert, animated: true)
     }
     
-    // 🆕 长按手势处理
-    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didLongPressScreenshot screenshot: ScreenshotItem, at index: Int) {
-        // 长按进入多选模式
-        if !multiSelectionManager.isInSelectionMode {
-            multiSelectionManager.enterSelectionMode()
-            
-            // 自动选择被长按的截图
-            multiSelectionManager.selectItem(screenshot)
-            
-            HapticFeedbackManager.shared.mediumImpact()
-            print("🔄 长按进入多选模式，已选择第 \(index + 1) 张截图")
-        }
-    }
-    
-    // 🆕 批量操作委托方法
-    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestBatchDelete screenshots: [ScreenshotItem]) {
-        guard !screenshots.isEmpty else { return }
-        
-        let alert = UIAlertController(
-            title: "删除截图",
-            message: "确定要删除选中的 \(screenshots.count) 张截图吗？",
-            preferredStyle: .alert
-        )
-        
-        alert.addAction(UIAlertAction(title: "删除", style: .destructive) { _ in
-            // 批量删除截图
-            for screenshot in screenshots {
-                self.screenshotManager.removeScreenshot(screenshot)
-            }
-            
-            // 退出多选模式
-            self.multiSelectionManager.exitSelectionMode()
-            
-            HapticFeedbackManager.shared.notificationSuccess()
-        })
-        
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        
-        present(alert, animated: true)
-    }
-    
-    func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didRequestBatchShare screenshots: [ScreenshotItem]) {
-        guard !screenshots.isEmpty else { return }
-        
-        let images = screenshots.map { $0.image }
-        let activityVC = UIActivityViewController(activityItems: images, applicationActivities: nil)
-        
-        // iPad适配
-        if let popover = activityVC.popoverPresentationController {
-            popover.sourceView = previewBar
-            popover.sourceRect = previewBar.bounds
-        }
-        
-        present(activityVC, animated: true)
-        
-        HapticFeedbackManager.shared.lightImpact()
-    }
 }
 
 // MARK: - 🆕 辅助方法扩展
