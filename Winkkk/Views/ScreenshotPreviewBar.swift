@@ -517,27 +517,6 @@ class ScreenshotPreviewBar: UIView {
 
 // MARK: - 🆕 ScreenshotDetailSheetDelegate
 extension ScreenshotPreviewBar: ScreenshotDetailSheetDelegate {
-    func screenshotDetailSheet(_ sheet: ScreenshotDetailSheet, didSelectScreenshot screenshot: ScreenshotItem, isSelected: Bool) {
-        if isSelected {
-            multiSelectionManager.selectItem(screenshot)
-        } else {
-            multiSelectionManager.deselectItem(screenshot)
-        }
-        
-        // 更新UI显示选中状态
-        updateSelectionDisplay()
-        
-        // 通知委托
-        delegate?.screenshotPreviewBar(self, didSelectScreenshots: multiSelectionManager.selectedItems)
-    }
-    
-    func screenshotDetailSheet(_ sheet: ScreenshotDetailSheet, didRequestProcessingCenter selectedScreenshots: [ScreenshotItem]) {
-        // 委托给上层处理
-        delegate?.screenshotPreviewBar(self, didRequestProcessingCenter: selectedScreenshots)
-    }
-    
-    private func updateSelectionDisplay() {
-        // 更新预览栏的选中状态显示
-        // 这里可以添加选中数量的显示等
-    }
+    // 纯预览Sheet不需要复杂的委托方法实现
+    // 如果未来需要添加新的委托方法，可以在这里实现
 }

@@ -237,13 +237,6 @@ class ScreenshotProcessingViewController: UIViewController {
         switch mode {
         case .stillImage:
             processingOptions = [
-                // 🌟 时间序列模式 - 特色功能，突出显示
-                ProcessingOption(
-                    title: "⏰ 时间序列模式",
-                    description: "将视频关键时刻融合成一张艺术图片",
-                    icon: "clock.arrow.circlepath",
-                    action: { [weak self] in self?.showTimeSequenceMode() }
-                ),
                 ProcessingOption(
                     title: "✨ 批量画质修复",
                     description: "AI智能修复图片质量",
@@ -251,50 +244,17 @@ class ScreenshotProcessingViewController: UIViewController {
                     action: { [weak self] in self?.showBatchImageEnhancement() }
                 ),
                 ProcessingOption(
-                    title: "🧠 DETR智能分割",
-                    description: "AI识别并提取人物、动物、植物、食物等主体",
-                    icon: "brain.head.profile",
-                    action: { [weak self] in self?.showDETRSubjectSegmentation() }
-                ),
-                ProcessingOption(
                     title: "🧩 创建拼图",
                     description: "将多张截图制作成拼图",
                     icon: "square.grid.3x3",
                     action: { [weak self] in self?.showCollageCreation() }
                 ),
-                // 📏 批量调整尺寸 - 暂时不需要
-                /*
-                ProcessingOption(
-                    title: "📏 批量调整尺寸",
-                    description: "统一调整图片尺寸",
-                    icon: "crop",
-                    action: { [weak self] in self?.showBatchResize() }
-                ),
-                */
-                // 🏷️ 批量添加水印 - 暂时不需要
-                /*
-                ProcessingOption(
-                    title: "🏷️ 批量添加水印",
-                    description: "为所有图片添加水印",
-                    icon: "text.badge.plus",
-                    action: { [weak self] in self?.showBatchWatermark() }
-                ),
-                */
                 ProcessingOption(
                     title: "📤 批量分享",
                     description: "一键分享所有图片",
                     icon: "square.and.arrow.up",
                     action: { [weak self] in self?.showBatchShare() }
                 )
-                // 💾 保存到相册 - 在上一步"完成"时已保存，此处重复
-                /*
-                ProcessingOption(
-                    title: "💾 保存到相册",
-                    description: "保存所有图片到系统相册",
-                    icon: "photo.on.rectangle",
-                    action: { [weak self] in self?.saveBatchToPhotos() }
-                )
-                */
             ]
             
         case .livePhoto:
@@ -310,18 +270,6 @@ class ScreenshotProcessingViewController: UIViewController {
                     description: "选择Live Photo的封面帧",
                     icon: "photo",
                     action: { [weak self] in self?.setCoverFrame() }
-                ),
-                ProcessingOption(
-                    title: "✨ 批量画质修复",
-                    description: "AI智能修复Live Photo质量",
-                    icon: "wand.and.stars",
-                    action: { [weak self] in self?.showBatchImageEnhancement() }
-                ),
-                ProcessingOption(
-                    title: "💾 保存Live Photo",
-                    description: "保存到系统相册Live Photo格式",
-                    icon: "livephoto",
-                    action: { [weak self] in self?.saveLivePhotos() }
                 ),
                 ProcessingOption(
                     title: "📤 分享Live Photo",
@@ -475,110 +423,7 @@ extension ScreenshotProcessingViewController {
         navigationController?.pushViewController(collageVC, animated: true)
     }
     
-    private func showDETRSubjectSegmentation() {
-        print("🧠 DETR智能分割")
-        
-        // 检查是否有图片可以处理
-        guard !screenshots.isEmpty else {
-            showAlert(title: "无法处理", message: "没有可用的图片进行智能分割")
-            return
-        }
-        
-        // 如果只有一张图片，直接跳转到单图分割界面
-        if screenshots.count == 1 {
-            guard let firstImage = screenshots.first?.image else {
-                showAlert(title: "错误", message: "无法加载图片")
-                return
-            }
-            
-            // 触觉反馈
-            HapticFeedbackManager.shared.buttonTap()
-            
-            // 跳转到DETR分割测试页面
-            let detrTestVC = DETRSegmentationTestViewController()
-            detrTestVC.setInitialImage(firstImage) // 我们需要添加这个方法
-            let navController = UINavigationController(rootViewController: detrTestVC)
-            navController.modalPresentationStyle = .fullScreen
-            present(navController, animated: true)
-            
-        } else {
-            // 多张图片，显示选择提示
-            let alert = UIAlertController(
-                title: "选择分割图片", 
-                message: "DETR智能分割目前支持单张图片处理，请选择一张图片进行分割。", 
-                preferredStyle: .alert
-            )
-            
-            alert.addAction(UIAlertAction(title: "选择第一张", style: .default) { [weak self] _ in
-                guard let self = self,
-                      let firstImage = self.screenshots.first?.image else { return }
-                
-                HapticFeedbackManager.shared.buttonTap()
-                let detrTestVC = DETRSegmentationTestViewController()
-                detrTestVC.setInitialImage(firstImage)
-                let navController = UINavigationController(rootViewController: detrTestVC)
-                navController.modalPresentationStyle = .fullScreen
-                self.present(navController, animated: true)
-            })
-            
-            alert.addAction(UIAlertAction(title: "手动选择", style: .default) { [weak self] _ in
-                // TODO: 可以实现一个图片选择器让用户选择要分割的图片
-                self?.showImageSelectionForSegmentation()
-            })
-            
-            alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-            present(alert, animated: true)
-        }
-    }
     
-    private func showImageSelectionForSegmentation() {
-        // 简单实现：显示所有图片让用户选择
-        let alert = UIAlertController(title: "选择要分割的图片", message: nil, preferredStyle: .actionSheet)
-        
-        for (index, screenshot) in screenshots.enumerated() {
-            alert.addAction(UIAlertAction(title: "图片 \(index + 1)", style: .default) { [weak self] _ in
-                guard let self = self,
-                      let image = screenshot.image else { return }
-                
-                HapticFeedbackManager.shared.buttonTap()
-                let detrTestVC = DETRSegmentationTestViewController()
-                detrTestVC.setInitialImage(image)
-                let navController = UINavigationController(rootViewController: detrTestVC)
-                navController.modalPresentationStyle = .fullScreen
-                self.present(navController, animated: true)
-            })
-        }
-        
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        
-        // iPad支持
-        if let popover = alert.popoverPresentationController {
-            popover.sourceView = view
-            popover.sourceRect = view.bounds
-        }
-        
-        present(alert, animated: true)
-    }
-    
-    // MARK: - 时间序列模式 (新增核心功能)
-    private func showTimeSequenceMode() {
-        print("⏰ 时间序列模式")
-        
-        // 检查是否有视频截图可用于时间序列处理
-        guard !screenshots.isEmpty else {
-            showAlert(title: "无法处理", message: "没有可用的截图进行时间序列处理")
-            return
-        }
-        
-        // 触觉反馈
-        HapticFeedbackManager.shared.buttonTap()
-        
-        // 跳转到时间序列处理页面
-        let timeSequenceVC = TimeSequenceViewController(screenshots: screenshots)
-        navigationController?.pushViewController(timeSequenceVC, animated: true)
-    }
-    
-    // showTimeSequenceInfoAlert 方法已移除 - 现在直接跳转到 TimeSequenceViewController
     
     // MARK: - 暂时注释的功能
     /*
@@ -649,32 +494,23 @@ extension ScreenshotProcessingViewController {
             return
         }
         
-        // 使用现有的截图详情界面来设置Live Photo封面
-        let detailSheet = ScreenshotDetailSheet(screenshots: livePhotos, currentIndex: 0)
-        present(detailSheet, animated: true)
-    }
-    
-    private func saveLivePhotos() {
-        print("💾 保存Live Photo")
-        
-        // 获取Live Photo类型的截图
-        let livePhotos = screenshots.filter { $0.mode == .livePhoto }
-        guard !livePhotos.isEmpty else {
-            showAlert(title: "提示", message: "没有Live Photo可以保存")
-            return
-        }
-        
-        // 显示保存确认
+        // 显示操作指南
         let alert = UIAlertController(
-            title: "保存Live Photo",
-            message: "将\(livePhotos.count)个Live Photo保存到系统相册？",
+            title: "设置Live Photo封面",
+            message: "在预览界面中，长按Live Photo可以播放动画，您可以选择喜欢的帧作为封面。\n\n注意：封面设置功能正在开发中，当前可以预览Live Photo效果。",
             preferredStyle: .alert
         )
         
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        alert.addAction(UIAlertAction(title: "保存", style: .default) { _ in
-            self.performLivePhotoSave(livePhotos)
+        alert.addAction(UIAlertAction(title: "预览Live Photo", style: .default) { _ in
+            // 触觉反馈
+            HapticFeedbackManager.shared.buttonTap()
+            
+            // 跳转到详情界面预览
+            let detailSheet = ScreenshotDetailSheet(screenshots: livePhotos, currentIndex: 0)
+            self.present(detailSheet, animated: true)
         })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         
         present(alert, animated: true)
     }
@@ -717,53 +553,6 @@ extension ScreenshotProcessingViewController {
         }
         
         present(activityVC, animated: true)
-    }
-    
-    /// 执行Live Photo保存操作
-    private func performLivePhotoSave(_ livePhotos: [ScreenshotItem]) {
-        // 显示保存进度
-        let progressAlert = UIAlertController(
-            title: "保存中",
-            message: "正在保存Live Photo到相册...",
-            preferredStyle: .alert
-        )
-        present(progressAlert, animated: true)
-        
-        // 使用ScreenshotManager的批量保存功能
-        ScreenshotManager.shared.batchSaveLivePhotosToAlbum(
-            livePhotos,
-            progress: { completed, total in
-                DispatchQueue.main.async {
-                    progressAlert.message = "正在保存Live Photo (\(completed)/\(total))..."
-                }
-            },
-            completion: { successCount, failureCount in
-                DispatchQueue.main.async {
-                    progressAlert.dismiss(animated: true) {
-                        self.showSaveResult(successCount: successCount, failureCount: failureCount)
-                    }
-                }
-            }
-        )
-    }
-    
-    /// 显示保存结果
-    private func showSaveResult(successCount: Int, failureCount: Int) {
-        let title: String
-        let message: String
-        
-        if failureCount == 0 {
-            title = "保存成功"
-            message = "已成功保存\(successCount)个Live Photo到相册"
-        } else if successCount == 0 {
-            title = "保存失败"
-            message = "保存失败，请检查相册权限设置"
-        } else {
-            title = "部分保存成功"
-            message = "成功保存\(successCount)个，失败\(failureCount)个Live Photo"
-        }
-        
-        showAlert(title: title, message: message)
     }
     
     /// 显示提示对话框
@@ -864,45 +653,17 @@ class ProcessingOptionCell: UITableViewCell {
         titleLabel.text = option.title
         descriptionLabel.text = option.description
         
-        // 🌟 为时间序列模式添加多层次突出显示效果
-        if option.title.contains("时间序列模式") {
-            // 1. 更强烈的渐变背景 (60%透明度 → 更明显)
-            backgroundColor = ThemeManager.buttonPrimary.withAlphaComponent(0.6)
-            
-            // 2. 圆角和边框突出
-            layer.cornerRadius = ThemeManager.standardCornerRadius
-            layer.borderWidth = 2.0
-            layer.borderColor = ThemeManager.buttonPrimary.cgColor
-            
-            // 3. 阴影效果增强视觉深度
-            layer.shadowColor = ThemeManager.buttonPrimary.cgColor
-            layer.shadowOffset = CGSize(width: 0, height: 4)
-            layer.shadowRadius = 8
-            layer.shadowOpacity = 0.4
-            
-            // 4. 图标特殊颜色突出
-            iconImageView.tintColor = ThemeManager.primaryText
-            
-            // 5. 标题文字加粗突出
-            titleLabel.font = ThemeManager.buttonFont.withSize(ThemeManager.buttonFont.pointSize + 1)
-            titleLabel.textColor = ThemeManager.primaryText
-            
-            // 6. 描述文字也加强对比
-            descriptionLabel.textColor = ThemeManager.primaryText.withAlphaComponent(0.8)
-            
-        } else {
-            // 恢复默认样式
-            backgroundColor = .clear
-            layer.cornerRadius = 0
-            layer.borderWidth = 0
-            layer.shadowOpacity = 0
-            
-            // 恢复默认图标和文字颜色
-            iconImageView.tintColor = ThemeManager.buttonPrimary
-            titleLabel.font = ThemeManager.buttonFont
-            titleLabel.textColor = .white
-            descriptionLabel.textColor = UIColor.white.withAlphaComponent(0.7)
-        }
+        // 使用默认样式
+        backgroundColor = .clear
+        layer.cornerRadius = 0
+        layer.borderWidth = 0
+        layer.shadowOpacity = 0
+        
+        // 设置默认图标和文字颜色
+        iconImageView.tintColor = ThemeManager.buttonPrimary
+        titleLabel.font = ThemeManager.buttonFont
+        titleLabel.textColor = .white
+        descriptionLabel.textColor = UIColor.white.withAlphaComponent(0.7)
     }
 }
 

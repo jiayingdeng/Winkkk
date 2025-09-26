@@ -911,7 +911,15 @@ class VideoPlayerViewController: UIViewController {
     
     // MARK: - Actions
     @objc private func cancelButtonTapped() {
-        dismiss(animated: true)
+        let screenshots = screenshotManager.screenshots
+        
+        if screenshots.isEmpty {
+            // 没有截图，直接返回
+            dismiss(animated: true)
+        } else {
+            // 有截图，显示确认对话框
+            showCancelConfirmationAlert(screenshotCount: screenshots.count)
+        }
     }
     
     @objc private func doneButtonTapped() {
@@ -1095,6 +1103,38 @@ class VideoPlayerViewController: UIViewController {
         })
         
         present(alert, animated: true)
+    }
+    
+    private func showCancelConfirmationAlert(screenshotCount: Int) {
+        let mode = screenshotManager.currentMode
+        let modeText = mode == .livePhoto ? "Live Photo" : "截图"
+        
+        let alert = UIAlertController(
+            title: "确定要取消吗？",
+            message: "当前有 \(screenshotCount) 张未保存的\(modeText)",
+            preferredStyle: .alert
+        )
+        
+        // 保留截图选项
+        alert.addAction(UIAlertAction(title: "保留\(modeText)", style: .default) { [weak self] _ in
+            self?.dismiss(animated: true)
+        })
+        
+        // 丢弃截图选项
+        alert.addAction(UIAlertAction(title: "丢弃\(modeText)", style: .destructive) { [weak self] _ in
+            self?.clearScreenshotsAndDismiss()
+        })
+        
+        // 继续编辑选项
+        alert.addAction(UIAlertAction(title: "继续编辑", style: .cancel))
+        
+        present(alert, animated: true)
+    }
+    
+    private func clearScreenshotsAndDismiss() {
+        screenshotManager.clearAllScreenshots()
+        HapticFeedbackManager.shared.lightImpact()
+        dismiss(animated: true)
     }
     
     private func navigateToScreenshotProcessing() {

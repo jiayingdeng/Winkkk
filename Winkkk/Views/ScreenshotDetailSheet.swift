@@ -11,8 +11,7 @@ import Photos
 import PhotosUI
 
 protocol ScreenshotDetailSheetDelegate: AnyObject {
-    func screenshotDetailSheet(_ sheet: ScreenshotDetailSheet, didSelectScreenshot screenshot: ScreenshotItem, isSelected: Bool)
-    func screenshotDetailSheet(_ sheet: ScreenshotDetailSheet, didRequestProcessingCenter selectedScreenshots: [ScreenshotItem])
+    // 纯预览Sheet只需要基础的委托方法（如果需要的话可以在这里添加）
 }
 
 class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
@@ -21,7 +20,6 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     weak var delegate: ScreenshotDetailSheetDelegate?
     private let screenshots: [ScreenshotItem]
     private var currentIndex: Int
-    private var selectedScreenshots = Set<UUID>() // 使用ID集合跟踪选中状态
     
     // MARK: - UI Components
     private let scrollView = UIScrollView()
@@ -29,10 +27,6 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     private let navigationBar = UIView()
     private let titleLabel = UILabel()
     private let closeButton = UIButton()
-    private let selectButton = UIButton()
-    private let bottomActionBar = UIView()
-    private let selectedCountLabel = UILabel()
-    private let processingCenterButton = UIButton()
     
     // MARK: - Initialization
     init(screenshots: [ScreenshotItem], currentIndex: Int = 0) {
@@ -81,19 +75,18 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     
     // MARK: - UI Setup
     private func setupUI() {
-        view.backgroundColor = .systemBackground
+        // 使用app主题的粉紫色背景
+        view.backgroundColor = ThemeManager.cardBackground
         
         setupNavigationBar()
         setupScrollView()
-        setupBottomActionBar()
         
         view.addSubview(navigationBar)
         view.addSubview(scrollView)
-        view.addSubview(bottomActionBar)
     }
     
     private func setupNavigationBar() {
-        navigationBar.backgroundColor = .systemBackground
+        navigationBar.backgroundColor = .clear
         
         // 标题
         titleLabel.text = "\(currentIndex + 1) / \(screenshots.count)"
@@ -107,15 +100,8 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
         closeButton.titleLabel?.font = .systemFont(ofSize: 18, weight: .medium)
         closeButton.addTarget(self, action: #selector(closeButtonTapped), for: .touchUpInside)
         
-        // 选择按钮
-        selectButton.setTitle("选择", for: .normal)
-        selectButton.setTitleColor(.systemBlue, for: .normal)
-        selectButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
-        selectButton.addTarget(self, action: #selector(selectButtonTapped), for: .touchUpInside)
-        
         navigationBar.addSubview(titleLabel)
         navigationBar.addSubview(closeButton)
-        navigationBar.addSubview(selectButton)
     }
     
     private func setupScrollView() {
@@ -136,27 +122,6 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
         }
     }
     
-    private func setupBottomActionBar() {
-        bottomActionBar.backgroundColor = .systemBackground
-        
-        // 选中数量标签
-        selectedCountLabel.text = "已选择 0 张"
-        selectedCountLabel.font = .systemFont(ofSize: 14, weight: .medium)
-        selectedCountLabel.textColor = .secondaryLabel
-        
-        // 进入处理中心按钮
-        processingCenterButton.setTitle("进入处理中心", for: .normal)
-        processingCenterButton.setTitleColor(.white, for: .normal)
-        processingCenterButton.backgroundColor = .systemBlue
-        processingCenterButton.layer.cornerRadius = 8
-        processingCenterButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
-        processingCenterButton.addTarget(self, action: #selector(processingCenterButtonTapped), for: .touchUpInside)
-        processingCenterButton.isEnabled = false
-        processingCenterButton.alpha = 0.5
-        
-        bottomActionBar.addSubview(selectedCountLabel)
-        bottomActionBar.addSubview(processingCenterButton)
-    }
     
     private func createImageView(for screenshot: ScreenshotItem) -> UIView {
         let containerView = UIView()
@@ -296,13 +261,9 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     private func setupConstraints() {
         navigationBar.translatesAutoresizingMaskIntoConstraints = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
-        bottomActionBar.translatesAutoresizingMaskIntoConstraints = false
         stackView.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         closeButton.translatesAutoresizingMaskIntoConstraints = false
-        selectButton.translatesAutoresizingMaskIntoConstraints = false
-        selectedCountLabel.translatesAutoresizingMaskIntoConstraints = false
-        processingCenterButton.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
             // 导航栏
@@ -320,37 +281,18 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
             closeButton.widthAnchor.constraint(equalToConstant: 44),
             closeButton.heightAnchor.constraint(equalToConstant: 44),
             
-            selectButton.trailingAnchor.constraint(equalTo: navigationBar.trailingAnchor, constant: -16),
-            selectButton.centerYAnchor.constraint(equalTo: navigationBar.centerYAnchor),
-            selectButton.heightAnchor.constraint(equalToConstant: 44),
-            
             // 滚动视图
             scrollView.topAnchor.constraint(equalTo: navigationBar.bottomAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: bottomActionBar.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
             
             // StackView
             stackView.topAnchor.constraint(equalTo: scrollView.topAnchor),
             stackView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
             stackView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
             stackView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
-            stackView.heightAnchor.constraint(equalTo: scrollView.heightAnchor),
-            
-            // 底部操作栏
-            bottomActionBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            bottomActionBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            bottomActionBar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            bottomActionBar.heightAnchor.constraint(equalToConstant: 60),
-            
-            // 底部操作栏内容
-            selectedCountLabel.leadingAnchor.constraint(equalTo: bottomActionBar.leadingAnchor, constant: 16),
-            selectedCountLabel.centerYAnchor.constraint(equalTo: bottomActionBar.centerYAnchor),
-            
-            processingCenterButton.trailingAnchor.constraint(equalTo: bottomActionBar.trailingAnchor, constant: -16),
-            processingCenterButton.centerYAnchor.constraint(equalTo: bottomActionBar.centerYAnchor),
-            processingCenterButton.heightAnchor.constraint(equalToConstant: 40),
-            processingCenterButton.widthAnchor.constraint(equalToConstant: 120)
+            stackView.heightAnchor.constraint(equalTo: scrollView.heightAnchor)
         ])
     }
     
@@ -366,27 +308,7 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
         dismiss(animated: true)
     }
     
-    @objc private func selectButtonTapped() {
-        guard currentIndex < screenshots.count else { return }
-        
-        let screenshot = screenshots[currentIndex]
-        let isCurrentlySelected = selectedScreenshots.contains(screenshot.id)
-        
-        if isCurrentlySelected {
-            selectedScreenshots.remove(screenshot.id)
-        } else {
-            selectedScreenshots.insert(screenshot.id)
-        }
-        
-        delegate?.screenshotDetailSheet(self, didSelectScreenshot: screenshot, isSelected: !isCurrentlySelected)
-        updateUI()
-    }
     
-    @objc private func processingCenterButtonTapped() {
-        let selected = screenshots.filter { selectedScreenshots.contains($0.id) }
-        delegate?.screenshotDetailSheet(self, didRequestProcessingCenter: selected)
-        dismiss(animated: true)
-    }
     
     @objc private func doubleTapped() {
         // TODO: 实现双击缩放功能
@@ -396,20 +318,6 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     private func updateUI() {
         // 更新标题
         titleLabel.text = "\(currentIndex + 1) / \(screenshots.count)"
-        
-        // 更新选择按钮
-        guard currentIndex < screenshots.count else { return }
-        let screenshot = screenshots[currentIndex]
-        let isSelected = selectedScreenshots.contains(screenshot.id)
-        selectButton.setTitle(isSelected ? "取消选择" : "选择", for: .normal)
-        selectButton.setTitleColor(isSelected ? .systemOrange : .systemBlue, for: .normal)
-        
-        // 更新底部操作栏
-        let selectedCount = selectedScreenshots.count
-        selectedCountLabel.text = "已选择 \(selectedCount) 张"
-        
-        processingCenterButton.isEnabled = selectedCount > 0
-        processingCenterButton.alpha = selectedCount > 0 ? 1.0 : 0.5
     }
     
     private func scrollToCurrentIndex(animated: Bool) {
@@ -632,11 +540,6 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
         }
     }
     
-    // MARK: - Public Methods
-    func setSelectedScreenshots(_ selected: Set<UUID>) {
-        selectedScreenshots = selected
-        updateUI()
-    }
 }
 
 // MARK: - UIScrollViewDelegate

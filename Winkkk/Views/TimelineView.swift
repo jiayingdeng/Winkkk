@@ -321,32 +321,35 @@ class TimelineView: UIView {
     private func updateLivePhotoRangePosition() {
         guard isLivePhotoMode, duration > 0, timeToPixelRatio > 0 else { return }
         
-        // 🎯 使用时间到像素转换比例计算3秒宽度（已包含缩放因子）
-        let threeSecondsWidth = CGFloat(3.0 * timeToPixelRatio)
+        // 🎯 获取当前白色竖线对应的时间
+        let currentTime = getCurrentCaptureTime()
         
-        // 🎯 关键修复：基于屏幕中心计算白色竖线在TimelineView坐标系中的位置
-        // 白色竖线固定在屏幕中心，我们需要将其转换为TimelineView内部坐标
-        let screenCenterX = UIScreen.main.bounds.width / 2
+        // 🎯 计算实际截图的时间范围（与ScreenshotEngine逻辑一致）
+        // Live Photo配置：1.5秒偏移，总共3秒时长
+        let keyPhotoOffset: Double = 1.5
+        let livePhotoDuration: Double = 3.0
         
-        // 🎯 将屏幕中心坐标转换为TimelineView内部坐标（考虑滚动偏移）
-        let timelineViewCenterX = screenCenterX + scrollView.contentOffset.x
+        let actualStartTime = max(0, currentTime - keyPhotoOffset)
+        let actualEndTime = min(duration, actualStartTime + livePhotoDuration)
+        let actualDuration = actualEndTime - actualStartTime
+        
+        // 🎯 将实际截图时间范围转换为屏幕坐标
+        let actualStartX = timeToCoordinate(actualStartTime)
+        let actualEndX = timeToCoordinate(actualEndTime)
+        let actualWidth = actualEndX - actualStartX
         
         // 🎯 边界检查：基于实际视频内容区域
         let actualVideoWidth = getActualVideoWidth()
         let videoContentStartX = leftPadding
         let videoContentEndX = leftPadding + actualVideoWidth
         
-        // 🎯 Live Photo范围始终从白色竖线开始向右延伸3秒
-        let rangeStartX = timelineViewCenterX
-        let rangeEndX = rangeStartX + threeSecondsWidth
-        
         // 🎯 确保范围不超出视频内容边界
-        let clampedStartX = max(videoContentStartX, rangeStartX)
-        let clampedEndX = min(videoContentEndX, rangeEndX)
+        let clampedStartX = max(videoContentStartX, actualStartX)
+        let clampedEndX = min(videoContentEndX, actualEndX)
         let finalWidth = max(0, clampedEndX - clampedStartX)
         
-        // 🎯 如果白色竖线超出视频范围，则隐藏Live Photo范围指示器
-        if rangeStartX < videoContentStartX || rangeStartX > videoContentEndX {
+        // 🎯 如果没有有效的截图范围，则隐藏指示器
+        if finalWidth <= 0 || actualDuration < 0.1 {
             livePhotoRangeView.isHidden = true
             return
         } else {
@@ -360,7 +363,25 @@ class TimelineView: UIView {
             height: timeScaleView.frame.height
         )
         
-        print("🎥 Live Photo范围更新: screenCenterX=\(screenCenterX), timelineViewCenterX=\(timelineViewCenterX), rangeStartX=\(rangeStartX), finalWidth=\(finalWidth)")
+        // 🎯 动态更新标签显示实际时长
+        updateLivePhotoRangeLabel(actualDuration)
+        
+        print("🎥 Live Photo范围修复: currentTime=\(currentTime), actualRange=\(actualStartTime)-\(actualEndTime), actualDuration=\(actualDuration), finalWidth=\(finalWidth)")
+    }
+    
+    /// 🎯 更新Live Photo范围标签显示实际时长
+    private func updateLivePhotoRangeLabel(_ duration: Double) {
+        // 查找标签视图
+        if let label = livePhotoRangeView.subviews.first(where: { $0 is UILabel }) as? UILabel {
+            // 根据时长显示不同格式
+            if duration >= 3.0 {
+                label.text = "3.0s"  // 完整时长
+            } else if duration >= 1.0 {
+                label.text = String(format: "%.1fs", duration)  // 保留一位小数
+            } else {
+                label.text = String(format: "%.2fs", duration)  // 保留两位小数
+            }
+        }
     }
     
     private func setupThumbView() {
