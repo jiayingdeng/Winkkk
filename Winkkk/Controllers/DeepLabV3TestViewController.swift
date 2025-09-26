@@ -400,7 +400,7 @@ class DeepLabV3TestViewController: UIViewController {
                 imageView.topAnchor.constraint(equalTo: containerView.topAnchor),
                 imageView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
                 imageView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-                imageView.heightAnchor.constraint(equalToConstant: 80),
+                imageView.heightAnchor.constraint(equalToConstant: 60), // 减小高度避免冲突
                 
                 label.topAnchor.constraint(equalTo: imageView.bottomAnchor, constant: 4),
                 label.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
@@ -772,7 +772,7 @@ class DeepLabV3TestViewController: UIViewController {
             batchResultsView.topAnchor.constraint(equalTo: framesPreviewView.bottomAnchor, constant: 12),
             batchResultsView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
             batchResultsView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            batchResultsView.heightAnchor.constraint(equalToConstant: 120),
+            batchResultsView.heightAnchor.constraint(equalToConstant: 100), // 调整高度适应60px图片
             
             batchResultsHeaderLabel.topAnchor.constraint(equalTo: batchResultsView.topAnchor, constant: 16),
             batchResultsHeaderLabel.leadingAnchor.constraint(equalTo: batchResultsView.leadingAnchor, constant: 16),
