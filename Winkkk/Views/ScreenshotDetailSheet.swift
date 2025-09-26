@@ -188,12 +188,12 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
             // 🎯 添加标签以便后续查找
             livePhotoView.tag = 9999
             
-            // 异步加载Live Photo
+            // 异步加载Live Photo - 直接使用原始文件，绕过LivePhotoMaker的二次处理
             Task {
                 do {
-                    let livePhoto = try await LivePhotoMaker.shared.createLivePhoto(
-                        videoURL: videoPath,
-                        imageURL: screenshot.displayImagePath
+                    let livePhoto = try await loadLivePhotoDirectly(
+                        imageURL: screenshot.displayImagePath,
+                        videoURL: videoPath
                     )
                     
                     await MainActor.run {
@@ -585,6 +585,51 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
             imageView.topAnchor.constraint(equalTo: containerView.topAnchor),
             imageView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
         ])
+    }
+    
+    // MARK: - Live Photo Direct Loading
+    
+    /// 直接加载Live Photo，绕过LivePhotoMaker的二次处理
+    /// 这个方法直接使用原始的图片和视频文件URL，避免破坏Live Photo元数据
+    private func loadLivePhotoDirectly(imageURL: URL, videoURL: URL) async throws -> PHLivePhoto {
+        print("📸 直接加载Live Photo（绕过LivePhotoMaker）")
+        print("   图片URL: \(imageURL)")
+        print("   视频URL: \(videoURL)")
+        
+        // 验证文件存在性
+        guard FileManager.default.fileExists(atPath: imageURL.path) else {
+            throw NSError(domain: "LivePhotoError", code: -1, userInfo: [NSLocalizedDescriptionKey: "图片文件不存在"])
+        }
+        
+        guard FileManager.default.fileExists(atPath: videoURL.path) else {
+            throw NSError(domain: "LivePhotoError", code: -2, userInfo: [NSLocalizedDescriptionKey: "视频文件不存在"])
+        }
+        
+        // 使用原始文件直接创建Live Photo请求
+        return try await withCheckedThrowingContinuation { continuation in
+            PHLivePhoto.request(withResourceFileURLs: [imageURL, videoURL],
+                              placeholderImage: nil,
+                              targetSize: CGSize.zero,
+                              contentMode: .aspectFit,
+                              resultHandler: { livePhoto, info in
+                // 检查是否是降级（预览）图像，如果是，则忽略并等待最终版本
+                if let isDegraded = info[PHLivePhotoInfoIsDegradedKey] as? Bool, isDegraded {
+                    print("🏞️ 收到降级版Live Photo，忽略...")
+                    return
+                }
+                
+                if let livePhoto = livePhoto {
+                    print("✅ Live Photo直接加载成功（最终版）")
+                    continuation.resume(returning: livePhoto)
+                } else {
+                    // 如果最终获取失败，则抛出错误
+                    let error = info[PHLivePhotoInfoErrorKey] as? Error ??
+                               NSError(domain: "LivePhotoError", code: -3, userInfo: [NSLocalizedDescriptionKey: "Live Photo加载失败"])
+                    print("❌ Live Photo直接加载失败: \(error)")
+                    continuation.resume(throwing: error)
+                }
+            })
+        }
     }
     
     // MARK: - Public Methods

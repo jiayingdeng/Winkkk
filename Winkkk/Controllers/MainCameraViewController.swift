@@ -57,6 +57,7 @@ class MainCameraViewController: UIViewController {
         setupConstraints()
         setupCameraPreview()
         configureTheme()
+        setupNotificationObservers()
         
         // 触感反馈管理器已在单例初始化时准备好
     }
@@ -348,6 +349,51 @@ class MainCameraViewController: UIViewController {
     private func configureTheme() {
         ThemeManager.shared.configureTheme()
     }
+    
+    // MARK: - Notification Setup
+    private func setupNotificationObservers() {
+        // 监听时光序列处理完成通知
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleTimeSequenceProcessingCompleted(_:)),
+            name: NSNotification.Name("TimeSequenceProcessingCompleted"),
+            object: nil
+        )
+    }
+    
+    @objc private func handleTimeSequenceProcessingCompleted(_ notification: Notification) {
+        guard let userInfo = notification.userInfo else { return }
+        
+        // 检查是否需要重置模式
+        let shouldResetMode = userInfo["shouldResetMode"] as? Bool ?? true
+        let returnToTimeSequenceMode = userInfo["returnToTimeSequenceMode"] as? Bool ?? false
+        
+        if returnToTimeSequenceMode && !shouldResetMode {
+            // 用户从时光序列处理页面返回，保持在时光序列模式
+            print("🎬 用户从时光序列处理页面返回，保持时光序列模式状态")
+            
+            // 🆕 使用新的处理完成方法
+            TimeSequenceModeManager.shared.handleProcessingCompleted(shouldKeepMode: true)
+            
+            // 确保界面状态与全局状态同步
+            if TimeSequenceModeManager.shared.isTimeSequenceMode {
+                isTimeSequenceMode = true
+                updateModeSwitcherDisplay()
+            }
+        } else if shouldResetMode {
+            // 处理完成，重置到普通模式
+            print("✅ 时光序列处理完成，重置到普通模式")
+            
+            // 🆕 使用新的处理完成方法
+            TimeSequenceModeManager.shared.handleProcessingCompleted(shouldKeepMode: false)
+            isTimeSequenceMode = false
+            updateModeSwitcherDisplay()
+        }
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
 }
 
 // MARK: - Camera Management
@@ -628,12 +674,10 @@ extension MainCameraViewController {
             navController.modalPresentationStyle = .fullScreen
             present(navController, animated: true)
             
-            // 重置时间序列模式状态
-            TimeSequenceModeManager.shared.reset()
+            // ⚠️ 重要修改：不要立即重置模式状态！
+            // 用户从时光序列处理页面返回时，应该回到时光序列模式的录像状态
+            // 模式重置将在用户主动切换模式或完成处理后进行
             
-            // 重置模式切换按钮
-            isTimeSequenceMode = false
-            updateModeSwitcherDisplay()
         } else {
             // 普通模式：跳转到视频播放器
             let playerVC = VideoPlayerViewController(videoURL: url)
@@ -920,6 +964,10 @@ extension MainCameraViewController {
     private func switchToNormalMode() {
         // 切换到普通录像模式
         isTimeSequenceMode = false
+        
+        // 🔧 修复：同步更新全局状态管理器
+        TimeSequenceModeManager.shared.switchToNormalMode()
+        
         updateModeSwitcherDisplay()
         
         // 更新界面状态

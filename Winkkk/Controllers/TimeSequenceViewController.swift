@@ -469,7 +469,23 @@ class TimeSequenceViewController: UIViewController {
     
     // MARK: - Actions
     @objc private func backButtonTapped() {
-        navigationController?.popViewController(animated: true)
+        // 添加触觉反馈
+        HapticFeedbackManager.shared.buttonTap()
+        
+        // 🎯 重要修改：返回到时光序列模式的录像状态
+        // 用户从录像页面跳转而来，返回时应该保持在时光序列模式
+        dismiss(animated: true) {
+            // 发送通知告知主界面用户已完成时光序列处理
+            // 但不重置模式状态，让用户继续在时光序列模式下录像
+            NotificationCenter.default.post(
+                name: NSNotification.Name("TimeSequenceProcessingCompleted"),
+                object: nil,
+                userInfo: [
+                    "shouldResetMode": false, // 关键：不重置模式
+                    "returnToTimeSequenceMode": true // 返回到时光序列模式状态
+                ]
+            )
+        }
     }
     
     @objc private func selectVideoButtonTapped() {

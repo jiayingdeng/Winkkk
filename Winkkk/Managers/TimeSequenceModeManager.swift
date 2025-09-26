@@ -71,6 +71,18 @@ class TimeSequenceModeManager {
         switchToNormalMode()
     }
     
+    /// 用户完成时光序列处理后的状态处理
+    /// - Parameter shouldKeepMode: 是否保持时光序列模式
+    func handleProcessingCompleted(shouldKeepMode: Bool = true) {
+        if shouldKeepMode {
+            print("✅ 时光序列处理完成，保持模式状态")
+            // 保持当前状态，不做任何改变
+        } else {
+            print("🔄 时光序列处理完成，重置为普通模式")
+            reset()
+        }
+    }
+    
     // MARK: - 状态查询
     
     /// 是否为时间序列模式
@@ -142,8 +154,9 @@ class TimeSequenceModeManager {
             navController.modalPresentationStyle = .fullScreen
             viewController.present(navController, animated: true)
             
-            // 重置时间序列模式状态
-            reset()
+            // 🚨 修复：不在这里立即重置状态！
+            // 让用户在处理完成后自然返回到时光序列模式
+            print("✅ 保持时光序列模式状态，等待用户处理完成")
         } else {
             // 普通模式：跳转到视频播放器
             print("📹 普通模式：跳转到视频播放器")

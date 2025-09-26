@@ -930,7 +930,7 @@ class VideoPlayerViewController: UIViewController {
     
     // MARK: - Photos Permission & Save
     private func requestPhotosPermissionAndSave(screenshots: [ScreenshotItem]) {
-        PHPhotoLibrary.requestAuthorization { [weak self] status in
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { [weak self] status in
             DispatchQueue.main.async {
                 switch status {
                 case .authorized, .limited:
@@ -940,8 +940,8 @@ class VideoPlayerViewController: UIViewController {
                     self?.showPhotosPermissionDeniedAlert()
                     
                 case .notDetermined:
-                    // 用户取消了权限请求，直接返回
-                    self?.dismiss(animated: true)
+                    // 用户未做选择，可以视为取消
+                    print("用户未决定相册权限")
                     
                 @unknown default:
                     self?.showPhotosPermissionDeniedAlert()
@@ -951,26 +951,75 @@ class VideoPlayerViewController: UIViewController {
     }
     
     private func saveScreenshotsToPhotoLibrary(screenshots: [ScreenshotItem]) {
+        let mode = screenshotManager.currentMode
+        
+        switch mode {
+        case .stillImage:
+            saveStillImages(screenshots)
+        case .livePhoto:
+            saveLivePhotos(screenshots)
+        }
+    }
+
+    private func saveStillImages(_ screenshots: [ScreenshotItem]) {
         var savedCount = 0
         let totalCount = screenshots.count
-        
+        var lastError: Error?
+
         for screenshot in screenshots {
-            // 从文件路径加载图片
             guard let imageData = try? Data(contentsOf: screenshot.originalImagePath),
                   let image = UIImage(data: imageData) else {
                 continue
             }
             
-            // 保存到系统相册
             UIImageWriteToSavedPhotosAlbum(image, self, #selector(image(_:didFinishSavingWithError:contextInfo:)), nil)
             savedCount += 1
         }
         
-        // 显示保存进度或结果
         if savedCount > 0 {
             showSaveProgressAndNavigate(savedCount: savedCount, totalCount: totalCount)
         } else {
             showSaveFailureAlert()
+        }
+    }
+
+    private func saveLivePhotos(_ screenshots: [ScreenshotItem]) {
+        let dispatchGroup = DispatchGroup()
+        var successCount = 0
+        var errorCount = 0
+        
+        for screenshot in screenshots {
+            guard let videoURL = screenshot.livePhotoVideoPath else {
+                errorCount += 1
+                continue
+            }
+            let imageURL = screenshot.originalImagePath
+            
+            dispatchGroup.enter()
+            PHPhotoLibrary.shared().performChanges({
+                let request = PHAssetCreationRequest.forAsset()
+                request.addResource(with: .photo, fileURL: imageURL, options: nil)
+                request.addResource(with: .pairedVideo, fileURL: videoURL, options: nil)
+            }) { success, error in
+                if success {
+                    successCount += 1
+                    print("✅ Live Photo 保存成功: \(imageURL.lastPathComponent)")
+                } else if let error = error {
+                    errorCount += 1
+                    print("❌ Live Photo 保存失败: \(error.localizedDescription)")
+                }
+                dispatchGroup.leave()
+            }
+        }
+        
+        dispatchGroup.notify(queue: .main) { [weak self] in
+            guard let self = self else { return }
+            
+            if successCount > 0 {
+                self.showSaveProgressAndNavigate(savedCount: successCount, totalCount: screenshots.count)
+            } else {
+                self.showSaveFailureAlert()
+            }
         }
     }
     
