@@ -80,6 +80,10 @@ class TimeSequenceViewController: UIViewController {
     private let saveButton = UIButton()
     private let shareButton = UIButton()
     
+    // 底部操作区域
+    private let bottomActionView = UIView()
+    private let returnToRecordingButton = UIButton()
+    
     // MARK: - State
     private var isProcessing = false {
         didSet {
@@ -162,6 +166,7 @@ class TimeSequenceViewController: UIViewController {
         setupPreviewArea()
         setupControlPanel()
         setupResultArea()
+        setupBottomActionArea()
         
         // 添加到内容视图
         contentView.addSubview(headerView)
@@ -169,6 +174,7 @@ class TimeSequenceViewController: UIViewController {
         contentView.addSubview(previewContainerView)
         contentView.addSubview(controlPanelView)
         contentView.addSubview(resultContainerView)
+        contentView.addSubview(bottomActionView)
     }
     
     private func setupHeaderView() {
@@ -306,6 +312,22 @@ class TimeSequenceViewController: UIViewController {
         resultContainerView.addSubview(shareButton)
     }
     
+    private func setupBottomActionArea() {
+        bottomActionView.backgroundColor = ThemeManager.cardBackground
+        bottomActionView.layer.cornerRadius = ThemeManager.largeCornerRadius
+        bottomActionView.isHidden = true  // 默认隐藏，处理完成后显示
+        
+        // 返回录像按钮
+        returnToRecordingButton.setTitle("🎥 返回时光序列录像", for: .normal)
+        returnToRecordingButton.setTitleColor(.white, for: .normal)
+        returnToRecordingButton.backgroundColor = UIColor.systemBlue
+        returnToRecordingButton.layer.cornerRadius = ThemeManager.standardCornerRadius
+        returnToRecordingButton.titleLabel?.font = ThemeManager.buttonFont
+        returnToRecordingButton.addTarget(self, action: #selector(returnToRecordingButtonTapped), for: .touchUpInside)
+        
+        bottomActionView.addSubview(returnToRecordingButton)
+    }
+    
     private func setupConstraints() {
         // 设置所有视图的translatesAutoresizingMaskIntoConstraints
         gradientBackgroundView.translatesAutoresizingMaskIntoConstraints = false
@@ -335,6 +357,9 @@ class TimeSequenceViewController: UIViewController {
         resultImageView.translatesAutoresizingMaskIntoConstraints = false
         saveButton.translatesAutoresizingMaskIntoConstraints = false
         shareButton.translatesAutoresizingMaskIntoConstraints = false
+        
+        bottomActionView.translatesAutoresizingMaskIntoConstraints = false
+        returnToRecordingButton.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
             // 渐变背景
@@ -435,7 +460,6 @@ class TimeSequenceViewController: UIViewController {
             resultContainerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             resultContainerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             resultContainerView.heightAnchor.constraint(equalToConstant: 320),
-            resultContainerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
             
             resultImageView.topAnchor.constraint(equalTo: resultContainerView.topAnchor, constant: 16),
             resultImageView.leadingAnchor.constraint(equalTo: resultContainerView.leadingAnchor, constant: 16),
@@ -450,7 +474,19 @@ class TimeSequenceViewController: UIViewController {
             shareButton.topAnchor.constraint(equalTo: resultImageView.bottomAnchor, constant: 16),
             shareButton.trailingAnchor.constraint(equalTo: resultContainerView.trailingAnchor, constant: -16),
             shareButton.widthAnchor.constraint(equalTo: resultContainerView.widthAnchor, multiplier: 0.45),
-            shareButton.heightAnchor.constraint(equalToConstant: 44)
+            shareButton.heightAnchor.constraint(equalToConstant: 44),
+            
+            // 底部操作区域
+            bottomActionView.topAnchor.constraint(equalTo: resultContainerView.bottomAnchor, constant: 20),
+            bottomActionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            bottomActionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            bottomActionView.heightAnchor.constraint(equalToConstant: 80),
+            bottomActionView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
+            
+            returnToRecordingButton.centerXAnchor.constraint(equalTo: bottomActionView.centerXAnchor),
+            returnToRecordingButton.centerYAnchor.constraint(equalTo: bottomActionView.centerYAnchor),
+            returnToRecordingButton.widthAnchor.constraint(equalToConstant: 240),
+            returnToRecordingButton.heightAnchor.constraint(equalToConstant: 44)
         ])
     }
     
@@ -612,6 +648,25 @@ class TimeSequenceViewController: UIViewController {
         }
         
         present(activityViewController, animated: true)
+    }
+    
+    @objc private func returnToRecordingButtonTapped() {
+        print("🎥 返回时光序列录像")
+        HapticFeedbackManager.shared.buttonTap()
+        
+        // 直接返回到时光序列录像界面
+        dismiss(animated: true) {
+            // 发送通知告知主界面用户想要继续录像
+            NotificationCenter.default.post(
+                name: NSNotification.Name("TimeSequenceProcessingCompleted"),
+                object: nil,
+                userInfo: [
+                    "shouldResetMode": false, // 关键：不重置模式
+                    "returnToTimeSequenceMode": true, // 返回到时光序列模式状态
+                    "shouldStartRecording": true // 新增：提示应该准备开始录像
+                ]
+            )
+        }
     }
     
     // MARK: - Helper Methods
@@ -1195,6 +1250,9 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
             
             // 🆕 处理完成后恢复正常标题状态
             self.updateTitleForManualMode()
+            
+            // 🆕 显示底部操作区域
+            self.bottomActionView.isHidden = false
             
             // 🆕 自动滚动到结果区域
             self.scrollToResultArea()

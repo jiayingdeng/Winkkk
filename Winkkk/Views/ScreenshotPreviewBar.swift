@@ -95,7 +95,7 @@ class ScreenshotPreviewBar: UIView {
         headerView.addSubview(hintLabel)
         
         // 清空按钮
-        clearButton.setTitle("🗑 清空", for: .normal)
+        clearButton.setTitle("🗑", for: .normal)
         clearButton.setTitleColor(UIColor.systemRed, for: .normal)
         clearButton.titleLabel?.font = ThemeManager.captionFont
         clearButton.backgroundColor = UIColor.systemRed.withAlphaComponent(0.1)
@@ -114,7 +114,7 @@ class ScreenshotPreviewBar: UIView {
             
             clearButton.trailingAnchor.constraint(equalTo: headerView.trailingAnchor),
             clearButton.centerYAnchor.constraint(equalTo: headerView.centerYAnchor),
-            clearButton.widthAnchor.constraint(equalToConstant: 60),
+            clearButton.widthAnchor.constraint(equalToConstant: 30),
             clearButton.heightAnchor.constraint(equalToConstant: 28)
         ])
     }

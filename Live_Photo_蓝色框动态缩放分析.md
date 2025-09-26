@@ -146,3 +146,6 @@ private func timeToCoordinate(_ time: Double) -> CGFloat {
 **分析时间**: 2024年12月
 **相关文件**: `Winkkk/Views/TimelineView.swift`
 
+
+
+

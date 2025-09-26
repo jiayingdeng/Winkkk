@@ -63,7 +63,7 @@ class SceneSelectionViewController: UIViewController {
     
     private let modeInfoContentLabel: UILabel = {
         let label = UILabel()
-        label.text = "• 记录变化过程，创建艺术效果图\n• 需要固定拍摄位置\n• 适合：面包发酵、植物生长、化妆过程、手工制作"
+        label.text = "• 记录运动轨迹过程，创建动态艺术效果图\n• 需要固定拍摄位置\n• 适合：人物动作、宠物活动、运动轨迹、舞蹈表演"
         label.font = UIFont.systemFont(ofSize: 14)
         label.textColor = .label
         label.textAlignment = .left

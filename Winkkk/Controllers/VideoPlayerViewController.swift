@@ -95,6 +95,9 @@ class VideoPlayerViewController: UIViewController {
     private let screenshotEngine = ScreenshotEngine()
     private let screenshotManager = ScreenshotManager.shared
     
+    // 截图预览栏高度约束
+    private var screenshotPreviewBarHeightConstraint: NSLayoutConstraint?
+    
     // 🆕 Combine订阅
     private var cancellables = Set<AnyCancellable>()
     
@@ -152,6 +155,9 @@ class VideoPlayerViewController: UIViewController {
         setupCaptureModeSwitcher()
         setupScreenshotPreviewBar()
         
+        // 🔧 确保截图按钮始终在最顶层，不被后续添加的组件遮挡
+        controlPanelBlurView.contentView.bringSubviewToFront(screenshotButton)
+        
         // 🆕 批量操作功能已集成到ScreenshotPreviewBar中
         
         // 导航栏
@@ -170,12 +176,23 @@ class VideoPlayerViewController: UIViewController {
             action: #selector(cancelButtonTapped)
         )
         
-        navigationItem.rightBarButtonItem = UIBarButtonItem(
-            title: "完成",
-            style: .done,
-            target: self,
-            action: #selector(doneButtonTapped)
-        )
+        // 🎯 创建自定义保存按钮
+        let saveButton = UIButton(type: .system)
+        saveButton.setTitle("保存", for: .normal)
+        saveButton.titleLabel?.font = UIFont.systemFont(ofSize: 17, weight: .semibold)
+        saveButton.setTitleColor(.white, for: .normal)
+        saveButton.backgroundColor = ThemeManager.buttonPrimary
+        saveButton.layer.cornerRadius = 8
+        saveButton.contentEdgeInsets = UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 16)
+        saveButton.addTarget(self, action: #selector(doneButtonTapped), for: .touchUpInside)
+        
+        // 添加轻微的阴影效果
+        saveButton.layer.shadowColor = UIColor.black.cgColor
+        saveButton.layer.shadowOffset = CGSize(width: 0, height: 2)
+        saveButton.layer.shadowOpacity = 0.2
+        saveButton.layer.shadowRadius = 4
+        
+        navigationItem.rightBarButtonItem = UIBarButtonItem(customView: saveButton)
     }
     
     private func setupControlPanel() {
@@ -206,6 +223,9 @@ class VideoPlayerViewController: UIViewController {
         controlPanelBlurView.contentView.addSubview(totalTimeLabel)
         controlPanelBlurView.contentView.addSubview(playPauseButton)
         controlPanelBlurView.contentView.addSubview(screenshotButton)
+        
+        // 🔧 确保截图按钮在最顶层，不被其他视图遮挡
+        controlPanelBlurView.contentView.bringSubviewToFront(screenshotButton)
     }
     
     private func setupPlayPauseButton() {
@@ -221,20 +241,28 @@ class VideoPlayerViewController: UIViewController {
     
     private func setupScreenshotButton() {
         screenshotButton.setImage(UIImage(systemName: "camera.fill"), for: .normal)
-        screenshotButton.setTitle("截图", for: .normal)
+        screenshotButton.setTitle("截取当前画面", for: .normal)
         screenshotButton.tintColor = .white
-        screenshotButton.backgroundColor = ThemeManager.success.withAlphaComponent(0.8)
-        screenshotButton.layer.cornerRadius = ThemeManager.smallCornerRadius
-        screenshotButton.titleLabel?.font = ThemeManager.buttonFont
+        screenshotButton.backgroundColor = ThemeManager.success  // 🌟 移除透明度，更加鲜艳
+        screenshotButton.layer.cornerRadius = ThemeManager.largeCornerRadius  // 🌟 更大圆角
+        screenshotButton.titleLabel?.font = ThemeManager.buttonFont  // 🌟 更突出的字体
+        
+        // 🌟 增强视觉效果 - 高亮按钮
+        screenshotButton.layer.shadowColor = ThemeManager.success.cgColor
+        screenshotButton.layer.shadowOffset = CGSize(width: 0, height: 4)
+        screenshotButton.layer.shadowOpacity = 0.3
+        screenshotButton.layer.shadowRadius = 8
+        screenshotButton.layer.borderWidth = 2
+        screenshotButton.layer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
         
         // 🔧 确保按钮可交互
         screenshotButton.isUserInteractionEnabled = true
         screenshotButton.isHidden = false
         screenshotButton.alpha = 1.0
         
-        // 设置图文布局
-        screenshotButton.imageEdgeInsets = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 8)
-        screenshotButton.titleEdgeInsets = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: 0)
+        // 设置图文布局 - 调整间距以适应更长文字
+        screenshotButton.imageEdgeInsets = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 12)
+        screenshotButton.titleEdgeInsets = UIEdgeInsets(top: 0, left: 12, bottom: 0, right: 0)
         
         screenshotButton.addTarget(self, action: #selector(screenshotButtonTapped), for: .touchUpInside)
         screenshotButton.addTarget(self, action: #selector(buttonPressed(_:)), for: .touchDown)
@@ -319,11 +347,11 @@ class VideoPlayerViewController: UIViewController {
             playPauseButton.widthAnchor.constraint(equalToConstant: 50),
             playPauseButton.heightAnchor.constraint(equalToConstant: 50),
             
-            // 截图按钮 - 位于屏幕右侧，与时间轴同一水平线
-            screenshotButton.centerYAnchor.constraint(equalTo: timelineView.centerYAnchor),
-            screenshotButton.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -20),
-            screenshotButton.widthAnchor.constraint(equalToConstant: 80),
-            screenshotButton.heightAnchor.constraint(equalToConstant: 40)
+            // 🌟 截图按钮 - 移动到时间标签正下方，建立清晰的垂直布局链
+            screenshotButton.topAnchor.constraint(equalTo: currentTimeLabel.bottomAnchor, constant: 12),
+            screenshotButton.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
+            screenshotButton.widthAnchor.constraint(equalToConstant: 180),  // 🌟 增加宽度以完整显示"截取当前画面"
+            screenshotButton.heightAnchor.constraint(equalToConstant: 48)   // 🌟 增加高度，更显眼
         ])
         
         // 🎯 初始化动态约束 - 三分屏布局不需要动态高度约束，使用比例约束
@@ -348,8 +376,8 @@ class VideoPlayerViewController: UIViewController {
         screenshotPreviewBar.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            // 🎯 控制面板内：截图预览栏 - 紧贴时间标签下方
-            screenshotPreviewBar.topAnchor.constraint(equalTo: currentTimeLabel.bottomAnchor, constant: 12),
+            // 🎯 控制面板内：截图预览栏 - 紧贴截图按钮下方，建立清晰的垂直布局链
+            screenshotPreviewBar.topAnchor.constraint(equalTo: screenshotButton.bottomAnchor, constant: 12),
             screenshotPreviewBar.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 16),
             screenshotPreviewBar.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -16),
             screenshotPreviewBar.bottomAnchor.constraint(equalTo: controlPanelBlurView.bottomAnchor, constant: -16),
@@ -361,10 +389,9 @@ class VideoPlayerViewController: UIViewController {
             captureModeSwitcher.widthAnchor.constraint(equalToConstant: 280)
         ])
         
-        // 🆕 截图预览栏最小高度约束保证可用性
-        let minHeightConstraint = screenshotPreviewBar.heightAnchor.constraint(greaterThanOrEqualToConstant: 150)
-        minHeightConstraint.priority = UILayoutPriority(999)  // 高优先级但非必需，允许在空间不足时适当压缩
-        minHeightConstraint.isActive = true
+        // 🆕 截图预览栏动态高度约束 - 初始高度为0，有截图时再展开
+        screenshotPreviewBarHeightConstraint = screenshotPreviewBar.heightAnchor.constraint(equalToConstant: 0)
+        screenshotPreviewBarHeightConstraint?.isActive = true
     }
     
     // MARK: - Player Setup
@@ -488,10 +515,19 @@ class VideoPlayerViewController: UIViewController {
         screenshotPreviewBar.alpha = 1.0
         screenshotPreviewBar.transform = .identity
         
+        // 🆕 根据截图是否存在来更新预览栏的高度
+        let targetHeight: CGFloat = screenshots.isEmpty ? 0 : 150
+        screenshotPreviewBarHeightConstraint?.constant = targetHeight
+        
+        // 使用动画使高度变化更平滑
+        UIView.animate(withDuration: 0.25) {
+            self.view.layoutIfNeeded()
+        }
+        
         if !screenshots.isEmpty {
-            print("📸 截图已添加到预览栏 (固定三分屏底部区域)")
+            print("📸 截图已添加到预览栏 (固定三分屏底部区域) - 高度: \(targetHeight)")
         } else {
-            print("📸 预览栏已清空，但底部区域保持显示 (固定三分屏)")
+            print("📸 预览栏已清空，高度收缩为0 (固定三分屏) - 高度: \(targetHeight)")
         }
     }
     
@@ -630,9 +666,9 @@ class VideoPlayerViewController: UIViewController {
     private func updateCaptureTimeLabel(_ captureTime: CMTime) {
         // 显示截取时间，区别于播放时间
         let captureTimeString = captureTime.formattedString
-        // 可以考虑添加视觉提示，比如颜色区分
-        totalTimeLabel.text = "截取: \(captureTimeString)"
-        totalTimeLabel.textColor = ThemeManager.success // 绿色表示截取时间
+        // 更新：不再显示为绿色，也不再添加“截取:”前缀
+        totalTimeLabel.text = captureTimeString
+        totalTimeLabel.textColor = .white.withAlphaComponent(0.7)
     }
     
     // 🎯 实时视频预览更新（防抖优化）
@@ -678,6 +714,10 @@ class VideoPlayerViewController: UIViewController {
     // MARK: - Screenshot
     @objc private func screenshotButtonTapped() {
         print("📸 截图按钮被点击！")
+        
+        // 🔧 添加调试信息确认按钮响应
+        HapticFeedbackManager.shared.mediumImpact()
+        print("🔧 DEBUG: 截图按钮响应正常，开始截图流程...")
         
         // 🎯 编辑器模式：停止流动以便精确截图
         stopFlowing()
@@ -920,13 +960,39 @@ class VideoPlayerViewController: UIViewController {
         let screenshots = screenshotManager.screenshots
         
         if screenshots.isEmpty {
-            // 无截图，直接返回
-            dismiss(animated: true)
+            // 🎯 无截图时，友好提示用户
+            showNoScreenshotsAlert()
             return
         }
         
         // 有截图，请求相册权限并保存
         requestPhotosPermissionAndSave(screenshots: screenshots)
+    }
+    
+    // 🎯 显示无截图提示
+    private func showNoScreenshotsAlert() {
+        let alert = UIAlertController(
+            title: "还没有截图哦 📸",
+            message: "您还没有截取任何精彩瞬间，要先截几张图片再保存吗？",
+            preferredStyle: .alert
+        )
+        
+        // 继续观看按钮（主要操作）
+        alert.addAction(UIAlertAction(
+            title: "继续观看",
+            style: .default,
+            handler: nil
+        ))
+        
+        // 直接退出按钮（次要操作）
+        alert.addAction(UIAlertAction(
+            title: "直接退出",
+            style: .cancel
+        ) { [weak self] _ in
+            self?.dismiss(animated: true)
+        })
+        
+        present(alert, animated: true)
     }
     
     // MARK: - Photos Permission & Save
@@ -1334,20 +1400,15 @@ extension VideoPlayerViewController: CaptureModeSwitcherDelegate {
 extension VideoPlayerViewController: ScreenshotPreviewBarDelegate {
     
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didTapScreenshot screenshot: ScreenshotItem, at index: Int) {
-        // 移除多选模式逐阐，直接进入详情页面
-        // 使用原有的详情页面展示逻辑
-            HapticFeedbackManager.shared.lightImpact()
-        } else {
-            // 🎯 固定三分屏设计：单击截图时不弹出界面，保持界面连续性
-            // 根据Wink风格设计，在固定布局内操作，不破坏用户体验
-            print("📸 单击截图 - 固定三分屏模式，无需弹出界面")
-            
-            // 触感反馈
-            HapticFeedbackManager.shared.lightImpact()
-            
-            // 🎯 提示用户可以长按进入多选模式
-            showOperationHint()
-        }
+        // 🎯 固定三分屏设计：单击截图时不弹出界面，保持界面连续性
+        // 根据Wink风格设计，在固定布局内操作，不破坏用户体验
+        print("📸 单击截图 - 固定三分屏模式，无需弹出界面")
+        
+        // 触感反馈
+        HapticFeedbackManager.shared.lightImpact()
+        
+        // 🎯 提示用户可以长按进入多选模式
+        showOperationHint()
     }
     
     func screenshotPreviewBar(_ previewBar: ScreenshotPreviewBar, didDeleteScreenshot screenshot: ScreenshotItem, at index: Int) {

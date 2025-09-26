@@ -238,6 +238,12 @@ class ScreenshotProcessingViewController: UIViewController {
         case .stillImage:
             processingOptions = [
                 ProcessingOption(
+                    title: "✨ 开始新的创作",
+                    description: "返回录制页面重新截图",
+                    icon: "plus.circle.fill",
+                    action: { [weak self] in self?.startNewCreation() }
+                ),
+                ProcessingOption(
                     title: "✨ 批量画质修复",
                     description: "AI智能修复图片质量",
                     icon: "wand.and.stars",
@@ -260,17 +266,24 @@ class ScreenshotProcessingViewController: UIViewController {
         case .livePhoto:
             processingOptions = [
                 ProcessingOption(
+                    title: "✨ 开始新的创作",
+                    description: "返回录制页面重新制作Live Photo",
+                    icon: "plus.circle.fill",
+                    action: { [weak self] in self?.startNewCreation() }
+                ),
+                ProcessingOption(
                     title: "▶️ 播放Live Photo",
                     description: "预览Live Photo动画效果",
                     icon: "play.circle",
                     action: { [weak self] in self?.playLivePhotos() }
                 ),
-                ProcessingOption(
-                    title: "🖼️ 设置封面",
-                    description: "选择Live Photo的封面帧",
-                    icon: "photo",
-                    action: { [weak self] in self?.setCoverFrame() }
-                ),
+                // TODO: 临时隐藏设置封面功能 - 等功能完成后恢复
+                // ProcessingOption(
+                //     title: "🖼️ 设置封面",
+                //     description: "选择Live Photo的封面帧",
+                //     icon: "photo",
+                //     action: { [weak self] in self?.setCoverFrame() }
+                // ),
                 ProcessingOption(
                     title: "📤 分享Live Photo",
                     description: "分享Live Photo到其他应用",
@@ -553,6 +566,111 @@ extension ScreenshotProcessingViewController {
         }
         
         present(activityVC, animated: true)
+    }
+    
+    /// 开始新的创作 - 返回录制页面
+    private func startNewCreation() {
+        print("✨ 开始新的创作")
+        
+        // 检查是否有内容需要放弃
+        guard !screenshots.isEmpty else {
+            // 没有内容，直接返回
+            navigateBackToVideoPlayer()
+            return
+        }
+        
+        // 有内容，显示确认对话框
+        let modeText = mode == .livePhoto ? "Live Photo" : "截图"
+        let alert = UIAlertController(
+            title: "开始新的创作",
+            message: "当前有 \(screenshots.count) 张未保存的\(modeText)，确定要放弃并开始新的创作吗？",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "确定开始", style: .destructive) { [weak self] _ in
+            self?.clearCurrentContentAndNavigateBack()
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        present(alert, animated: true)
+    }
+    
+    /// 清空当前内容并返回录制页面
+    private func clearCurrentContentAndNavigateBack() {
+        // 触觉反馈
+        HapticFeedbackManager.shared.lightImpact()
+        
+        // 清空当前截图数据
+        // 注意：这里不能直接调用screenshotManager.clearAllScreenshots()
+        // 因为ScreenshotProcessingViewController是独立的界面，有自己的screenshots数组
+        // 需要在导航回去时清空VideoPlayerViewController中的数据
+        
+        navigateBackToVideoPlayer()
+    }
+    
+    /// 导航回到录制页面
+    private func navigateBackToVideoPlayer() {
+        // 方法1：如果是从VideoPlayerViewController模态呈现的，直接dismiss
+        if let navigationController = self.navigationController,
+           let presentingVC = navigationController.presentingViewController {
+            
+            // 检查presenting view controller是否是VideoPlayerViewController
+            if let videoPlayerVC = presentingVC as? VideoPlayerViewController {
+                // 清空VideoPlayerViewController中的截图数据
+                clearVideoPlayerScreenshots(videoPlayerVC)
+                
+                dismiss(animated: true) {
+                    print("✨ 已返回到录制页面，准备开始新的创作")
+                }
+                return
+            }
+            
+            // 检查是否是嵌套在NavigationController中的VideoPlayerViewController
+            if let navController = presentingVC as? UINavigationController,
+               let videoPlayerVC = navController.topViewController as? VideoPlayerViewController {
+                clearVideoPlayerScreenshots(videoPlayerVC)
+                
+                dismiss(animated: true) {
+                    print("✨ 已返回到录制页面，准备开始新的创作")
+                }
+                return
+            }
+        }
+        
+        // 方法2：如果navigation stack中有VideoPlayerViewController，pop回去
+        if let navigationController = self.navigationController {
+            for viewController in navigationController.viewControllers {
+                if let videoPlayerVC = viewController as? VideoPlayerViewController {
+                    clearVideoPlayerScreenshots(videoPlayerVC)
+                    navigationController.popToViewController(videoPlayerVC, animated: true)
+                    return
+                }
+            }
+        }
+        
+        // 方法3：兜底策略 - 直接dismiss并重置模式
+        // 清空截图数据和重置模式
+        ScreenshotManager.shared.clearAllScreenshots()
+        TimeSequenceModeManager.shared.switchToNormalMode()
+        
+        dismiss(animated: true) {
+            print("✨ 已返回，重置为普通录像模式，准备开始新的创作")
+        }
+    }
+    
+    /// 清空VideoPlayerViewController中的截图数据并重置到普通录像模式
+    private func clearVideoPlayerScreenshots(_ videoPlayerVC: VideoPlayerViewController) {
+        // 通过ScreenshotManager清空数据
+        // 注意：这里假设VideoPlayerViewController使用的是同一个ScreenshotManager实例
+        let screenshotManager = ScreenshotManager.shared
+        screenshotManager.clearAllScreenshots()
+        
+        // 🎯 关键修复：确保返回到普通录像模式
+        // 当用户点击"开始新的创作"时，应该回到普通录像模式，而不是保持时间序列模式
+        TimeSequenceModeManager.shared.switchToNormalMode()
+        
+        print("✨ 已清空录制页面的截图数据，重置为普通录像模式，准备新的创作")
     }
     
     /// 显示提示对话框

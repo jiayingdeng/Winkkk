@@ -644,10 +644,10 @@ extension MainCameraViewController {
         let alert = UIAlertController(title: "录制完成", message: "选择下一步操作", preferredStyle: .actionSheet)
         
         alert.addAction(UIAlertAction(title: "直接编辑", style: .default) { [weak self] _ in
-            self?.editVideo(url: url)
+            self?.editVideoAndSaveToGallery(url: url)
         })
         
-        alert.addAction(UIAlertAction(title: "保存到相册", style: .default) { [weak self] _ in
+        alert.addAction(UIAlertAction(title: "保存到app相册", style: .default) { [weak self] _ in
             self?.saveVideoToAppGallery(url: url)
         })
         
@@ -662,6 +662,53 @@ extension MainCameraViewController {
         }
         
         present(alert, animated: true)
+    }
+    
+    private func editVideoAndSaveToGallery(url: URL) {
+        print("📹 开始保存视频到app相册并准备编辑")
+        
+        // 显示保存进度指示器
+        let loadingAlert = UIAlertController(title: "保存中", message: "正在保存视频到app相册...", preferredStyle: .alert)
+        present(loadingAlert, animated: true)
+        
+        // 先保存视频到app内部相册
+        VideoManager.shared.saveVideo(from: url) { [weak self] result in
+            DispatchQueue.main.async {
+                // 关闭进度指示器
+                loadingAlert.dismiss(animated: true) {
+                    switch result {
+                    case .success(let videoItem):
+                        print("✅ 视频已保存到app相册，开始编辑")
+                        print("📁 新的视频路径: \(videoItem.filePath)")
+                        
+                        // ⚠️ 关键修复：使用保存后的新路径，而不是原始临时路径
+                        // 原始临时文件已经被moveItem移动走了，所以要使用新路径
+                        self?.editVideo(url: videoItem.filePath)
+                        
+                        // 成功触觉反馈
+                        self?.hapticManager.notificationSuccess()
+                        
+                    case .failure(let error):
+                        print("❌ 保存视频到app相册失败: \(error)")
+                        
+                        // 保存失败，询问用户是否仍要编辑（使用原始路径，因为文件还在原位置）
+                        let errorAlert = UIAlertController(
+                            title: "保存失败",
+                            message: "视频保存到app相册失败，是否仍要进入编辑？\n错误：\(error.localizedDescription)",
+                            preferredStyle: .alert
+                        )
+                        errorAlert.addAction(UIAlertAction(title: "仍要编辑", style: .default) { _ in
+                            self?.editVideo(url: url)
+                        })
+                        errorAlert.addAction(UIAlertAction(title: "取消", style: .cancel))
+                        self?.present(errorAlert, animated: true)
+                        
+                        // 错误触觉反馈
+                        self?.hapticManager.notificationError()
+                    }
+                }
+            }
+        }
     }
     
     private func editVideo(url: URL) {
@@ -986,13 +1033,13 @@ extension MainCameraViewController {
             title: "⏰ 时间序列录像模式",
             message: """
             💡 这个模式专门用于：
-            • 记录变化过程
-            • 创建艺术效果图
+            • 记录运动轨迹过程
+            • 创建动态艺术效果图
             • 需要固定拍摄位置
             
             🎯 适合场景：
-            • 面包发酵 • 植物生长
-            • 化妆过程 • 手工制作
+            • 人物动作 • 宠物活动
+            • 运动轨迹 • 舞蹈表演
             """,
             preferredStyle: .alert
         )

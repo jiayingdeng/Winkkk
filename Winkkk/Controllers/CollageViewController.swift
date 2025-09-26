@@ -15,7 +15,6 @@ class CollageViewController: UIViewController {
     private var imageItems: [CollageImageItem]
     private var collageImage: UIImage?
     private var selectedImageIndex: Int? // 当前选中的图片索引
-    private var selectedLayout: CollageLayout = .grid
     private var selectedAspectRatio: AspectRatio = .square1_1
     private var selectedLayoutTemplate: CollageLayoutTemplate = GridLayoutTemplate()
     private let availableTemplates: [CollageLayoutTemplate] = [
@@ -43,8 +42,6 @@ class CollageViewController: UIViewController {
     // 布局选择区域
     private let layoutSectionView = UIView()
     private let layoutTitleLabel = UILabel()
-    private let layoutSegmentedControl = UISegmentedControl(items: ["🗺️ 网格", "↔️ 横向", "↕️ 竖向"])
-    private let templateTitleLabel = UILabel()
     private let templateCollectionView: UICollectionView
     private let templateFlowLayout = UICollectionViewFlowLayout()
     
@@ -212,23 +209,9 @@ class CollageViewController: UIViewController {
         // 标题
         layoutTitleLabel.font = ThemeManager.buttonFont
         layoutTitleLabel.textColor = .white
-        layoutTitleLabel.text = "选择布局"
+        layoutTitleLabel.text = "选择布局模板"
         layoutSectionView.addSubview(layoutTitleLabel)
         
-        // 分段控制器
-        layoutSegmentedControl.selectedSegmentIndex = 0
-        layoutSegmentedControl.backgroundColor = UIColor.white.withAlphaComponent(0.1)
-        layoutSegmentedControl.selectedSegmentTintColor = ThemeManager.buttonPrimary
-        layoutSegmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .normal)
-        layoutSegmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.black], for: .selected)
-        layoutSegmentedControl.addTarget(self, action: #selector(layoutChanged), for: .valueChanged)
-        layoutSectionView.addSubview(layoutSegmentedControl)
-        
-        // 模板选择标题
-        templateTitleLabel.font = ThemeManager.captionFont
-        templateTitleLabel.textColor = UIColor.white.withAlphaComponent(0.8)
-        templateTitleLabel.text = "布局模板"
-        layoutSectionView.addSubview(templateTitleLabel)
         
         // 模板选择集合视图
         templateCollectionView.backgroundColor = .clear
@@ -411,8 +394,6 @@ class CollageViewController: UIViewController {
         previewPlaceholder.translatesAutoresizingMaskIntoConstraints = false
         layoutSectionView.translatesAutoresizingMaskIntoConstraints = false
         layoutTitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        layoutSegmentedControl.translatesAutoresizingMaskIntoConstraints = false
-        templateTitleLabel.translatesAutoresizingMaskIntoConstraints = false
         templateCollectionView.translatesAutoresizingMaskIntoConstraints = false
         aspectRatioSectionView.translatesAutoresizingMaskIntoConstraints = false
         aspectRatioTitleLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -471,11 +452,11 @@ class CollageViewController: UIViewController {
             countLabel.trailingAnchor.constraint(equalTo: headerView.trailingAnchor),
             countLabel.heightAnchor.constraint(equalToConstant: 24),
             
-            // 预览区域
-            previewContainerView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 20),
+            // 预览区域 - 使用动态高度
+            previewContainerView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 16),
             previewContainerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             previewContainerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            previewContainerView.heightAnchor.constraint(equalToConstant: 200),
+            previewContainerView.heightAnchor.constraint(equalTo: contentView.widthAnchor, multiplier: 0.6),
             
             previewImageView.topAnchor.constraint(equalTo: previewContainerView.topAnchor, constant: 16),
             previewImageView.leadingAnchor.constraint(equalTo: previewContainerView.leadingAnchor, constant: 16),
@@ -487,68 +468,61 @@ class CollageViewController: UIViewController {
             previewPlaceholder.leadingAnchor.constraint(equalTo: previewContainerView.leadingAnchor, constant: 16),
             previewPlaceholder.trailingAnchor.constraint(equalTo: previewContainerView.trailingAnchor, constant: -16),
             
-            // 布局选择区域
-            layoutSectionView.topAnchor.constraint(equalTo: previewContainerView.bottomAnchor, constant: 20),
+            // 布局选择区域 - 优化高度
+            layoutSectionView.topAnchor.constraint(equalTo: previewContainerView.bottomAnchor, constant: 16),
             layoutSectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             layoutSectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            layoutSectionView.heightAnchor.constraint(equalToConstant: 180),
+            layoutSectionView.heightAnchor.constraint(greaterThanOrEqualToConstant: 150),
             
             layoutTitleLabel.topAnchor.constraint(equalTo: layoutSectionView.topAnchor, constant: 16),
             layoutTitleLabel.leadingAnchor.constraint(equalTo: layoutSectionView.leadingAnchor, constant: 16),
             layoutTitleLabel.trailingAnchor.constraint(equalTo: layoutSectionView.trailingAnchor, constant: -16),
             layoutTitleLabel.heightAnchor.constraint(equalToConstant: 24),
             
-            layoutSegmentedControl.topAnchor.constraint(equalTo: layoutTitleLabel.bottomAnchor, constant: 12),
-            layoutSegmentedControl.leadingAnchor.constraint(equalTo: layoutSectionView.leadingAnchor, constant: 16),
-            layoutSegmentedControl.trailingAnchor.constraint(equalTo: layoutSectionView.trailingAnchor, constant: -16),
-            layoutSegmentedControl.heightAnchor.constraint(equalToConstant: 36),
+            templateCollectionView.topAnchor.constraint(equalTo: layoutTitleLabel.bottomAnchor, constant: 12),
+            templateCollectionView.leadingAnchor.constraint(equalTo: layoutSectionView.leadingAnchor, constant: 16),
+            templateCollectionView.trailingAnchor.constraint(equalTo: layoutSectionView.trailingAnchor, constant: -16),
+            templateCollectionView.heightAnchor.constraint(equalToConstant: 80),
+            templateCollectionView.bottomAnchor.constraint(lessThanOrEqualTo: layoutSectionView.bottomAnchor, constant: -16),
             
-            templateTitleLabel.topAnchor.constraint(equalTo: layoutSegmentedControl.bottomAnchor, constant: 16),
-            templateTitleLabel.leadingAnchor.constraint(equalTo: layoutSectionView.leadingAnchor, constant: 16),
-            templateTitleLabel.trailingAnchor.constraint(equalTo: layoutSectionView.trailingAnchor, constant: -16),
-            templateTitleLabel.heightAnchor.constraint(equalToConstant: 20),
-            
-            templateCollectionView.topAnchor.constraint(equalTo: templateTitleLabel.bottomAnchor, constant: 8),
-            templateCollectionView.leadingAnchor.constraint(equalTo: layoutSectionView.leadingAnchor),
-            templateCollectionView.trailingAnchor.constraint(equalTo: layoutSectionView.trailingAnchor),
-            templateCollectionView.heightAnchor.constraint(equalToConstant: 70),
-            
-            // 比例选择区域
-            aspectRatioSectionView.topAnchor.constraint(equalTo: layoutSectionView.bottomAnchor, constant: 20),
+            // 比例选择区域 - 优化高度
+            aspectRatioSectionView.topAnchor.constraint(equalTo: layoutSectionView.bottomAnchor, constant: 16),
             aspectRatioSectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             aspectRatioSectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            aspectRatioSectionView.heightAnchor.constraint(equalToConstant: 100),
+            aspectRatioSectionView.heightAnchor.constraint(greaterThanOrEqualToConstant: 90),
             
             aspectRatioTitleLabel.topAnchor.constraint(equalTo: aspectRatioSectionView.topAnchor, constant: 16),
             aspectRatioTitleLabel.leadingAnchor.constraint(equalTo: aspectRatioSectionView.leadingAnchor, constant: 16),
             aspectRatioTitleLabel.trailingAnchor.constraint(equalTo: aspectRatioSectionView.trailingAnchor, constant: -16),
             aspectRatioTitleLabel.heightAnchor.constraint(equalToConstant: 24),
             
-            aspectRatioCollectionView.topAnchor.constraint(equalTo: aspectRatioTitleLabel.bottomAnchor, constant: 12),
-            aspectRatioCollectionView.leadingAnchor.constraint(equalTo: aspectRatioSectionView.leadingAnchor),
-            aspectRatioCollectionView.trailingAnchor.constraint(equalTo: aspectRatioSectionView.trailingAnchor),
-            aspectRatioCollectionView.bottomAnchor.constraint(equalTo: aspectRatioSectionView.bottomAnchor, constant: -8),
+            aspectRatioCollectionView.topAnchor.constraint(equalTo: aspectRatioTitleLabel.bottomAnchor, constant: 8),
+            aspectRatioCollectionView.leadingAnchor.constraint(equalTo: aspectRatioSectionView.leadingAnchor, constant: 16),
+            aspectRatioCollectionView.trailingAnchor.constraint(equalTo: aspectRatioSectionView.trailingAnchor, constant: -16),
+            aspectRatioCollectionView.heightAnchor.constraint(equalToConstant: 50),
+            aspectRatioCollectionView.bottomAnchor.constraint(lessThanOrEqualTo: aspectRatioSectionView.bottomAnchor, constant: -8),
             
-            // 图片编辑区域
-            editingSectionView.topAnchor.constraint(equalTo: aspectRatioSectionView.bottomAnchor, constant: 20),
+            // 图片编辑区域 - 优化高度
+            editingSectionView.topAnchor.constraint(equalTo: aspectRatioSectionView.bottomAnchor, constant: 16),
             editingSectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             editingSectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            editingSectionView.heightAnchor.constraint(equalToConstant: 160),
+            editingSectionView.heightAnchor.constraint(greaterThanOrEqualToConstant: 140),
             
             editingTitleLabel.topAnchor.constraint(equalTo: editingSectionView.topAnchor, constant: 16),
             editingTitleLabel.leadingAnchor.constraint(equalTo: editingSectionView.leadingAnchor, constant: 16),
             editingTitleLabel.trailingAnchor.constraint(equalTo: editingSectionView.trailingAnchor, constant: -16),
             editingTitleLabel.heightAnchor.constraint(equalToConstant: 24),
             
-            imageSelectionCollectionView.topAnchor.constraint(equalTo: editingTitleLabel.bottomAnchor, constant: 12),
-            imageSelectionCollectionView.leadingAnchor.constraint(equalTo: editingSectionView.leadingAnchor),
-            imageSelectionCollectionView.trailingAnchor.constraint(equalTo: editingSectionView.trailingAnchor),
+            imageSelectionCollectionView.topAnchor.constraint(equalTo: editingTitleLabel.bottomAnchor, constant: 8),
+            imageSelectionCollectionView.leadingAnchor.constraint(equalTo: editingSectionView.leadingAnchor, constant: 16),
+            imageSelectionCollectionView.trailingAnchor.constraint(equalTo: editingSectionView.trailingAnchor, constant: -16),
             imageSelectionCollectionView.heightAnchor.constraint(equalToConstant: 70),
             
             editingControlsView.topAnchor.constraint(equalTo: imageSelectionCollectionView.bottomAnchor, constant: 8),
             editingControlsView.leadingAnchor.constraint(equalTo: editingSectionView.leadingAnchor, constant: 16),
             editingControlsView.trailingAnchor.constraint(equalTo: editingSectionView.trailingAnchor, constant: -16),
             editingControlsView.heightAnchor.constraint(equalToConstant: 36),
+            editingControlsView.bottomAnchor.constraint(lessThanOrEqualTo: editingSectionView.bottomAnchor, constant: -16),
             
             rotateLeftButton.leadingAnchor.constraint(equalTo: editingControlsView.leadingAnchor, constant: 8),
             rotateLeftButton.centerYAnchor.constraint(equalTo: editingControlsView.centerYAnchor),
@@ -575,11 +549,11 @@ class CollageViewController: UIViewController {
             resetEditingButton.widthAnchor.constraint(equalToConstant: 48),
             resetEditingButton.heightAnchor.constraint(equalToConstant: 28),
             
-            // 控制面板
-            controlPanelView.topAnchor.constraint(equalTo: editingSectionView.bottomAnchor, constant: 20),
+            // 控制面板 - 优化高度
+            controlPanelView.topAnchor.constraint(equalTo: editingSectionView.bottomAnchor, constant: 16),
             controlPanelView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             controlPanelView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            controlPanelView.heightAnchor.constraint(equalToConstant: 120),
+            controlPanelView.heightAnchor.constraint(greaterThanOrEqualToConstant: 100),
             
             generateButton.topAnchor.constraint(equalTo: controlPanelView.topAnchor, constant: 16),
             generateButton.leadingAnchor.constraint(equalTo: controlPanelView.leadingAnchor, constant: 16),
@@ -595,28 +569,29 @@ class CollageViewController: UIViewController {
             statusLabel.leadingAnchor.constraint(equalTo: controlPanelView.leadingAnchor, constant: 16),
             statusLabel.trailingAnchor.constraint(equalTo: controlPanelView.trailingAnchor, constant: -16),
             statusLabel.heightAnchor.constraint(equalToConstant: 24),
+            statusLabel.bottomAnchor.constraint(lessThanOrEqualTo: controlPanelView.bottomAnchor, constant: -16),
             
-            // 底部按钮
-            bottomButtonsView.topAnchor.constraint(equalTo: controlPanelView.bottomAnchor, constant: 20),
+            // 底部按钮 - 增加安全区域间距
+            bottomButtonsView.topAnchor.constraint(equalTo: controlPanelView.bottomAnchor, constant: 16),
             bottomButtonsView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             bottomButtonsView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            bottomButtonsView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -20),
-            bottomButtonsView.heightAnchor.constraint(equalToConstant: 48),
+            bottomButtonsView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -30),
+            bottomButtonsView.heightAnchor.constraint(equalToConstant: 52),
             
             resetButton.leadingAnchor.constraint(equalTo: bottomButtonsView.leadingAnchor),
             resetButton.centerYAnchor.constraint(equalTo: bottomButtonsView.centerYAnchor),
             resetButton.widthAnchor.constraint(equalTo: bottomButtonsView.widthAnchor, multiplier: 0.25),
-            resetButton.heightAnchor.constraint(equalToConstant: 48),
+            resetButton.heightAnchor.constraint(equalToConstant: 52),
             
             saveButton.centerXAnchor.constraint(equalTo: bottomButtonsView.centerXAnchor),
             saveButton.centerYAnchor.constraint(equalTo: bottomButtonsView.centerYAnchor),
             saveButton.widthAnchor.constraint(equalTo: bottomButtonsView.widthAnchor, multiplier: 0.35),
-            saveButton.heightAnchor.constraint(equalToConstant: 48),
+            saveButton.heightAnchor.constraint(equalToConstant: 52),
             
             shareButton.trailingAnchor.constraint(equalTo: bottomButtonsView.trailingAnchor),
             shareButton.centerYAnchor.constraint(equalTo: bottomButtonsView.centerYAnchor),
             shareButton.widthAnchor.constraint(equalTo: bottomButtonsView.widthAnchor, multiplier: 0.35),
-            shareButton.heightAnchor.constraint(equalToConstant: 48)
+            shareButton.heightAnchor.constraint(equalToConstant: 52)
         ])
     }
     
@@ -639,22 +614,6 @@ class CollageViewController: UIViewController {
         navigationController?.popViewController(animated: true)
     }
     
-    @objc private func layoutChanged() {
-        HapticFeedbackManager.shared.buttonTap()
-        
-        switch layoutSegmentedControl.selectedSegmentIndex {
-        case 0:
-            selectedLayout = .grid
-        case 1:
-            selectedLayout = .horizontal
-        case 2:
-            selectedLayout = .vertical
-        default:
-            selectedLayout = .grid
-        }
-        
-        updatePreview()
-    }
     
     @objc private func generateCollage() {
         HapticFeedbackManager.shared.buttonTap()
@@ -664,7 +623,7 @@ class CollageViewController: UIViewController {
         
         // 异步生成拼图
         DispatchQueue.global(qos: .userInitiated).async {
-            let generatedImage = self.createCollageImage(with: self.selectedLayout)
+            let generatedImage = self.createCollageImage()
             
             DispatchQueue.main.async {
                 self.hideGeneratingProgress()
@@ -693,8 +652,6 @@ class CollageViewController: UIViewController {
         previewPlaceholder.text = "选择布局后生成预览"
         enableBottomButtons(false)
         statusLabel.text = ""
-        layoutSegmentedControl.selectedSegmentIndex = 0
-        selectedLayout = .grid
         selectedAspectRatio = .square1_1
         aspectRatioCollectionView.reloadData()
     }
@@ -821,7 +778,41 @@ class CollageViewController: UIViewController {
     
     // MARK: - Helper Methods
     private func updatePreview() {
-        statusLabel.text = "点击生成按钮创建拼图"
+        // 自动生成预览拼图
+        DispatchQueue.global(qos: .userInitiated).async {
+            let generatedImage = self.createCollageImageWithTemplate(size: self.calculateCollageSize())
+            
+            DispatchQueue.main.async {
+                if let image = generatedImage {
+                    self.collageImage = image
+                    self.previewImageView.image = image
+                    self.previewPlaceholder.isHidden = true
+                    self.enableBottomButtons(true)
+                    self.statusLabel.text = "预览已生成，可以保存或分享"
+                } else {
+                    self.previewPlaceholder.isHidden = false
+                    self.previewPlaceholder.text = "预览生成失败"
+                    self.statusLabel.text = "预览生成失败，请重试"
+                }
+            }
+        }
+    }
+    
+    private func calculateCollageSize() -> CGSize {
+        let baseSize: CGFloat = 800
+        
+        switch selectedAspectRatio {
+        case .square1_1:
+            return CGSize(width: baseSize, height: baseSize)
+        case .portrait3_4:
+            return CGSize(width: baseSize * 3/4, height: baseSize)
+        case .landscape4_3:
+            return CGSize(width: baseSize * 4/3, height: baseSize)
+        case .widescreen16_9:
+            return CGSize(width: baseSize * 16/9, height: baseSize)
+        case .full:
+            return UIScreen.main.bounds.size
+        }
     }
     
     private func showGeneratingProgress() {
@@ -874,8 +865,8 @@ class CollageViewController: UIViewController {
 // MARK: - Collage Generation
 extension CollageViewController {
     
-    private func createCollageImage(with layout: CollageLayout) -> UIImage? {
-        let collageSize = selectedAspectRatio.size
+    private func createCollageImage() -> UIImage? {
+        let collageSize = calculateCollageSize()
         return createCollageImageWithTemplate(size: collageSize)
     }
     
@@ -1021,12 +1012,6 @@ extension CollageViewController {
     }
 }
 
-// MARK: - CollageLayout Enum
-enum CollageLayout {
-    case grid
-    case horizontal
-    case vertical
-}
 
 // MARK: - CollageLayoutTemplate Protocol
 protocol CollageLayoutTemplate {

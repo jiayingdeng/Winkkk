@@ -234,6 +234,9 @@ class TimelineView: UIView {
         setupPlayheadIndicator()
         contentView.addSubview(playheadIndicator)
         
+        // 🎯 确保白色竖线始终在最顶层，不被缩略图遮挡
+        playheadIndicator.layer.zPosition = 1000
+        
         // 🆕 Live Photo模式组件
         setupLivePhotoComponents()
         contentView.addSubview(livePhotoRangeView)
@@ -461,9 +464,9 @@ class TimelineView: UIView {
             thumbView.heightAnchor.constraint(equalToConstant: 24),
             // 位置约束将动态更新
             
-            // 🎯 播放头指示器 (白色竖线) - 贯穿整个TimelineView高度
-            playheadIndicator.topAnchor.constraint(equalTo: contentView.topAnchor),
-            playheadIndicator.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            // 🎯 播放头指示器 (白色竖线) - 从缩略图上方延伸到缩略图底部
+            playheadIndicator.topAnchor.constraint(equalTo: thumbnailContainerView.topAnchor, constant: -8),
+            playheadIndicator.bottomAnchor.constraint(equalTo: thumbnailContainerView.bottomAnchor),
             playheadIndicator.widthAnchor.constraint(equalToConstant: 2)
             // centerX约束将动态更新，跟随播放进度
         ])
