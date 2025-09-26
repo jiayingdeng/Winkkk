@@ -404,12 +404,58 @@ class MainCameraViewController: UIViewController {
         print("📱 收到打开相机通知，准备展示录像页面")
         
         DispatchQueue.main.async { [weak self] in
-            // 确保状态已重置
-            self?.isTimeSequenceMode = false
-            self?.updateModeSwitcherDisplay()
+            guard let self = self else { return }
             
-            // 确保相机预览正常启动
-            self?.startCameraPreview()
+            // 🔧 修复关键问题：关闭所有模态界面，回到主录像页面
+            if self.presentedViewController != nil {
+                print("🔄 检测到模态界面，准备关闭所有模态界面...")
+                
+                // 递归关闭所有模态界面
+                self.dismissAllModalViewControllers {
+                    print("✅ 所有模态界面已关闭，现在在主录像页面")
+                    
+                    // 确保状态已重置
+                    self.isTimeSequenceMode = false
+                    self.updateModeSwitcherDisplay()
+                    
+                    // 确保相机预览正常启动
+                    self.startCameraPreview()
+                    
+                    // 可选：显示提示消息
+                    let alert = UIAlertController(
+                        title: "✨ 已回到录像页面",
+                        message: "可以开始新的创作了！",
+                        preferredStyle: .alert
+                    )
+                    alert.addAction(UIAlertAction(title: "确定", style: .default))
+                    self.present(alert, animated: true)
+                }
+            } else {
+                print("✅ 当前已在主录像页面")
+                
+                // 确保状态已重置
+                self.isTimeSequenceMode = false
+                self.updateModeSwitcherDisplay()
+                
+                // 确保相机预览正常启动
+                self.startCameraPreview()
+            }
+        }
+    }
+    
+    /// 递归关闭所有模态界面
+    private func dismissAllModalViewControllers(completion: @escaping () -> Void) {
+        if let presented = presentedViewController {
+            print("🔄 发现模态界面: \(type(of: presented))，准备关闭...")
+            
+            presented.dismiss(animated: true) { [weak self] in
+                print("✅ 模态界面已关闭，检查是否还有其他模态界面...")
+                // 递归检查是否还有其他模态界面
+                self?.dismissAllModalViewControllers(completion: completion)
+            }
+        } else {
+            print("✅ 所有模态界面已关闭")
+            completion()
         }
     }
     

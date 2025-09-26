@@ -207,7 +207,47 @@ extension PersistenceController {
     /// 删除截图项目
     func deleteScreenshotItem(_ screenshotItem: ScreenshotItem) {
         let context = container.viewContext
+        
+        // 🎯 清理相关文件，特别是Live Photo的视频文件
+        cleanupScreenshotFiles(screenshotItem)
+        
         context.delete(screenshotItem)
         save()
+    }
+    
+    /// 清理截图相关的文件
+    private func cleanupScreenshotFiles(_ screenshotItem: ScreenshotItem) {
+        let fileManager = FileManager.default
+        
+        // 清理普通截图文件
+        let imagePath = screenshotItem.displayImagePath
+        if fileManager.fileExists(atPath: imagePath.path) {
+            try? fileManager.removeItem(at: imagePath)
+            print("🗑️ 已删除图片文件: \(imagePath.lastPathComponent)")
+        }
+        
+        // 清理增强后的图片文件（如果存在）
+        if screenshotItem.isEnhanced, let enhancedImagePath = screenshotItem.enhancedImagePath {
+            if fileManager.fileExists(atPath: enhancedImagePath.path) {
+                try? fileManager.removeItem(at: enhancedImagePath)
+                print("🗑️ 已删除增强图片文件: \(enhancedImagePath.lastPathComponent)")
+            }
+        }
+        
+        // 🎯 清理Live Photo相关文件
+        if screenshotItem.isLivePhoto {
+            print("📸 开始清理Live Photo相关文件...")
+            
+            // 清理Live Photo视频文件
+            if let videoPath = screenshotItem.livePhotoVideoPath,
+               fileManager.fileExists(atPath: videoPath.path) {
+                try? fileManager.removeItem(at: videoPath)
+                print("🗑️ 已删除Live Photo视频文件: \(videoPath.lastPathComponent)")
+            }
+            
+            // 清理Live Photo相关数据
+            screenshotItem.clearLivePhotoData()
+            print("✅ Live Photo数据清理完成")
+        }
     }
 }

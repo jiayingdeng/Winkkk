@@ -22,6 +22,10 @@ class ScreenshotManager: ObservableObject {
     @Published var currentMode: CaptureMode = .stillImage
     @Published var selectedScreenshots: [ScreenshotItem] = []
     
+    // MARK: - Video Session Properties
+    /// 当前编辑的视频URL - 用于会话隔离
+    @Published var currentVideoURL: URL?
+    
     // MARK: - Private Properties
     private let persistenceController = PersistenceController.shared
     private let notificationCenter = NotificationCenter.default
@@ -62,6 +66,57 @@ class ScreenshotManager: ObservableObject {
         notifyModeChanged(from: previousMode, to: newMode)
         
         print("📸 截图模式切换: \(previousMode.displayName) → \(newMode.displayName)")
+    }
+    
+    // MARK: - 视频会话管理
+    
+    /// 切换视频会话（会清理临时截图，保留已保存的）
+    /// - Parameter videoURL: 新的视频URL，nil表示退出视频编辑模式
+    func switchVideoSession(to videoURL: URL?) {
+        let previousURL = currentVideoURL
+        currentVideoURL = videoURL
+        
+        // 如果切换到不同的视频或退出视频模式，清理临时截图
+        if previousURL != videoURL {
+            cleanTemporaryScreenshots()
+        }
+        
+        // 通知会话切换
+        let userInfo: [String: Any] = [
+            "previousURL": previousURL as Any,
+            "newURL": videoURL as Any
+        ]
+        notificationCenter.post(name: .videoSessionChanged, object: self, userInfo: userInfo)
+        
+        if let videoURL = videoURL {
+            print("📸 切换视频会话: \(videoURL.lastPathComponent)")
+        } else {
+            print("📸 退出视频编辑模式")
+        }
+    }
+    
+    /// 清理临时截图（保留已保存到相册的截图）
+    private func cleanTemporaryScreenshots() {
+        let temporaryScreenshots = screenshots.filter { !$0.isSavedToPhotos }
+        
+        // 从数组中移除临时截图
+        screenshots.removeAll { !$0.isSavedToPhotos }
+        selectedScreenshots.removeAll { !$0.isSavedToPhotos }
+        
+        // 从数据库删除临时截图
+        temporaryScreenshots.forEach { screenshot in
+            persistenceController.deleteScreenshotItem(screenshot)
+        }
+        
+        if !temporaryScreenshots.isEmpty {
+            print("📸 清理临时截图: \(temporaryScreenshots.count)张")
+            notifyTemporaryScreenshotsCleared(temporaryScreenshots)
+        }
+    }
+    
+    /// 检查当前是否在视频编辑模式
+    var isInVideoEditingMode: Bool {
+        return currentVideoURL != nil
     }
     
     // MARK: - 截图管理
@@ -286,6 +341,14 @@ class ScreenshotManager: ObservableObject {
     private func notifySelectionChanged() {
         notificationCenter.post(name: .screenshotSelectionChanged, object: self)
     }
+    
+    private func notifyTemporaryScreenshotsCleared(_ clearedScreenshots: [ScreenshotItem]) {
+        let userInfo: [String: Any] = [
+            "clearedScreenshots": clearedScreenshots,
+            "count": clearedScreenshots.count
+        ]
+        notificationCenter.post(name: .temporaryScreenshotsCleared, object: self, userInfo: userInfo)
+    }
 }
 
 // MARK: - 批量操作
@@ -461,4 +524,6 @@ extension Notification.Name {
     static let allScreenshotsCleared = Notification.Name("allScreenshotsCleared")
     static let screenshotSelectionChanged = Notification.Name("screenshotSelectionChanged")
     static let shouldOpenCamera = Notification.Name("shouldOpenCamera")
+    static let videoSessionChanged = Notification.Name("videoSessionChanged")
+    static let temporaryScreenshotsCleared = Notification.Name("temporaryScreenshotsCleared")
 }

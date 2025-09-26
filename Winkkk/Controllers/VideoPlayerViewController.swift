@@ -105,6 +105,9 @@ class VideoPlayerViewController: UIViewController {
     init(videoURL: URL) {
         self.videoURL = videoURL
         super.init(nibName: nil, bundle: nil)
+        
+        // 🆕 切换到当前视频的会话，隔离截图数据
+        screenshotManager.switchVideoSession(to: videoURL)
     }
     
     required init?(coder: NSCoder) {
@@ -133,6 +136,9 @@ class VideoPlayerViewController: UIViewController {
     
     deinit {
         cleanupPlayer()
+        
+        // 🆕 退出视频会话，清理临时截图
+        screenshotManager.switchVideoSession(to: nil)
     }
     
     // MARK: - UI Setup

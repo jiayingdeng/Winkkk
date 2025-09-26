@@ -204,6 +204,13 @@ extension PersistenceController {
         isLivePhotoAttribute.isOptional = false
         isLivePhotoAttribute.defaultValue = false
         
+        // 🔧 修复：添加缺失的 isSavedToPhotos 属性定义
+        let isSavedToPhotosAttribute = NSAttributeDescription()
+        isSavedToPhotosAttribute.name = "isSavedToPhotos"
+        isSavedToPhotosAttribute.attributeType = .booleanAttributeType
+        isSavedToPhotosAttribute.isOptional = false
+        isSavedToPhotosAttribute.defaultValue = false
+        
         screenshotEntity.properties = [
             screenshotIdAttribute, originalImagePathAttribute, enhancedImagePathAttribute,
             timestampAttribute, enhanceLevelAttribute, screenshotCreatedDateAttribute,
@@ -211,7 +218,7 @@ extension PersistenceController {
             originalFileSizeAttribute, enhancedFileSizeAttribute,
             captureModeAttribute, selectionOrderAttribute, isSelectedAttribute, processingStatusAttribute,
             livePhotoVideoPathAttribute, livePhotoIdentifierAttribute, livePhotoDurationAttribute,
-            keyPhotoOffsetAttribute, isLivePhotoAttribute
+            keyPhotoOffsetAttribute, isLivePhotoAttribute, isSavedToPhotosAttribute
         ]
         
         // 创建关系

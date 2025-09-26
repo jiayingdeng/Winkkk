@@ -626,49 +626,20 @@ extension ScreenshotProcessingViewController {
         ScreenshotManager.shared.clearAllScreenshots()
         TimeSequenceModeManager.shared.switchToNormalMode()
         
-        // 方法1：如果是从VideoPlayerViewController模态呈现的，直接dismiss
-        if let navigationController = self.navigationController,
-           let presentingVC = navigationController.presentingViewController {
-            
-            print("📱 检测到模态展示，尝试dismiss到presenting view controller")
-            
-            // 检查presenting view controller是否是VideoPlayerViewController
-            if let videoPlayerVC = presentingVC as? VideoPlayerViewController {
-                print("✅ 找到VideoPlayerViewController，准备dismiss")
-                dismiss(animated: true) {
-                    print("✨ 已返回到录制页面，准备开始新的创作")
-                }
-                return
-            }
-            
-            // 检查是否是嵌套在NavigationController中的VideoPlayerViewController
-            if let navController = presentingVC as? UINavigationController,
-               let videoPlayerVC = navController.topViewController as? VideoPlayerViewController {
-                print("✅ 找到嵌套的VideoPlayerViewController，准备dismiss")
-                dismiss(animated: true) {
-                    print("✨ 已返回到录制页面，准备开始新的创作")
-                }
-                return
-            }
+        // 🎯 Live Photo模式下的特殊处理
+        if mode == .livePhoto {
+            print("📸 Live Photo模式：确保清理相关数据")
+            // Live Photo的清理已经在ScreenshotManager.clearAllScreenshots()中处理
+            // 这里添加日志确认清理完成
         }
         
-        // 方法2：如果navigation stack中有VideoPlayerViewController，pop回去
-        if let navigationController = self.navigationController {
-            print("📚 检查navigation stack中的view controllers")
-            for viewController in navigationController.viewControllers {
-                if let videoPlayerVC = viewController as? VideoPlayerViewController {
-                    print("✅ 在navigation stack中找到VideoPlayerViewController，准备pop")
-                    navigationController.popToViewController(videoPlayerVC, animated: true)
-                    return
-                }
-            }
-        }
-        
-        // 方法3：兜底策略 - 直接dismiss，但通过通知机制触发重新打开相机
-        print("⚠️ 使用兜底策略：dismiss并通知打开相机")
+        // 🔧 优化策略：直接使用通知机制，让MainCameraViewController统一处理
+        // 这样避免了复杂的导航层次判断，更加可靠
+        print("📡 使用通知机制返回主录像页面")
         dismiss(animated: true) {
-            print("✨ 已返回，准备通知打开新的相机页面")
+            print("✨ 已关闭\(self.mode == .livePhoto ? "Live Photo" : "截图")处理页面，发送打开相机通知")
             // 🎯 通过通知中心发送打开相机的通知
+            // MainCameraViewController会接收此通知并关闭所有模态界面
             NotificationCenter.default.post(name: .shouldOpenCamera, object: nil)
         }
     }
