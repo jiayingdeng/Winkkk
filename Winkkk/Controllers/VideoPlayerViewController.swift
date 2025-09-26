@@ -977,9 +977,9 @@ class VideoPlayerViewController: UIViewController {
             preferredStyle: .alert
         )
         
-        // 继续观看按钮（主要操作）
+        // 继续编辑按钮（主要操作）
         alert.addAction(UIAlertAction(
-            title: "继续观看",
+            title: "继续编辑",
             style: .default,
             handler: nil
         ))
@@ -1092,12 +1092,23 @@ class VideoPlayerViewController: UIViewController {
     
     @objc private func image(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
         // 这个方法会在每张图片保存完成后被调用
-        // 可以在这里更新保存进度，但由于是异步的，需要额外的计数管理
         if let error = error {
             print("❌ 截图保存到相册失败: \(error.localizedDescription)")
         } else {
             print("✅ 截图已保存到相册")
+            // 🎯 更新所有截图的保存状态
+            updateScreenshotsSaveStatus()
         }
+    }
+    
+    /// 更新截图保存状态
+    private func updateScreenshotsSaveStatus() {
+        let screenshots = screenshotManager.screenshots
+        for screenshot in screenshots {
+            screenshot.isSavedToPhotos = true
+        }
+        // 保存到数据库
+        PersistenceController.shared.save()
     }
     
     private func showSaveProgressAndNavigate(savedCount: Int, totalCount: Int) {

@@ -183,6 +183,7 @@ extension PersistenceController {
         screenshotItem.selectionOrder = 0
         screenshotItem.isSelected = false
         screenshotItem.processingStatus = ProcessingStatus.original.rawValue
+        screenshotItem.isSavedToPhotos = false
         
         save()
         return screenshotItem

@@ -477,7 +477,7 @@ class ImageEnhanceViewController: UIViewController {
     
     // MARK: - Actions
     @objc private func cancelButtonTapped() {
-        dismiss(animated: true)
+        navigationController?.popViewController(animated: true)
     }
     
     @objc private func resetButtonTapped() {

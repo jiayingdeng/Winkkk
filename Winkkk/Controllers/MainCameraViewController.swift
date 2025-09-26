@@ -359,6 +359,14 @@ class MainCameraViewController: UIViewController {
             name: NSNotification.Name("TimeSequenceProcessingCompleted"),
             object: nil
         )
+        
+        // 🎯 监听打开相机通知（从处理中心返回时触发）
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleShouldOpenCamera(_:)),
+            name: .shouldOpenCamera,
+            object: nil
+        )
     }
     
     @objc private func handleTimeSequenceProcessingCompleted(_ notification: Notification) {
@@ -388,6 +396,20 @@ class MainCameraViewController: UIViewController {
             TimeSequenceModeManager.shared.handleProcessingCompleted(shouldKeepMode: false)
             isTimeSequenceMode = false
             updateModeSwitcherDisplay()
+        }
+    }
+    
+    /// 🎯 处理打开相机通知
+    @objc private func handleShouldOpenCamera(_ notification: Notification) {
+        print("📱 收到打开相机通知，准备展示录像页面")
+        
+        DispatchQueue.main.async { [weak self] in
+            // 确保状态已重置
+            self?.isTimeSequenceMode = false
+            self?.updateModeSwitcherDisplay()
+            
+            // 确保相机预览正常启动
+            self?.startCameraPreview()
         }
     }
     

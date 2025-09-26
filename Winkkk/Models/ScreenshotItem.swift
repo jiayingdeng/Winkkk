@@ -72,6 +72,9 @@ extension ScreenshotItem {
     
     /// 处理状态
     @NSManaged public var processingStatus: String
+    
+    /// 是否已保存到相册
+    @NSManaged public var isSavedToPhotos: Bool
 }
 
 // MARK: - Live Photo支持属性

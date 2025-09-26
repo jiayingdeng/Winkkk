@@ -460,4 +460,5 @@ extension Notification.Name {
     static let screenshotRemoved = Notification.Name("screenshotRemoved")
     static let allScreenshotsCleared = Notification.Name("allScreenshotsCleared")
     static let screenshotSelectionChanged = Notification.Name("screenshotSelectionChanged")
+    static let shouldOpenCamera = Notification.Name("shouldOpenCamera")
 }

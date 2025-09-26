@@ -542,7 +542,7 @@ extension BatchImageEnhanceViewController {
         if isProcessing {
             showCancelConfirmation()
         } else {
-            dismiss(animated: true)
+            navigationController?.popViewController(animated: true)
         }
     }
 }
@@ -851,7 +851,7 @@ extension BatchImageEnhanceViewController {
         
         alert.addAction(UIAlertAction(title: "继续处理", style: .cancel))
         alert.addAction(UIAlertAction(title: "取消", style: .destructive) { _ in
-            self.dismiss(animated: true)
+            self.navigationController?.popViewController(animated: true)
         })
         
         present(alert, animated: true)

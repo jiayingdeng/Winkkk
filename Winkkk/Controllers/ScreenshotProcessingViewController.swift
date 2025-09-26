@@ -579,11 +579,20 @@ extension ScreenshotProcessingViewController {
             return
         }
         
-        // 有内容，显示确认对话框
+        // 🎯 检查截图是否已保存
+        let unsavedScreenshots = screenshots.filter { !$0.isSavedToPhotos }
+        
+        if unsavedScreenshots.isEmpty {
+            // 所有截图都已保存，直接清空并返回
+            clearCurrentContentAndNavigateBack()
+            return
+        }
+        
+        // 有未保存的内容，显示确认对话框
         let modeText = mode == .livePhoto ? "Live Photo" : "截图"
         let alert = UIAlertController(
             title: "开始新的创作",
-            message: "当前有 \(screenshots.count) 张未保存的\(modeText)，确定要放弃并开始新的创作吗？",
+            message: "当前有 \(unsavedScreenshots.count) 张未保存的\(modeText)，确定要放弃并开始新的创作吗？",
             preferredStyle: .alert
         )
         
@@ -611,15 +620,21 @@ extension ScreenshotProcessingViewController {
     
     /// 导航回到录制页面
     private func navigateBackToVideoPlayer() {
+        print("🔄 开始导航回到录制页面...")
+        
+        // 清空截图数据和重置模式（在导航前就清空，确保状态正确）
+        ScreenshotManager.shared.clearAllScreenshots()
+        TimeSequenceModeManager.shared.switchToNormalMode()
+        
         // 方法1：如果是从VideoPlayerViewController模态呈现的，直接dismiss
         if let navigationController = self.navigationController,
            let presentingVC = navigationController.presentingViewController {
             
+            print("📱 检测到模态展示，尝试dismiss到presenting view controller")
+            
             // 检查presenting view controller是否是VideoPlayerViewController
             if let videoPlayerVC = presentingVC as? VideoPlayerViewController {
-                // 清空VideoPlayerViewController中的截图数据
-                clearVideoPlayerScreenshots(videoPlayerVC)
-                
+                print("✅ 找到VideoPlayerViewController，准备dismiss")
                 dismiss(animated: true) {
                     print("✨ 已返回到录制页面，准备开始新的创作")
                 }
@@ -629,8 +644,7 @@ extension ScreenshotProcessingViewController {
             // 检查是否是嵌套在NavigationController中的VideoPlayerViewController
             if let navController = presentingVC as? UINavigationController,
                let videoPlayerVC = navController.topViewController as? VideoPlayerViewController {
-                clearVideoPlayerScreenshots(videoPlayerVC)
-                
+                print("✅ 找到嵌套的VideoPlayerViewController，准备dismiss")
                 dismiss(animated: true) {
                     print("✨ 已返回到录制页面，准备开始新的创作")
                 }
@@ -640,22 +654,22 @@ extension ScreenshotProcessingViewController {
         
         // 方法2：如果navigation stack中有VideoPlayerViewController，pop回去
         if let navigationController = self.navigationController {
+            print("📚 检查navigation stack中的view controllers")
             for viewController in navigationController.viewControllers {
                 if let videoPlayerVC = viewController as? VideoPlayerViewController {
-                    clearVideoPlayerScreenshots(videoPlayerVC)
+                    print("✅ 在navigation stack中找到VideoPlayerViewController，准备pop")
                     navigationController.popToViewController(videoPlayerVC, animated: true)
                     return
                 }
             }
         }
         
-        // 方法3：兜底策略 - 直接dismiss并重置模式
-        // 清空截图数据和重置模式
-        ScreenshotManager.shared.clearAllScreenshots()
-        TimeSequenceModeManager.shared.switchToNormalMode()
-        
+        // 方法3：兜底策略 - 直接dismiss，但通过通知机制触发重新打开相机
+        print("⚠️ 使用兜底策略：dismiss并通知打开相机")
         dismiss(animated: true) {
-            print("✨ 已返回，重置为普通录像模式，准备开始新的创作")
+            print("✨ 已返回，准备通知打开新的相机页面")
+            // 🎯 通过通知中心发送打开相机的通知
+            NotificationCenter.default.post(name: .shouldOpenCamera, object: nil)
         }
     }
     

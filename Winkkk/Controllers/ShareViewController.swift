@@ -435,7 +435,15 @@ class ShareViewController: UIViewController {
     
     // MARK: - Actions
     @objc private func cancelButtonTapped() {
-        dismiss(animated: true)
+        // 智能判断导航方式
+        if let navigationController = navigationController,
+           navigationController.presentingViewController != nil {
+            // 如果是模态展示的，使用dismiss
+            navigationController.dismiss(animated: true)
+        } else {
+            // 如果是push的，使用popViewController
+            navigationController?.popViewController(animated: true)
+        }
     }
 }
 
