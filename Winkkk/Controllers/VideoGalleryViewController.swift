@@ -99,7 +99,7 @@ class VideoGalleryViewController: UIViewController {
     
     private lazy var exportButton: UIButton = {
         let button = UIButton(type: .system)
-        button.setTitle("导出", for: .normal)
+        button.setTitle("导出到相册", for: .normal)
         button.setTitleColor(UIColor.systemBlue, for: .normal)
         button.setTitleColor(UIColor.systemBlue.withAlphaComponent(0.6), for: .disabled)
         button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .medium)
@@ -181,7 +181,7 @@ class VideoGalleryViewController: UIViewController {
     }
     
     private func setupNavigationBar() {
-        title = "应用内视频"
+        title = "我的创作"
         
         // 自定义导航栏外观
         navigationController?.navigationBar.prefersLargeTitles = false

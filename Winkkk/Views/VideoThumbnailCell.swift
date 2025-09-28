@@ -424,7 +424,7 @@ class EmptyStateView: UIView {
     
     private let titleLabel: UILabel = {
         let label = UILabel()
-        label.text = "还没有视频"
+        label.text = "开始你的创作之旅"
         label.font = ThemeManager.headlineFont
         label.textColor = ThemeManager.primaryText
         label.textAlignment = .center
@@ -433,7 +433,7 @@ class EmptyStateView: UIView {
     
     private let messageLabel: UILabel = {
         let label = UILabel()
-        label.text = "点击右上角的 + 按钮添加视频，\n或者返回拍摄新的视频"
+        label.text = "在应用内拍摄或导入视频\n完成后可导出到系统相册分享"
         label.font = ThemeManager.bodyFont
         label.textColor = ThemeManager.secondaryText
         label.textAlignment = .center
