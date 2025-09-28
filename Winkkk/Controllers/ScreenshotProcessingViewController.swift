@@ -33,15 +33,18 @@ class ScreenshotProcessingViewController: UIViewController {
     private let collectionView: UICollectionView
     private let collectionFlowLayout = UICollectionViewFlowLayout()
     
-    // 智能推荐区域
+    // 推荐区域
     private let recommendationCardView = UIView()
-    private let recommendationBlurView = BlurEffectView(style: .regular, intensity: 0.9)
+    private let recommendationBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
     private let recommendationTitleLabel = UILabel()
     private let recommendationDescriptionLabel = UILabel()
-    private let recommendationActionButton = UIButton()
-    
+    private let recommendationActionButton = UIButton(type: .system)
+
     // 操作选项区域
     private let optionsTableView = UITableView()
+    
+    // MARK: - Constraints
+    private var previewHeightConstraint: NSLayoutConstraint!
     
     // MARK: - Dependencies
     private let workflowManager = WorkflowManager.shared
@@ -82,6 +85,15 @@ class ScreenshotProcessingViewController: UIViewController {
         HapticFeedbackManager.shared.lightImpact()
     }
     
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        
+        // 当视图布局改变时（比如屏幕旋转），更新预览区域高度
+        if view.bounds.width > 0 && previewHeightConstraint != nil {
+            updatePreviewContainerHeight(animated: false)
+        }
+    }
+    
     @objc private func executeRecommendedWorkflow() {
         guard let recommendation = objc_getAssociatedObject(recommendationActionButton, "recommendation") as? WorkflowRecommendation else { return }
         
@@ -107,7 +119,7 @@ class ScreenshotProcessingViewController: UIViewController {
         // 预览区域
         setupPreviewArea()
         
-        // 智能推荐区域
+        // 推荐区域
         setupRecommendationCard()
         
         // 操作选项表格
@@ -269,7 +281,6 @@ class ScreenshotProcessingViewController: UIViewController {
             previewContainerView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 20),
             previewContainerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             previewContainerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            previewContainerView.heightAnchor.constraint(equalToConstant: 80),
             
             // 集合视图
             collectionView.topAnchor.constraint(equalTo: previewContainerView.topAnchor, constant: 10),
@@ -314,6 +325,62 @@ class ScreenshotProcessingViewController: UIViewController {
             optionsTableView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
             optionsTableView.heightAnchor.constraint(equalToConstant: CGFloat(processingOptions.count * 60))
         ])
+        
+        // 设置初始预览区域高度约束
+        updatePreviewContainerHeight(animated: false)
+    }
+    
+    // MARK: - Preview Container Height Management
+    private func updatePreviewContainerHeight(animated: Bool = true) {
+        // 移除现有的高度约束（如果存在）
+        if previewHeightConstraint != nil {
+            previewHeightConstraint.isActive = false
+        }
+        
+        // 计算新的高度
+        let containerWidth = view.bounds.width - 32 // 左右各16的边距
+        let targetHeight = calculatePreviewHeight(containerWidth: containerWidth)
+        
+        // 创建新的高度约束
+        previewHeightConstraint = previewContainerView.heightAnchor.constraint(equalToConstant: targetHeight)
+        previewHeightConstraint.isActive = true
+        
+        // 执行布局更新
+        if animated {
+            UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseInOut], animations: {
+                self.view.layoutIfNeeded()
+            })
+        } else {
+            view.layoutIfNeeded()
+        }
+    }
+    
+    private func calculatePreviewHeight(containerWidth: CGFloat) -> CGFloat {
+        let screenshotCount = screenshots.count
+        let itemSize: CGFloat = 60 // 缩略图尺寸
+        let itemSpacing: CGFloat = 8 // 间距
+        let horizontalPadding: CGFloat = 32 // 左右内边距总和
+        let verticalPadding: CGFloat = 20 // 上下内边距总和
+        
+        // 计算可用宽度
+        let availableWidth = containerWidth - horizontalPadding
+        
+        // 计算单行可显示的最大数量
+        let maxItemsPerRow = max(1, Int((availableWidth + itemSpacing) / (itemSize + itemSpacing)))
+        
+        // 计算需要的行数
+        let numberOfRows = max(1, Int(ceil(Double(screenshotCount) / Double(maxItemsPerRow))))
+        
+        // 计算总高度
+        let totalItemHeight = CGFloat(numberOfRows) * itemSize
+        let totalSpacing = CGFloat(max(0, numberOfRows - 1)) * itemSpacing
+        let totalHeight = totalItemHeight + totalSpacing + verticalPadding
+        
+        // 限制最小和最大高度
+        let minHeight: CGFloat = 80
+        let maxHeight: CGFloat = 200 // 防止预览区域过高
+        
+        return max(minHeight, min(maxHeight, totalHeight))
     }
     
     private func configureNavigationBar() {

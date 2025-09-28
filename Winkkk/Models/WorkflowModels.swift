@@ -221,3 +221,4 @@ struct WorkflowHistory {
         return steps.last?.stepType
     }
 }
+

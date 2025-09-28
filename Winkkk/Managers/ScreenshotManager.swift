@@ -10,6 +10,8 @@ import Foundation
 import UIKit
 import Combine
 import Photos
+import AVFoundation
+import CoreData
 
 // MARK: - 截图管理器
 class ScreenshotManager: ObservableObject {
@@ -70,15 +72,26 @@ class ScreenshotManager: ObservableObject {
     
     // MARK: - 视频会话管理
     
-    /// 切换视频会话（会清理临时截图，保留已保存的）
+    /// 切换视频会话（实现真正的会话数据隔离）
     /// - Parameter videoURL: 新的视频URL，nil表示退出视频编辑模式
     func switchVideoSession(to videoURL: URL?) {
         let previousURL = currentVideoURL
+        
+        // 🎯 保存当前会话的截图数据到数据库
+        if let previousURL = previousURL {
+            saveCurrentSessionData(for: previousURL)
+        }
+        
+        // 🎯 更新当前视频URL
         currentVideoURL = videoURL
         
-        // 如果切换到不同的视频或退出视频模式，清理临时截图
-        if previousURL != videoURL {
-            cleanTemporaryScreenshots()
+        // 🎯 加载新会话的截图数据
+        if let videoURL = videoURL {
+            loadScreenshotsForVideo(videoURL)
+        } else {
+            // 退出视频编辑模式，清空截图数组
+            screenshots.removeAll()
+            selectedScreenshots.removeAll()
         }
         
         // 通知会话切换
@@ -95,23 +108,145 @@ class ScreenshotManager: ObservableObject {
         }
     }
     
-    /// 清理临时截图（保留已保存到相册的截图）
-    private func cleanTemporaryScreenshots() {
-        let temporaryScreenshots = screenshots.filter { !$0.isSavedToPhotos }
+    /// 🆕 保存当前会话的截图数据到数据库
+    private func saveCurrentSessionData(for videoURL: URL) {
+        // 确保所有截图都与正确的视频关联
+        let videoItem = findOrCreateVideoItem(for: videoURL)
         
-        // 从数组中移除临时截图
+        for screenshot in screenshots {
+            // 如果截图还没有关联视频源，设置关联
+            if screenshot.videoSource == nil {
+                screenshot.videoSource = videoItem
+            }
+        }
+        
+        // 保存到数据库
+        persistenceController.save()
+        print("📸 已保存会话数据: \(videoURL.lastPathComponent) - \(screenshots.count)张截图")
+    }
+    
+    /// 🆕 为视频URL查找或创建对应的VideoItem
+    private func findOrCreateVideoItem(for videoURL: URL) -> VideoItem {
+        let context = persistenceController.container.viewContext
+        
+        // 首先尝试查找现有的VideoItem
+        let fetchRequest: NSFetchRequest<VideoItem> = VideoItem.fetchRequest()
+        fetchRequest.predicate = NSPredicate(format: "filePath == %@", videoURL as NSURL)
+        
+        do {
+            let existingItems = try context.fetch(fetchRequest)
+            if let existingItem = existingItems.first {
+                return existingItem
+            }
+        } catch {
+            print("❌ 查找VideoItem失败: \(error)")
+        }
+        
+        // 如果没有找到，创建新的VideoItem
+        return createVideoItem(for: videoURL)
+    }
+    
+    /// 🆕 为视频URL创建新的VideoItem
+    private func createVideoItem(for videoURL: URL) -> VideoItem {
+        // 获取视频基本信息
+        let asset = AVAsset(url: videoURL)
+        let duration = asset.duration.seconds
+        
+        // 获取视频尺寸
+        var width: Int32 = 0
+        var height: Int32 = 0
+        if let track = asset.tracks(withMediaType: .video).first {
+            let size = track.naturalSize.applying(track.preferredTransform)
+            width = Int32(abs(size.width))
+            height = Int32(abs(size.height))
+        }
+        
+        // 获取文件大小
+        let fileSize = (try? videoURL.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+        
+        // 创建VideoItem
+        let videoItem = persistenceController.createVideoItem(
+            fileName: videoURL.lastPathComponent,
+            filePath: videoURL,
+            duration: duration,
+            isFromCamera: false, // 从相册打开的视频
+            width: width,
+            height: height,
+            fileSize: Int64(fileSize)
+        )
+        
+        print("📸 已创建VideoItem: \(videoURL.lastPathComponent)")
+        return videoItem
+    }
+    
+    /// 🆕 加载特定视频的截图数据
+    private func loadScreenshotsForVideo(_ videoURL: URL) {
+        let context = persistenceController.container.viewContext
+        
+        // 查找对应的VideoItem
+        let videoFetchRequest: NSFetchRequest<VideoItem> = VideoItem.fetchRequest()
+        videoFetchRequest.predicate = NSPredicate(format: "filePath == %@", videoURL as NSURL)
+        
+        do {
+            let videoItems = try context.fetch(videoFetchRequest)
+            
+            if let videoItem = videoItems.first {
+                // 找到了对应的VideoItem，加载其截图
+                let screenshotFetchRequest: NSFetchRequest<ScreenshotItem> = ScreenshotItem.fetchRequest()
+                screenshotFetchRequest.predicate = NSPredicate(format: "videoSource == %@", videoItem)
+                screenshotFetchRequest.sortDescriptors = [
+                    NSSortDescriptor(key: "selectionOrder", ascending: true),
+                    NSSortDescriptor(key: "timestamp", ascending: true)
+                ]
+                
+                let loadedScreenshots = try context.fetch(screenshotFetchRequest)
+                
+                // 更新截图数组
+                screenshots = loadedScreenshots
+                selectedScreenshots = loadedScreenshots.filter { $0.isSelected }
+                
+                print("📸 已加载会话数据: \(videoURL.lastPathComponent) - \(screenshots.count)张截图")
+            } else {
+                // 没有找到对应的VideoItem，说明是第一次打开这个视频
+                screenshots.removeAll()
+                selectedScreenshots.removeAll()
+                print("📸 新视频会话: \(videoURL.lastPathComponent) - 无历史截图")
+            }
+        } catch {
+            print("❌ 加载截图数据失败: \(error)")
+            screenshots.removeAll()
+            selectedScreenshots.removeAll()
+        }
+    }
+    
+    /// 🎯 手动清理未保存的截图（用于用户主动丢弃）
+    /// 在用户明确选择丢弃截图时调用
+    func clearUnsavedScreenshots() {
+        let unsavedScreenshots = screenshots.filter { !$0.isSavedToPhotos }
+        
+        // 从数组中移除未保存的截图
         screenshots.removeAll { !$0.isSavedToPhotos }
         selectedScreenshots.removeAll { !$0.isSavedToPhotos }
         
-        // 从数据库删除临时截图
-        temporaryScreenshots.forEach { screenshot in
+        // 从数据库删除未保存的截图
+        unsavedScreenshots.forEach { screenshot in
             persistenceController.deleteScreenshotItem(screenshot)
         }
         
-        if !temporaryScreenshots.isEmpty {
-            print("📸 清理临时截图: \(temporaryScreenshots.count)张")
-            notifyTemporaryScreenshotsCleared(temporaryScreenshots)
+        if !unsavedScreenshots.isEmpty {
+            print("📸 手动清理未保存截图: \(unsavedScreenshots.count)张")
+            notifyTemporaryScreenshotsCleared(unsavedScreenshots)
         }
+    }
+    
+    /// 🎯 已废弃：清理临时截图方法
+    /// 现在使用真正的会话隔离，不再需要手动清理临时截图
+    /// 所有截图数据都通过会话切换自动管理
+    @available(*, deprecated, message: "使用新的会话隔离机制，此方法已不再需要")
+    private func cleanTemporaryScreenshots() {
+        // 🎯 新的会话隔离机制下，这个方法已经不再需要
+        // 所有截图数据的保存和加载都通过switchVideoSession自动处理
+        print("⚠️ cleanTemporaryScreenshots已废弃，使用新的会话隔离机制")
     }
     
     /// 检查当前是否在视频编辑模式
@@ -128,6 +263,12 @@ class ScreenshotManager: ObservableObject {
         // 检查数量限制
         guard screenshots.count < currentMode.maxCount else {
             throw ScreenshotSessionError.maxLimitReached(mode: currentMode, count: currentMode.maxCount)
+        }
+        
+        // 🎯 确保截图与当前视频会话关联
+        if let currentVideoURL = currentVideoURL {
+            let videoItem = findOrCreateVideoItem(for: currentVideoURL)
+            screenshot.videoSource = videoItem
         }
         
         // 更新截图属性以匹配当前会话
