@@ -54,10 +54,7 @@ class CollageViewController: UIViewController {
     private let aspectRatioCollectionView: UICollectionView
     private let aspectRatioFlowLayout = UICollectionViewFlowLayout()
     
-    // 控制面板
-    private let controlPanelView = UIView()
-    private let generateButton = UIButton()
-    private let progressView = UIProgressView()
+    // 状态标签（移到头部区域）
     private let statusLabel = UILabel()
     
     // 图片编辑区域
@@ -160,9 +157,6 @@ class CollageViewController: UIViewController {
         // 图片编辑区域
         setupEditingSection()
         
-        // 控制面板
-        setupControlPanel()
-        
         // 底部按钮
         setupBottomButtons()
         
@@ -172,7 +166,6 @@ class CollageViewController: UIViewController {
         contentView.addSubview(layoutSectionView)
         contentView.addSubview(aspectRatioSectionView)
         contentView.addSubview(editingSectionView)
-        contentView.addSubview(controlPanelView)
         contentView.addSubview(bottomButtonsView)
     }
     
@@ -192,6 +185,13 @@ class CollageViewController: UIViewController {
         countLabel.textAlignment = .center
         countLabel.text = "已选择 \(imageItems.count) 张图片"
         headerView.addSubview(countLabel)
+        
+        // 状态标签（移到头部区域）
+        statusLabel.font = ThemeManager.captionFont
+        statusLabel.textColor = UIColor.white.withAlphaComponent(0.8)
+        statusLabel.textAlignment = .center
+        statusLabel.text = ""
+        headerView.addSubview(statusLabel)
     }
     
     private func setupPreviewArea() {
@@ -210,7 +210,7 @@ class CollageViewController: UIViewController {
         previewPlaceholder.font = ThemeManager.captionFont
         previewPlaceholder.textColor = UIColor.white.withAlphaComponent(0.6)
         previewPlaceholder.textAlignment = .center
-        previewPlaceholder.text = "选择布局后生成预览"
+        previewPlaceholder.text = "选择布局后自动生成拼图"
         previewPlaceholder.numberOfLines = 0
         previewContainerView.addSubview(previewPlaceholder)
     }
@@ -331,32 +331,6 @@ class CollageViewController: UIViewController {
         updateEditingButtonsState()
     }
     
-    private func setupControlPanel() {
-        controlPanelView.backgroundColor = UIColor.black.withAlphaComponent(0.2)
-        controlPanelView.layer.cornerRadius = ThemeManager.standardCornerRadius
-        
-        // 生成按钮
-        generateButton.setTitle("🎨 生成拼图", for: .normal)
-        generateButton.titleLabel?.font = ThemeManager.buttonFont
-        generateButton.setTitleColor(.white, for: .normal)
-        generateButton.backgroundColor = ThemeManager.buttonPrimary
-        generateButton.layer.cornerRadius = ThemeManager.standardCornerRadius
-        generateButton.addTarget(self, action: #selector(generateCollage), for: .touchUpInside)
-        controlPanelView.addSubview(generateButton)
-        
-        // 进度条
-        progressView.progressTintColor = ThemeManager.buttonPrimary
-        progressView.trackTintColor = UIColor.white.withAlphaComponent(0.3)
-        progressView.isHidden = true
-        controlPanelView.addSubview(progressView)
-        
-        // 状态标签
-        statusLabel.font = ThemeManager.captionFont
-        statusLabel.textColor = UIColor.white.withAlphaComponent(0.8)
-        statusLabel.textAlignment = .center
-        statusLabel.text = ""
-        controlPanelView.addSubview(statusLabel)
-    }
     
     private func setupBottomButtons() {
         bottomButtonsView.backgroundColor = .clear
@@ -368,8 +342,8 @@ class CollageViewController: UIViewController {
         resetButton.backgroundColor = UIColor.white.withAlphaComponent(0.2)
         resetButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         resetButton.addTarget(self, action: #selector(resetCollage), for: .touchUpInside)
-        resetButton.isEnabled = false
-        resetButton.alpha = 0.5
+        resetButton.isEnabled = true  // 重置按钮始终可用
+        resetButton.alpha = 1.0
         bottomButtonsView.addSubview(resetButton)
         
         // 保存按钮
@@ -379,7 +353,7 @@ class CollageViewController: UIViewController {
         saveButton.backgroundColor = ThemeManager.buttonSecondary
         saveButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         saveButton.addTarget(self, action: #selector(saveCollage), for: .touchUpInside)
-        saveButton.isEnabled = false
+        saveButton.isEnabled = false  // 初始禁用，拼图生成后启用
         saveButton.alpha = 0.5
         bottomButtonsView.addSubview(saveButton)
         
@@ -431,9 +405,6 @@ class CollageViewController: UIViewController {
         flipHorizontalButton.translatesAutoresizingMaskIntoConstraints = false
         flipVerticalButton.translatesAutoresizingMaskIntoConstraints = false
         resetEditingButton.translatesAutoresizingMaskIntoConstraints = false
-        controlPanelView.translatesAutoresizingMaskIntoConstraints = false
-        generateButton.translatesAutoresizingMaskIntoConstraints = false
-        progressView.translatesAutoresizingMaskIntoConstraints = false
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         bottomButtonsView.translatesAutoresizingMaskIntoConstraints = false
         resetButton.translatesAutoresizingMaskIntoConstraints = false
@@ -465,17 +436,22 @@ class CollageViewController: UIViewController {
             headerView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
             headerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             headerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            headerView.heightAnchor.constraint(equalToConstant: 80),
+            headerView.heightAnchor.constraint(equalToConstant: 100),
             
             titleLabel.topAnchor.constraint(equalTo: headerView.topAnchor),
             titleLabel.leadingAnchor.constraint(equalTo: headerView.leadingAnchor),
             titleLabel.trailingAnchor.constraint(equalTo: headerView.trailingAnchor),
             titleLabel.heightAnchor.constraint(equalToConstant: 40),
             
-            countLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            countLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
             countLabel.leadingAnchor.constraint(equalTo: headerView.leadingAnchor),
             countLabel.trailingAnchor.constraint(equalTo: headerView.trailingAnchor),
-            countLabel.heightAnchor.constraint(equalToConstant: 24),
+            countLabel.heightAnchor.constraint(equalToConstant: 20),
+            
+            statusLabel.topAnchor.constraint(equalTo: countLabel.bottomAnchor, constant: 4),
+            statusLabel.leadingAnchor.constraint(equalTo: headerView.leadingAnchor),
+            statusLabel.trailingAnchor.constraint(equalTo: headerView.trailingAnchor),
+            statusLabel.heightAnchor.constraint(equalToConstant: 20),
             
             // 预览区域 - 使用动态高度
             previewContainerView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 16),
@@ -573,30 +549,8 @@ class CollageViewController: UIViewController {
             resetEditingButton.widthAnchor.constraint(equalToConstant: 48),
             resetEditingButton.heightAnchor.constraint(equalToConstant: 28),
             
-            // 控制面板 - 优化高度
-            controlPanelView.topAnchor.constraint(equalTo: editingSectionView.bottomAnchor, constant: 16),
-            controlPanelView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            controlPanelView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            controlPanelView.heightAnchor.constraint(greaterThanOrEqualToConstant: 100),
-            
-            generateButton.topAnchor.constraint(equalTo: controlPanelView.topAnchor, constant: 16),
-            generateButton.leadingAnchor.constraint(equalTo: controlPanelView.leadingAnchor, constant: 16),
-            generateButton.trailingAnchor.constraint(equalTo: controlPanelView.trailingAnchor, constant: -16),
-            generateButton.heightAnchor.constraint(equalToConstant: 48),
-            
-            progressView.topAnchor.constraint(equalTo: generateButton.bottomAnchor, constant: 12),
-            progressView.leadingAnchor.constraint(equalTo: controlPanelView.leadingAnchor, constant: 16),
-            progressView.trailingAnchor.constraint(equalTo: controlPanelView.trailingAnchor, constant: -16),
-            progressView.heightAnchor.constraint(equalToConstant: 4),
-            
-            statusLabel.topAnchor.constraint(equalTo: progressView.bottomAnchor, constant: 8),
-            statusLabel.leadingAnchor.constraint(equalTo: controlPanelView.leadingAnchor, constant: 16),
-            statusLabel.trailingAnchor.constraint(equalTo: controlPanelView.trailingAnchor, constant: -16),
-            statusLabel.heightAnchor.constraint(equalToConstant: 24),
-            statusLabel.bottomAnchor.constraint(lessThanOrEqualTo: controlPanelView.bottomAnchor, constant: -16),
-            
-            // 底部按钮 - 增加安全区域间距
-            bottomButtonsView.topAnchor.constraint(equalTo: controlPanelView.bottomAnchor, constant: 16),
+            // 底部按钮 - 直接连接编辑区域
+            bottomButtonsView.topAnchor.constraint(equalTo: editingSectionView.bottomAnchor, constant: 24),
             bottomButtonsView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             bottomButtonsView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             bottomButtonsView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -30),
@@ -661,12 +615,12 @@ class CollageViewController: UIViewController {
             // 横向比例，宽度优先
             targetHeight = contentWidth / aspectRatio + 32 // 加上内部上下边距
         } else {
-            // 纵向或正方形比例，限制最大高度
-            let maxHeight = containerWidth * 0.8 // 最大高度限制
+            // 纵向或正方形比例，适当提高最大高度限制
+            let maxHeight = containerWidth * 1.2 // 提高最大高度限制，让预览更清晰
             targetHeight = min(contentWidth / aspectRatio + 32, maxHeight)
         }
         
-        return CGSize(width: containerWidth, height: max(200, targetHeight)) // 最小高度200
+        return CGSize(width: containerWidth, height: max(350, targetHeight)) // 提高最小高度到350
     }
     
     private func getAspectRatioValue() -> CGFloat {
@@ -704,33 +658,6 @@ class CollageViewController: UIViewController {
     }
     
     
-    @objc private func generateCollage() {
-        HapticFeedbackManager.shared.buttonTap()
-        
-        // 显示生成进度
-        showGeneratingProgress()
-        
-        // 异步生成拼图
-        DispatchQueue.global(qos: .userInitiated).async {
-            let generatedImage = self.createCollageImage()
-            
-            DispatchQueue.main.async {
-                self.hideGeneratingProgress()
-                
-                if let image = generatedImage {
-                    self.collageImage = image
-                    self.previewImageView.image = image
-                    self.previewPlaceholder.isHidden = true
-                    self.enableBottomButtons(true)
-                    self.statusLabel.text = "拼图生成完成"
-                    HapticFeedbackManager.shared.notificationSuccess()
-                } else {
-                    self.statusLabel.text = "生成失败，请重试"
-                    HapticFeedbackManager.shared.notificationError()
-                }
-            }
-        }
-    }
     
     @objc private func resetCollage() {
         HapticFeedbackManager.shared.buttonTap()
@@ -738,7 +665,7 @@ class CollageViewController: UIViewController {
         collageImage = nil
         previewImageView.image = nil
         previewPlaceholder.isHidden = false
-        previewPlaceholder.text = "选择布局后生成预览"
+        previewPlaceholder.text = "选择布局后自动生成拼图"
         enableBottomButtons(false)
         statusLabel.text = ""
         selectedAspectRatio = .square1_1
@@ -821,7 +748,7 @@ class CollageViewController: UIViewController {
             updatePreview()
         }
         
-        statusLabel.text = "图片编辑已重置"
+        statusLabel.text = "图片编辑已重置，拼图已更新"
     }
     
     private func updateEditingButtonsState() {
@@ -886,6 +813,7 @@ class CollageViewController: UIViewController {
     private func updatePreview() {
         // 自动生成预览拼图
         DispatchQueue.global(qos: .userInitiated).async {
+            // 使用高质量的固定尺寸生成拼图，确保最终输出质量
             let generatedImage = self.createCollageImageWithTemplate(size: self.calculateCollageSize())
             
             DispatchQueue.main.async {
@@ -894,18 +822,20 @@ class CollageViewController: UIViewController {
                     self.previewImageView.image = image
                     self.previewPlaceholder.isHidden = true
                     self.enableBottomButtons(true)
-                    self.statusLabel.text = "预览已生成，可以保存或分享"
+                    self.statusLabel.text = "拼图已生成，可以保存或分享"
+                    HapticFeedbackManager.shared.lightImpact()
                 } else {
                     self.previewPlaceholder.isHidden = false
-                    self.previewPlaceholder.text = "预览生成失败"
-                    self.statusLabel.text = "预览生成失败，请重试"
+                    self.previewPlaceholder.text = "拼图生成失败"
+                    self.statusLabel.text = "拼图生成失败，请重试"
                 }
             }
         }
     }
     
     private func calculateCollageSize() -> CGSize {
-        let baseSize: CGFloat = 800
+        // 使用更高的基础尺寸，确保输出质量
+        let baseSize: CGFloat = 1200
         
         switch selectedAspectRatio {
         case .square1_1:
@@ -921,33 +851,17 @@ class CollageViewController: UIViewController {
         }
     }
     
-    private func showGeneratingProgress() {
-        generateButton.isEnabled = false
-        generateButton.alpha = 0.5
-        progressView.isHidden = false
-        progressView.progress = 0.0
-        statusLabel.text = "正在生成拼图..."
-        
-        // 模拟进度条动画
-        UIView.animate(withDuration: 2.0) {
-            self.progressView.progress = 1.0
-        }
-    }
-    
-    private func hideGeneratingProgress() {
-        generateButton.isEnabled = true
-        generateButton.alpha = 1.0
-        progressView.isHidden = true
-        progressView.progress = 0.0
-    }
     
     private func enableBottomButtons(_ enabled: Bool) {
-        resetButton.isEnabled = enabled
+        // 重置按钮始终可用
+        resetButton.isEnabled = true
+        resetButton.alpha = 1.0
+        
+        // 其他按钮根据拼图生成状态调整
         saveButton.isEnabled = enabled
         shareButton.isEnabled = enabled
         enhanceButton.isEnabled = enabled
         
-        resetButton.alpha = enabled ? 1.0 : 0.5
         saveButton.alpha = enabled ? 1.0 : 0.5
         shareButton.alpha = enabled ? 1.0 : 0.5
         enhanceButton.alpha = enabled ? 1.0 : 0.5
