@@ -73,15 +73,10 @@ class VideoGalleryViewController: UIViewController {
         let button = UIButton(type: .system)
         button.setImage(UIImage(systemName: "plus"), for: .normal)
         
-        // 添加背景色强调重要性
-        button.backgroundColor = ThemeManager.buttonPrimary
+        // 添加背景色强调重要性 - 深紫色
+        button.backgroundColor = UIColor(red: 0.4, green: 0.2, blue: 0.6, alpha: 1.0) // 深紫色
         button.tintColor = .white
-        button.layer.cornerRadius = 16
         button.layer.masksToBounds = true
-        
-        // 设置固定尺寸确保圆形外观
-        button.widthAnchor.constraint(equalToConstant: 32).isActive = true
-        button.heightAnchor.constraint(equalToConstant: 32).isActive = true
         
         button.addTarget(self, action: #selector(importButtonTapped), for: .touchUpInside)
         return button
@@ -234,6 +229,50 @@ class VideoGalleryViewController: UIViewController {
         return button
     }()
     
+    // 标题标签 - 需要可访问以便更新文本
+    private lazy var titleLabel: UILabel = {
+        let label = UILabel()
+        label.text = "我的创作"
+        label.font = ThemeManager.headlineFont
+        label.textColor = ThemeManager.primaryText
+        label.textAlignment = .left
+        return label
+    }()
+    
+    // 自定义标题视图
+    private lazy var titleView: UIView = {
+        let containerView = UIView()
+        
+        // 将加号按钮设置得更小一些，适合紧贴标题
+        importButton.widthAnchor.constraint(equalToConstant: 28).isActive = true
+        importButton.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        importButton.layer.cornerRadius = 14 // 调整圆角
+        
+        // 添加到容器视图
+        containerView.addSubview(titleLabel)
+        containerView.addSubview(importButton)
+        
+        // 设置约束
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        importButton.translatesAutoresizingMaskIntoConstraints = false
+        
+        NSLayoutConstraint.activate([
+            // 标题标签约束
+            titleLabel.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
+            titleLabel.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+            
+            // 加号按钮约束 - 紧贴标题右侧
+            importButton.leadingAnchor.constraint(equalTo: titleLabel.trailingAnchor, constant: 8),
+            importButton.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+            importButton.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
+            
+            // 容器视图高度
+            containerView.heightAnchor.constraint(equalToConstant: 44)
+        ])
+        
+        return containerView
+    }()
+    
     // MARK: - Data Management
     private let videoManager = VideoManager.shared
     private var fetchedResultsController: NSFetchedResultsController<VideoItem>!
@@ -299,7 +338,8 @@ class VideoGalleryViewController: UIViewController {
     }
     
     private func setupNavigationBar() {
-        title = "我的创作"
+        // 使用自定义标题视图代替普通标题
+        navigationItem.titleView = titleView
         
         // 自定义导航栏外观
         navigationController?.navigationBar.prefersLargeTitles = false
@@ -322,12 +362,8 @@ class VideoGalleryViewController: UIViewController {
         if isSelectionMode {
             navigationItem.rightBarButtonItem = UIBarButtonItem(customView: cancelButton)
         } else {
-            // 创建右侧按钮栈 - 将加号按钮放在最显眼的位置（最右侧）
-            let stackView = UIStackView(arrangedSubviews: [selectButton, importButton])
-            stackView.axis = .horizontal
-            stackView.spacing = 16
-            stackView.alignment = .center
-            navigationItem.rightBarButtonItem = UIBarButtonItem(customView: stackView)
+            // 只保留选择按钮在右侧，加号按钮已移到标题旁边
+            navigationItem.rightBarButtonItem = UIBarButtonItem(customView: selectButton)
         }
     }
     
@@ -761,6 +797,9 @@ class VideoGalleryViewController: UIViewController {
         updateToolbarForSelectionMode()
         updateSelectionUI()
         
+        // 隐藏加号按钮
+        importButton.isHidden = true
+        
         // 动画更新collection view
         UIView.animate(withDuration: 0.3) {
             self.collectionView.reloadData()
@@ -771,6 +810,12 @@ class VideoGalleryViewController: UIViewController {
         isSelectionMode = false
         selectedVideoItems.removeAll()
         updateToolbarForNormalMode()
+        
+        // 恢复原标题
+        titleLabel.text = "我的创作"
+        
+        // 显示加号按钮
+        importButton.isHidden = false
         
         // 动画更新collection view
         UIView.animate(withDuration: 0.3) {
@@ -800,9 +845,9 @@ class VideoGalleryViewController: UIViewController {
         // 更新选择计数显示
         let selectedCount = selectedVideoItems.count
         if selectedCount > 0 {
-            title = "已选择 \(selectedCount) 个视频"
+            titleLabel.text = "已选择 \(selectedCount) 个视频"
         } else {
-            title = "选择视频"
+            titleLabel.text = "选择视频"
         }
     }
     

@@ -806,14 +806,10 @@ extension ScreenshotProcessingViewController {
             print("✅ 数据清理完成")
         }
         
-        // 🚀 优化3：页面关闭和通知发送在主线程并行处理
-        dismiss(animated: true) {
-            print("✨ 已关闭\(mode == .livePhoto ? "Live Photo" : "截图")处理页面")
-            
-            // 🚀 优化4：简化通知链路 - 直接在主线程发送通知
-            NotificationCenter.default.post(name: .shouldOpenCamera, object: nil)
-            print("📡 已发送打开相机通知")
-        }
+        // 🔧 修复竞态条件：直接发送通知，让MainCameraViewController统一处理界面关闭
+        print("📡 发送打开相机通知，由MainCameraViewController统一处理界面关闭")
+        NotificationCenter.default.post(name: .shouldOpenCamera, object: nil)
+        print("✅ 已发送打开相机通知，避免双重dismiss竞态条件")
     }
     
     /// 清空VideoPlayerViewController中的截图数据并重置到普通录像模式
