@@ -429,8 +429,18 @@ class VideoGalleryViewController: UIViewController {
         
         do {
             try fetchedResultsController.performFetch()
-            videos = fetchedResultsController.fetchedObjects ?? []
-            print("✅ VideoGallery: Loaded \(videos.count) videos")
+            let allVideos = fetchedResultsController.fetchedObjects ?? []
+            
+            // 🚀 立即过滤掉文件不存在的视频，避免UI闪烁
+            videos = allVideos.filter { video in
+                let exists = FileManager.default.fileExists(atPath: video.filePath.path)
+                if !exists {
+                    print("🔍 隐藏孤儿记录: \(video.fileName) (文件不存在)")
+                }
+                return exists
+            }
+            
+            print("✅ VideoGallery: Loaded \(allVideos.count) total records, showing \(videos.count) valid videos")
         } catch {
             print("❌ VideoGallery: 获取视频数据失败: \(error)")
         }
@@ -450,18 +460,18 @@ class VideoGalleryViewController: UIViewController {
     
     // 🆕 延迟清理方法 - 避免与NSFetchedResultsController初始化冲突
     private func performDeferredCleanup() {
-        print("📱 VideoGallery: 开始延迟清理检查")
+        print("📱 VideoGallery: 开始静默清理检查")
         
-        // 🔧 修改清理策略：每次启动都检查孤儿记录，但智能决定是否执行清理
+        // 🚀 优化：UI已经过滤了孤儿记录，现在只需要静默清理数据库
         videoManager.checkForOrphanRecords { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
                 case .success(let orphanCount):
                     if orphanCount > 0 {
-                        print("🧹 VideoGallery: 发现 \(orphanCount) 个孤儿记录，开始清理")
+                        print("🧹 VideoGallery: 静默清理 \(orphanCount) 个孤儿记录")
                         self?.executeCleanup()
                     } else {
-                        print("✅ VideoGallery: 没有发现孤儿记录，跳过清理")
+                        print("✅ VideoGallery: 数据库已清洁，无需清理")
                     }
                 case .failure(let error):
                     print("❌ VideoGallery: 检查孤儿记录失败: \(error)")
@@ -517,8 +527,18 @@ class VideoGalleryViewController: UIViewController {
         
         do {
             try fetchedResultsController.performFetch()
-            videos = fetchedResultsController.fetchedObjects ?? []
-            print("✅ VideoGallery: Refreshed \(videos.count) videos")
+            let allVideos = fetchedResultsController.fetchedObjects ?? []
+            
+            // 🚀 立即过滤掉文件不存在的视频，避免UI闪烁
+            videos = allVideos.filter { video in
+                let exists = FileManager.default.fileExists(atPath: video.filePath.path)
+                if !exists {
+                    print("🔍 隐藏孤儿记录: \(video.fileName) (文件不存在)")
+                }
+                return exists
+            }
+            
+            print("✅ VideoGallery: Refreshed \(allVideos.count) total records, showing \(videos.count) valid videos")
             scheduleUIUpdate()
         } catch {
             print("❌ VideoGallery: 刷新数据失败: \(error)")
@@ -1207,7 +1227,14 @@ extension VideoGalleryViewController: NSFetchedResultsControllerDelegate {
                 return
             }
             
-            self.videos = fetchedObjects
+            // 🚀 立即过滤掉文件不存在的视频，避免UI闪烁
+            self.videos = fetchedObjects.filter { video in
+                let exists = FileManager.default.fileExists(atPath: video.filePath.path)
+                if !exists {
+                    print("🔍 隐藏孤儿记录: \(video.fileName) (文件不存在)")
+                }
+                return exists
+            }
             
             // 使用防抖机制，避免频繁更新UI
             self.scheduleUIUpdate()
