@@ -60,8 +60,8 @@ class CaptureModeSwitcher: UIView {
     private func setupUI() {
         backgroundColor = .clear
         
-        // 模糊背景
-        blurEffectView.layer.cornerRadius = ThemeManager.standardCornerRadius
+        // 模糊背景 - 🌟 更圆润的背景设计
+        blurEffectView.layer.cornerRadius = 25  // 更大的圆角半径
         blurEffectView.clipsToBounds = true
         addSubview(blurEffectView)
         
@@ -86,11 +86,13 @@ class CaptureModeSwitcher: UIView {
         stillImageButton.titleLabel?.font = ThemeManager.buttonFont.withSize(ThemeManager.buttonFont.pointSize + 1)  // 🌟 稍大字体
         stillImageButton.contentHorizontalAlignment = .center
         stillImageButton.semanticContentAttribute = .forceLeftToRight
+        // 🌟 添加按钮内边距，让文字和按钮边缘有舒适间隙
+        stillImageButton.contentEdgeInsets = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16)
         stillImageButton.imageEdgeInsets = UIEdgeInsets(top: 0, left: -8, bottom: 0, right: 8)
         stillImageButton.titleEdgeInsets = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: -8)
         
         // 🌟 增强视觉效果 - 主要功能按钮
-        stillImageButton.layer.cornerRadius = ThemeManager.smallCornerRadius
+        stillImageButton.layer.cornerRadius = 20  // 更圆润的设计
         stillImageButton.clipsToBounds = false  // 🌟 允许阴影显示
         
         // 🌟 预设阴影属性（选中时才激活）
@@ -108,11 +110,13 @@ class CaptureModeSwitcher: UIView {
         livePhotoButton.titleLabel?.font = ThemeManager.buttonFont
         livePhotoButton.contentHorizontalAlignment = .center
         livePhotoButton.semanticContentAttribute = .forceLeftToRight
+        // 🌟 添加按钮内边距，让文字和按钮边缘有舒适间隙
+        livePhotoButton.contentEdgeInsets = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16)
         livePhotoButton.imageEdgeInsets = UIEdgeInsets(top: 0, left: -8, bottom: 0, right: 8)
         livePhotoButton.titleEdgeInsets = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: -8)
         
         // 设置样式
-        livePhotoButton.layer.cornerRadius = ThemeManager.smallCornerRadius
+        livePhotoButton.layer.cornerRadius = 20  // 更圆润的设计
         livePhotoButton.clipsToBounds = false  // 🌟 允许阴影显示
         
         // 🌟 预设阴影属性（选中时才激活）
