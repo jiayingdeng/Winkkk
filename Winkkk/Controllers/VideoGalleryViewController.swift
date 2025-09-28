@@ -572,23 +572,26 @@ class VideoGalleryViewController: UIViewController {
     private func applyCurrentFilters() {
         filteredVideos = videos.filter { video in
             // 检查来源筛选
-            let sourceMatches = currentFilterOptions.sources.contains { sourceType in
-                switch sourceType {
-                case .appRecorded:
-                    return video.videoSource == VideoSourceType.appRecorded.rawValue
-                case .systemImported:
-                    return video.videoSource == VideoSourceType.systemImported.rawValue
-                }
+            let sourceMatches: Bool
+            if video.videoSource == VideoSourceType.appRecorded.rawValue {
+                sourceMatches = currentFilterOptions.showAppRecorded
+            } else if video.videoSource == VideoSourceType.systemImported.rawValue {
+                sourceMatches = currentFilterOptions.showSystemImported
+            } else {
+                sourceMatches = false
             }
             
-            // 检查状态筛选
-            let statusMatches = currentFilterOptions.statuses.contains { statusType in
-                switch statusType {
-                case .exported:
-                    return video.exportStatus == ExportStatusType.exported.rawValue
-                case .pending:
-                    return video.exportStatus == ExportStatusType.pending.rawValue
+            // 检查状态筛选 (仅对应用拍摄的视频)
+            let statusMatches: Bool
+            if video.videoSource == VideoSourceType.appRecorded.rawValue {
+                // 对于应用拍摄的视频，检查是否显示待导出状态
+                if video.exportStatus == ExportStatusType.pending.rawValue {
+                    statusMatches = currentFilterOptions.showPendingExport
+                } else {
+                    statusMatches = true // 已导出的视频总是显示
                 }
+            } else {
+                statusMatches = true // 系统导入的视频不需要状态筛选
             }
             
             return sourceMatches && statusMatches
@@ -1361,7 +1364,9 @@ extension VideoGalleryViewController: VideoGalleryGuideDelegate {
         
         // 测试筛选选项
         var testOptions = VideoFilterOptions()
-        testOptions.sources = [.systemImported]
+        testOptions.showSystemImported = true
+        testOptions.showAppRecorded = false
+        testOptions.showPendingExport = true
         currentFilterOptions = testOptions
         applyCurrentFilters()
         

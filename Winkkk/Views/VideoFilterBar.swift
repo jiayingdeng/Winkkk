@@ -15,17 +15,18 @@ protocol VideoFilterBarDelegate: AnyObject {
 
 // MARK: - VideoFilterOptions
 struct VideoFilterOptions {
-    var sources: Set<VideoSourceType> = Set(VideoSourceType.allCases)
-    var statuses: Set<ExportStatusType> = Set(ExportStatusType.allCases)
+    var showAppRecorded: Bool = true     // 📱 应用拍摄
+    var showSystemImported: Bool = true  // 📥 系统导入
+    var showPendingExport: Bool = true   // ⏳ 待导出（仅应用拍摄）
     
     var isShowingAll: Bool {
-        return sources.count == VideoSourceType.allCases.count && 
-               statuses.count == ExportStatusType.allCases.count
+        return showAppRecorded && showSystemImported && showPendingExport
     }
     
     mutating func reset() {
-        sources = Set(VideoSourceType.allCases)
-        statuses = Set(ExportStatusType.allCases)
+        showAppRecorded = true
+        showSystemImported = true
+        showPendingExport = true
     }
 }
 
@@ -54,10 +55,9 @@ class VideoFilterBar: UIView {
     }()
     
     private lazy var allButton = createFilterButton(title: "全部", type: .all)
-    private lazy var appSourceButton = createFilterButton(title: "📱 应用", type: .source(.appRecorded))
-    private lazy var importSourceButton = createFilterButton(title: "📥 导入", type: .source(.systemImported))
-    private lazy var exportedButton = createFilterButton(title: "✅ 已导出", type: .status(.exported))
-    private lazy var pendingButton = createFilterButton(title: "⏳ 待导出", type: .status(.pending))
+    private lazy var appRecordedButton = createFilterButton(title: "📱 应用拍摄", type: .appRecorded)
+    private lazy var systemImportedButton = createFilterButton(title: "📥 系统导入", type: .systemImported)
+    private lazy var pendingExportButton = createFilterButton(title: "⏳ 待导出", type: .pendingExport)
     
     private lazy var resultCountLabel: UILabel = {
         let label = UILabel()
@@ -74,8 +74,9 @@ class VideoFilterBar: UIView {
     // MARK: - Button Types
     private enum FilterButtonType {
         case all
-        case source(VideoSourceType)
-        case status(ExportStatusType)
+        case appRecorded
+        case systemImported
+        case pendingExport
     }
     
     // MARK: - Initialization
@@ -103,11 +104,10 @@ class VideoFilterBar: UIView {
         // 添加按钮到堆栈视图
         stackView.addArrangedSubview(allButton)
         stackView.addArrangedSubview(createSeparator())
-        stackView.addArrangedSubview(appSourceButton)
-        stackView.addArrangedSubview(importSourceButton)
+        stackView.addArrangedSubview(appRecordedButton)
+        stackView.addArrangedSubview(systemImportedButton)
         stackView.addArrangedSubview(createSeparator())
-        stackView.addArrangedSubview(exportedButton)
-        stackView.addArrangedSubview(pendingButton)
+        stackView.addArrangedSubview(pendingExportButton)
         stackView.addArrangedSubview(createSeparator())
         stackView.addArrangedSubview(resultCountLabel)
         
@@ -154,10 +154,12 @@ class VideoFilterBar: UIView {
         switch type {
         case .all:
             button.tag = 0
-        case .source(let sourceType):
-            button.tag = 100 + sourceType.rawValue.hashValue
-        case .status(let statusType):
-            button.tag = 200 + statusType.rawValue.hashValue
+        case .appRecorded:
+            button.tag = 100
+        case .systemImported:
+            button.tag = 101
+        case .pendingExport:
+            button.tag = 200
         }
         
         return button
@@ -184,19 +186,14 @@ class VideoFilterBar: UIView {
             }
             filterOptions.reset()
             
-        case 100..<200: // 来源按钮
-            if sender == appSourceButton {
-                toggleSource(.appRecorded)
-            } else if sender == importSourceButton {
-                toggleSource(.systemImported)
-            }
+        case 100: // 应用拍摄
+            toggleAppRecorded()
             
-        case 200..<300: // 状态按钮
-            if sender == exportedButton {
-                toggleStatus(.exported)
-            } else if sender == pendingButton {
-                toggleStatus(.pending)
-            }
+        case 101: // 系统导入
+            toggleSystemImported()
+            
+        case 200: // 待导出
+            togglePendingExport()
             
         default:
             break
@@ -206,44 +203,34 @@ class VideoFilterBar: UIView {
         delegate?.videoFilterBar(self, didChangeFilters: filterOptions)
     }
     
-    private func toggleSource(_ sourceType: VideoSourceType) {
-        if filterOptions.sources.contains(sourceType) {
-            filterOptions.sources.remove(sourceType)
-        } else {
-            filterOptions.sources.insert(sourceType)
-        }
+    private func toggleAppRecorded() {
+        filterOptions.showAppRecorded.toggle()
         
-        // 确保至少有一个来源被选中
-        if filterOptions.sources.isEmpty {
-            filterOptions.sources.insert(sourceType)
+        // 确保至少有一个类别被选中
+        if !filterOptions.showAppRecorded && !filterOptions.showSystemImported {
+            filterOptions.showAppRecorded = true
         }
     }
     
-    private func toggleStatus(_ statusType: ExportStatusType) {
-        if filterOptions.statuses.contains(statusType) {
-            filterOptions.statuses.remove(statusType)
-        } else {
-            filterOptions.statuses.insert(statusType)
-        }
+    private func toggleSystemImported() {
+        filterOptions.showSystemImported.toggle()
         
-        // 确保至少有一个状态被选中
-        if filterOptions.statuses.isEmpty {
-            filterOptions.statuses.insert(statusType)
+        // 确保至少有一个类别被选中
+        if !filterOptions.showAppRecorded && !filterOptions.showSystemImported {
+            filterOptions.showSystemImported = true
         }
+    }
+    
+    private func togglePendingExport() {
+        filterOptions.showPendingExport.toggle()
     }
     
     // MARK: - UI Updates
     private func updateButtonStates() {
-        // 更新全部按钮
         updateButtonAppearance(allButton, isSelected: filterOptions.isShowingAll)
-        
-        // 更新来源按钮
-        updateButtonAppearance(appSourceButton, isSelected: filterOptions.sources.contains(.appRecorded))
-        updateButtonAppearance(importSourceButton, isSelected: filterOptions.sources.contains(.systemImported))
-        
-        // 更新状态按钮
-        updateButtonAppearance(exportedButton, isSelected: filterOptions.statuses.contains(.exported))
-        updateButtonAppearance(pendingButton, isSelected: filterOptions.statuses.contains(.pending))
+        updateButtonAppearance(appRecordedButton, isSelected: filterOptions.showAppRecorded)
+        updateButtonAppearance(systemImportedButton, isSelected: filterOptions.showSystemImported)
+        updateButtonAppearance(pendingExportButton, isSelected: filterOptions.showPendingExport)
     }
     
     private func updateButtonAppearance(_ button: UIButton, isSelected: Bool) {
@@ -267,6 +254,19 @@ class VideoFilterBar: UIView {
         } else {
             resultCountLabel.isHidden = false
             resultCountLabel.text = "\(count)/\(total)"
+        }
+    }
+    
+    // 新增：控制FilterBar的显示/隐藏
+    func setVisible(_ visible: Bool, animated: Bool = true) {
+        if animated {
+            UIView.animate(withDuration: 0.3) {
+                self.alpha = visible ? 1 : 0
+                self.transform = visible ? .identity : CGAffineTransform(translationX: 0, y: -20)
+            }
+        } else {
+            alpha = visible ? 1 : 0
+            transform = visible ? .identity : CGAffineTransform(translationX: 0, y: -20)
         }
     }
     

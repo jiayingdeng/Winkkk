@@ -421,14 +421,8 @@ class MainCameraViewController: UIViewController {
                     // 🚀 优化：快速检查相机状态并启动
                     self.ensureCameraReady()
                     
-                    // 保留成功提示消息（按用户要求）
-                    let alert = UIAlertController(
-                        title: "✨ 已回到录像页面",
-                        message: "可以开始新的创作了！",
-                        preferredStyle: .alert
-                    )
-                    alert.addAction(UIAlertAction(title: "确定", style: .default))
-                    self.present(alert, animated: true)
+                    // 🔧 修复：安全地展示成功提示消息
+                    self.safelyPresentSuccessAlert()
                 }
             } else {
                 print("✅ 当前已在主录像页面")
@@ -460,7 +454,7 @@ class MainCameraViewController: UIViewController {
         }
     }
     
-    /// 🔧 方案1：统一控制的模态界面关闭方法
+    /// 🔧 方案1：统一控制的模态界面关闭方法 - 修复版本
     private func dismissAllModalViewControllers(completion: @escaping () -> Void) {
         // 🚀 收集所有需要关闭的模态界面
         var modalsToClose: [UIViewController] = []
@@ -484,26 +478,57 @@ class MainCameraViewController: UIViewController {
             print("  层级 \(index + 1): \(type(of: modal))")
         }
         
-        // 🚀 一次性关闭最顶层的模态界面，系统会自动处理下层
-        // 这比递归关闭更快且更稳定，避免了竞态条件
-        if let topModal = modalsToClose.first {
-            print("🔄 MainCamera: 开始关闭顶层模态界面: \(type(of: topModal))")
+        // 🚀 修复关键问题：从最顶层模态界面开始递归关闭到MainCameraViewController
+        // 确保所有嵌套的模态界面都被正确关闭，但MainCameraViewController本身不被dismiss
+        print("🔄 MainCamera: 开始递归关闭所有模态界面")
+        
+        self.dismissModalRecursively(completion: completion)
+    }
+    
+    /// 🔧 递归关闭模态界面的安全方法
+    private func dismissModalRecursively(completion: @escaping () -> Void) {
+        guard let presented = self.presentedViewController else {
+            print("✅ MainCamera: 递归关闭完成，无更多模态界面")
+            completion()
+            return
+        }
+        
+        print("🔄 MainCamera: 关闭模态界面: \(type(of: presented))")
+        
+        presented.dismiss(animated: true) { [weak self] in
+            // 🚀 递归处理下一个模态界面
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self?.dismissModalRecursively(completion: completion)
+            }
+        }
+    }
+    
+    /// 🔧 安全地展示成功提示Alert，避免"view not in window hierarchy"错误
+    private func safelyPresentSuccessAlert() {
+        // 🚀 验证视图控制器状态
+        guard self.view.window != nil,
+              self.presentedViewController == nil else {
+            print("⚠️ MainCamera: 无法展示Alert，视图控制器状态不正确")
+            return
+        }
+        
+        // 🔧 使用小延迟确保界面完全稳定
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self = self,
+                  self.view.window != nil else {
+                print("⚠️ MainCamera: Alert展示时视图控制器已不在窗口层级中")
+                return
+            }
             
-            // 🔧 使用animated: true保证用户体验，但通过统一控制避免竞态
-            topModal.dismiss(animated: true) { [weak self] in
-                // 🚀 确保在主线程执行，并添加适当延迟确保界面完全关闭
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    print("✅ MainCamera: 所有模态界面已关闭")
-                    
-                    // 🔧 验证确实没有模态界面了
-                    if self?.presentedViewController == nil {
-                        print("✅ MainCamera: 验证通过，当前无模态界面")
-                    } else {
-                        print("⚠️ MainCamera: 警告，仍有模态界面未关闭")
-                    }
-                    
-                    completion()
-                }
+            let alert = UIAlertController(
+                title: "✨ 已回到录像页面",
+                message: "可以开始新的创作了！",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "确定", style: .default))
+            
+            self.present(alert, animated: true) {
+                print("✅ 成功展示回到录像页面提示")
             }
         }
     }
