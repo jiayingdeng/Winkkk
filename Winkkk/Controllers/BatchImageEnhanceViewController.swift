@@ -616,10 +616,15 @@ extension BatchImageEnhanceViewController {
         }
     }
     
-    /// 执行返回操作
+    /// 执行返回操作 - 第一层立即优化版本
     private func performReturn() {
         // 🚀 优化：智能返回路径判断
         guard let navigationController = navigationController else { return }
+        
+        // 🚀 优化1：并行化资源清理 - 立即开始清理，不等待导航完成
+        DispatchQueue.global(qos: .utility).async {
+            self.cleanupImageResources()
+        }
         
         // 检查导航栈中是否有ScreenshotProcessingViewController
         let hasScreenshotProcessingVC = navigationController.viewControllers.contains { viewController in
@@ -633,23 +638,14 @@ extension BatchImageEnhanceViewController {
             }
             
             if let targetVC = targetViewController {
+                // 🚀 优化2：立即导航，资源清理并行进行
                 navigationController.popToViewController(targetVC, animated: true)
-                
-                // 🚀 优化：异步清理资源，避免阻塞UI
-                DispatchQueue.global(qos: .utility).async {
-                    self.cleanupImageResources()
-                }
                 return
             }
         }
         
-        // 默认返回上一页
+        // 🚀 优化3：默认返回，简化逻辑
         navigationController.popViewController(animated: true)
-        
-        // 🚀 优化：异步清理资源，避免阻塞UI
-        DispatchQueue.global(qos: .utility).async {
-            self.cleanupImageResources()
-        }
     }
     
     /// 🚀 新增：清理图片资源，优化内存使用

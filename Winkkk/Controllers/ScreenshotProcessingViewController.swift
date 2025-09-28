@@ -766,37 +766,37 @@ extension ScreenshotProcessingViewController {
         navigateBackToVideoPlayer()
     }
     
-    /// 导航回到录制页面 - 优化版本
+    /// 导航回到录制页面 - 第一层立即优化版本
     private func navigateBackToVideoPlayer() {
         print("🔄 开始导航回到录制页面...")
         
-        // 🚀 优化1：异步清理数据，避免阻塞UI动画
-        let mode = self.mode // 保存模式信息，避免闭包中访问self
+        // 🚀 优化1：保存模式信息，避免闭包中访问self
+        let mode = self.mode
         
-        // 🚀 优化2：立即开始关闭动画，不等待数据清理完成
+        // 🚀 优化2：并行化 - 数据清理和页面关闭同时开始
+        // 立即开始数据清理，不等待dismiss完成
+        DispatchQueue.global(qos: .userInitiated).async {
+            print("🧹 并行开始数据清理...")
+            
+            // 清空截图数据和重置模式
+            ScreenshotManager.shared.clearAllScreenshots()
+            TimeSequenceModeManager.shared.switchToNormalMode()
+            
+            // Live Photo模式下的特殊处理
+            if mode == .livePhoto {
+                print("📸 Live Photo模式：数据清理完成")
+            }
+            
+            print("✅ 数据清理完成")
+        }
+        
+        // 🚀 优化3：页面关闭和通知发送在主线程并行处理
         dismiss(animated: true) {
             print("✨ 已关闭\(mode == .livePhoto ? "Live Photo" : "截图")处理页面")
             
-            // 🚀 优化3：数据清理在后台异步执行
-            DispatchQueue.global(qos: .userInitiated).async {
-                print("🧹 开始异步清理数据...")
-                
-                // 清空截图数据和重置模式
-                ScreenshotManager.shared.clearAllScreenshots()
-                TimeSequenceModeManager.shared.switchToNormalMode()
-                
-                // Live Photo模式下的特殊处理
-                if mode == .livePhoto {
-                    print("📸 Live Photo模式：数据清理完成")
-                }
-                
-                print("✅ 数据清理完成，发送打开相机通知")
-                
-                // 回到主线程发送通知
-                DispatchQueue.main.async {
-                    NotificationCenter.default.post(name: .shouldOpenCamera, object: nil)
-                }
-            }
+            // 🚀 优化4：简化通知链路 - 直接在主线程发送通知
+            NotificationCenter.default.post(name: .shouldOpenCamera, object: nil)
+            print("📡 已发送打开相机通知")
         }
     }
     

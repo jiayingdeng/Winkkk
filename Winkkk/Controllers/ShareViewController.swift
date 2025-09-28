@@ -435,9 +435,10 @@ class ShareViewController: UIViewController {
     
     // MARK: - Actions
     @objc private func cancelButtonTapped() {
+        // 🚀 优化1：立即触感反馈，提升响应感
         HapticFeedbackManager.shared.buttonTap()
         
-        // 🚀 优化：智能判断返回路径，优先返回到截图处理中心
+        // 🚀 优化2：智能判断返回路径，优先返回到截图处理中心
         guard let navigationController = navigationController else { return }
         
         // 检查导航栈中是否有ScreenshotProcessingViewController
@@ -452,12 +453,13 @@ class ShareViewController: UIViewController {
             }
             
             if let targetVC = targetViewController {
+                // 🚀 优化3：直接导航，无需额外处理
                 navigationController.popToViewController(targetVC, animated: true)
                 return
             }
         }
         
-        // 🎯 智能判断其他导航方式
+        // 🚀 优化4：简化导航判断逻辑
         if navigationController.presentingViewController != nil {
             // 如果整个导航控制器是模态展示的，使用dismiss
             navigationController.dismiss(animated: true)
