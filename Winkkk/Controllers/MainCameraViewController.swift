@@ -460,9 +460,9 @@ class MainCameraViewController: UIViewController {
         }
     }
     
-    /// 优化的模态界面关闭方法 - 减少递归层级
+    /// 🔧 方案1：统一控制的模态界面关闭方法
     private func dismissAllModalViewControllers(completion: @escaping () -> Void) {
-        // 🚀 优化：收集所有需要关闭的模态界面
+        // 🚀 收集所有需要关闭的模态界面
         var modalsToClose: [UIViewController] = []
         var current = presentedViewController
         
@@ -472,22 +472,36 @@ class MainCameraViewController: UIViewController {
         }
         
         guard !modalsToClose.isEmpty else {
-            print("✅ 没有模态界面需要关闭")
+            print("✅ MainCamera: 没有模态界面需要关闭")
             completion()
             return
         }
         
-        print("🔄 发现 \(modalsToClose.count) 个模态界面需要关闭")
+        print("🔄 MainCamera: 发现 \(modalsToClose.count) 个模态界面需要关闭")
         
-        // 🚀 优化：一次性关闭最顶层的模态界面，系统会自动处理下层
-        // 这比递归关闭更快且更稳定
+        // 🔧 修复：打印界面层级信息，便于调试
+        for (index, modal) in modalsToClose.enumerated() {
+            print("  层级 \(index + 1): \(type(of: modal))")
+        }
+        
+        // 🚀 一次性关闭最顶层的模态界面，系统会自动处理下层
+        // 这比递归关闭更快且更稳定，避免了竞态条件
         if let topModal = modalsToClose.first {
-            print("🔄 关闭顶层模态界面: \(type(of: topModal))")
+            print("🔄 MainCamera: 开始关闭顶层模态界面: \(type(of: topModal))")
             
+            // 🔧 使用animated: true保证用户体验，但通过统一控制避免竞态
             topModal.dismiss(animated: true) { [weak self] in
-                // 🚀 优化：使用短延迟确保界面完全关闭后再执行回调
+                // 🚀 确保在主线程执行，并添加适当延迟确保界面完全关闭
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    print("✅ 所有模态界面已关闭")
+                    print("✅ MainCamera: 所有模态界面已关闭")
+                    
+                    // 🔧 验证确实没有模态界面了
+                    if self?.presentedViewController == nil {
+                        print("✅ MainCamera: 验证通过，当前无模态界面")
+                    } else {
+                        print("⚠️ MainCamera: 警告，仍有模态界面未关闭")
+                    }
+                    
                     completion()
                 }
             }

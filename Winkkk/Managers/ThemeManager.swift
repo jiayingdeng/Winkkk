@@ -57,6 +57,12 @@ class ThemeManager: ObservableObject {
     
     /// 分割线色
     static let separator = UIColor(red: 230/255, green: 179/255, blue: 255/255, alpha: 0.3)
+    
+    /// 次要背景色 - 更浅的粉色
+    static let backgroundSecondary = UIColor(red: 248/255, green: 235/255, blue: 255/255, alpha: 0.5) // #F8EBFF
+    
+    /// 破坏性操作色 - 温柔的红色（用于删除等操作）
+    static let destructive = UIColor(red: 255/255, green: 182/255, blue: 193/255, alpha: 1.0) // #FFB6C1
 }
 
 // MARK: - SwiftUI Color扩展

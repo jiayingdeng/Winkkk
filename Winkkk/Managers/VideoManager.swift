@@ -169,7 +169,9 @@ class VideoManager: NSObject {
                     isFromCamera: false,
                     width: videoInfo.width,
                     height: videoInfo.height,
-                    fileSize: destinationURL.fileSize
+                    fileSize: destinationURL.fileSize,
+                    videoSource: VideoSourceType.systemImported.rawValue,
+                    exportStatus: ExportStatusType.exported.rawValue  // 系统导入的视频默认已导出
                 )
                 
                 // 异步生成缩略图
@@ -214,7 +216,9 @@ class VideoManager: NSObject {
                     isFromCamera: true,
                     width: videoInfo.width,
                     height: videoInfo.height,
-                    fileSize: destinationURL.fileSize
+                    fileSize: destinationURL.fileSize,
+                    videoSource: VideoSourceType.appRecorded.rawValue,
+                    exportStatus: ExportStatusType.pending.rawValue  // App录制的视频默认待导出
                 )
                 
                 // 异步生成缩略图
@@ -501,7 +505,7 @@ class VideoManager: NSObject {
                 
                 // 权限获得，执行导出
                 DispatchQueue.main.async {
-                    UISaveVideoAtPathToSavedPhotosAlbum(video.filePath.path, self, #selector(self.videoExportCompleted(_:didFinishSavingWithError:contextInfo:)), Unmanaged.passRetained(CompletionWrapper(completion: completion)).toOpaque())
+                    UISaveVideoAtPathToSavedPhotosAlbum(video.filePath.path, self, #selector(self.videoExportCompleted(_:didFinishSavingWithError:contextInfo:)), Unmanaged.passRetained(CompletionWrapper(completion: completion, videoItem: video)).toOpaque())
                 }
             } catch {
                 DispatchQueue.main.async {
@@ -518,7 +522,36 @@ class VideoManager: NSObject {
             if let error = error {
                 wrapper.completion(.failure(error))
             } else {
+                // 导出成功，更新视频的导出状态
+                if let videoItem = wrapper.videoItem {
+                    self.updateVideoExportStatus(videoItem, to: .exported)
+                }
                 wrapper.completion(.success(()))
+            }
+        }
+    }
+    
+    // MARK: - Export Status Management
+    func updateVideoExportStatus(_ videoItem: VideoItem, to status: ExportStatusType) {
+        backgroundContext.perform { [weak self] in
+            guard let self = self else { return }
+            
+            do {
+                // 在后台上下文中找到对应的对象
+                let request: NSFetchRequest<VideoItem> = VideoItem.fetchRequest()
+                request.predicate = NSPredicate(format: "id == %@", videoItem.id as CVarArg)
+                request.fetchLimit = 1
+                
+                if let bgVideoItem = try self.backgroundContext.fetch(request).first {
+                    bgVideoItem.exportStatusType = status
+                    
+                    if self.backgroundContext.hasChanges {
+                        try self.backgroundContext.save()
+                        print("✅ 更新视频导出状态为: \(status.displayName)")
+                    }
+                }
+            } catch {
+                print("❌ 更新视频导出状态失败: \(error)")
             }
         }
     }
@@ -546,9 +579,11 @@ class VideoManager: NSObject {
 // MARK: - Helper Classes
 private class CompletionWrapper {
     let completion: (Result<Void, Error>) -> Void
+    let videoItem: VideoItem?
     
-    init(completion: @escaping (Result<Void, Error>) -> Void) {
+    init(completion: @escaping (Result<Void, Error>) -> Void, videoItem: VideoItem? = nil) {
         self.completion = completion
+        self.videoItem = videoItem
     }
 }
 

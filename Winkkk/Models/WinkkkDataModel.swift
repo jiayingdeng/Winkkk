@@ -76,10 +76,23 @@ extension PersistenceController {
         fileSizeAttribute.isOptional = false
         fileSizeAttribute.defaultValue = 0
         
+        let videoSourceAttribute = NSAttributeDescription()
+        videoSourceAttribute.name = "videoSource"
+        videoSourceAttribute.attributeType = .stringAttributeType
+        videoSourceAttribute.isOptional = false
+        videoSourceAttribute.defaultValue = "app_recorded"
+        
+        let exportStatusAttribute = NSAttributeDescription()
+        exportStatusAttribute.name = "exportStatus"
+        exportStatusAttribute.attributeType = .stringAttributeType
+        exportStatusAttribute.isOptional = false
+        exportStatusAttribute.defaultValue = "pending"
+        
         videoEntity.properties = [
             videoIdAttribute, fileNameAttribute, filePathAttribute,
             durationAttribute, createdDateAttribute, thumbnailPathAttribute,
-            isFromCameraAttribute, widthAttribute, heightAttribute, fileSizeAttribute
+            isFromCameraAttribute, widthAttribute, heightAttribute, fileSizeAttribute,
+            videoSourceAttribute, exportStatusAttribute
         ]
         
         // 创建ScreenshotItem实体

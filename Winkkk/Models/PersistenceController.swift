@@ -30,6 +30,8 @@ struct PersistenceController {
         sampleVideo.width = 1080
         sampleVideo.height = 1920
         sampleVideo.fileSize = 15_000_000
+        sampleVideo.videoSource = VideoSourceType.appRecorded.rawValue
+        sampleVideo.exportStatus = ExportStatusType.pending.rawValue
         
         let sampleScreenshot = ScreenshotItem(context: viewContext)
         sampleScreenshot.id = UUID()
@@ -134,7 +136,9 @@ extension PersistenceController {
         width: Int32,
         height: Int32,
         fileSize: Int64,
-        thumbnailPath: URL? = nil
+        thumbnailPath: URL? = nil,
+        videoSource: String? = nil,
+        exportStatus: String? = nil
     ) -> VideoItem {
         let context = container.viewContext
         let videoItem = VideoItem(context: context)
@@ -149,6 +153,10 @@ extension PersistenceController {
         videoItem.height = height
         videoItem.fileSize = fileSize
         videoItem.thumbnailPath = thumbnailPath
+        
+        // 设置新字段的默认值
+        videoItem.videoSource = videoSource ?? (isFromCamera ? VideoSourceType.appRecorded.rawValue : VideoSourceType.systemImported.rawValue)
+        videoItem.exportStatus = exportStatus ?? (isFromCamera ? ExportStatusType.pending.rawValue : ExportStatusType.exported.rawValue)
         
         save()
         return videoItem

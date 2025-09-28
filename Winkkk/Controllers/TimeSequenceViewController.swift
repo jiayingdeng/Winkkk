@@ -135,6 +135,9 @@ class TimeSequenceViewController: UIViewController {
         setupConstraints()
         configureNavigationBar()
         
+        // 🎯 监听打开相机通知，确保能响应返回录像页面的请求
+        setupNotificationObservers()
+        
         // 进入时间序列模式的触感反馈
         HapticFeedbackManager.shared.lightImpact()
         
@@ -488,6 +491,32 @@ class TimeSequenceViewController: UIViewController {
             returnToRecordingButton.widthAnchor.constraint(equalToConstant: 240),
             returnToRecordingButton.heightAnchor.constraint(equalToConstant: 44)
         ])
+    }
+    
+    deinit {
+        // 移除通知监听
+        NotificationCenter.default.removeObserver(self)
+        print("📱 TimeSequence: Deinitializing")
+    }
+    
+    // MARK: - Notification Setup
+    private func setupNotificationObservers() {
+        // 🎯 监听打开相机通知，确保TimeSequenceViewController能响应返回录像页面的请求
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleShouldOpenCamera(_:)),
+            name: .shouldOpenCamera,
+            object: nil
+        )
+    }
+    
+    /// 🎯 处理打开相机通知 - TimeSequenceViewController版本
+    @objc private func handleShouldOpenCamera(_ notification: Notification) {
+        print("📱 TimeSequence: 收到打开相机通知，等待MainCameraViewController统一关闭")
+        
+        // 🔧 修复方案1：不再自主关闭，让MainCameraViewController统一控制所有模态界面的关闭
+        // 这样可以避免多个控制器同时异步关闭导致的界面闪现问题
+        // 移除自主dismiss逻辑，交由MainCameraViewController的dismissAllModalViewControllers统一处理
     }
     
     private func configureNavigationBar() {

@@ -79,6 +79,18 @@ class VideoThumbnailCell: UICollectionViewCell {
         return view
     }()
     
+    private let statusLabel: UILabel = {
+        let label = UILabel()
+        label.font = UIFont.systemFont(ofSize: 12, weight: .medium)
+        label.textColor = .white
+        label.backgroundColor = UIColor.black.withAlphaComponent(0.75)
+        label.textAlignment = .center
+        label.layer.cornerRadius = 6
+        label.layer.masksToBounds = true
+        label.isHidden = true
+        return label
+    }()
+    
     // MARK: - Properties
     private var videoItem: VideoItem?
     private var thumbnailTask: Task<Void, Never>?
@@ -102,6 +114,8 @@ class VideoThumbnailCell: UICollectionViewCell {
         
         thumbnailImageView.image = nil
         durationLabel.text = ""
+        statusLabel.text = ""
+        statusLabel.isHidden = true
         videoItem = nil
         selectionIndicatorView.isHidden = true
         
@@ -143,6 +157,7 @@ class VideoThumbnailCell: UICollectionViewCell {
         contentView.addSubview(overlayGradientView)
         contentView.addSubview(playIconView)
         contentView.addSubview(durationLabel)
+        contentView.addSubview(statusLabel)
     }
     
     private func setupConstraints() {
@@ -151,6 +166,7 @@ class VideoThumbnailCell: UICollectionViewCell {
         playIconView.translatesAutoresizingMaskIntoConstraints = false
         overlayGradientView.translatesAutoresizingMaskIntoConstraints = false
         selectionIndicatorView.translatesAutoresizingMaskIntoConstraints = false
+        statusLabel.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
             // 选择指示器
@@ -181,7 +197,13 @@ class VideoThumbnailCell: UICollectionViewCell {
             durationLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
             durationLabel.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -8),
             durationLabel.heightAnchor.constraint(equalToConstant: 20),
-            durationLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 40)
+            durationLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 40),
+            
+            // 状态标签
+            statusLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
+            statusLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+            statusLabel.heightAnchor.constraint(equalToConstant: 24),
+            statusLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 32)
         ])
     }
     
@@ -192,8 +214,31 @@ class VideoThumbnailCell: UICollectionViewCell {
         // 设置时长
         durationLabel.text = videoItem.formattedDuration
         
+        // 设置状态标签
+        configureStatusLabel(for: videoItem)
+        
         // 加载缩略图
         loadThumbnail(for: videoItem)
+    }
+    
+    private func configureStatusLabel(for videoItem: VideoItem) {
+        let statusText = videoItem.statusLabel
+        
+        if !statusText.isEmpty {
+            statusLabel.text = statusText
+            statusLabel.isHidden = false
+            
+            // 根据视频来源调整标签内边距
+            let padding: CGFloat = statusText.count > 2 ? 8 : 6
+            statusLabel.layer.cornerRadius = 12
+            
+            // 添加内边距
+            statusLabel.sizeToFit()
+            let size = statusLabel.intrinsicContentSize
+            statusLabel.frame.size = CGSize(width: size.width + padding * 2, height: 24)
+        } else {
+            statusLabel.isHidden = true
+        }
     }
     
     // MARK: - Selection

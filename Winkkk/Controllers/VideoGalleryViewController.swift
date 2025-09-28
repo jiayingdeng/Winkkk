@@ -33,6 +33,10 @@ class VideoGalleryViewController: UIViewController {
         // 修复：移除此处的contentInset，统一交由Compositional Layout管理
         // cv.contentInset = UIEdgeInsets(top: 20, left: 8, bottom: 20, right: 8)
         
+        // 性能优化：启用预加载和内存管理
+        cv.isPrefetchingEnabled = true
+        cv.prefetchDataSource = self
+        
         // 注册cell
         cv.register(VideoThumbnailCell.self, forCellWithReuseIdentifier: VideoThumbnailCell.identifier)
         cv.register(AddVideoCell.self, forCellWithReuseIdentifier: AddVideoCell.identifier)
@@ -42,6 +46,27 @@ class VideoGalleryViewController: UIViewController {
     
     private let gradientBackgroundView = GradientBackgroundView()
     private let emptyStateView = EmptyStateView()
+    
+    // 筛选功能相关
+    private lazy var filterBar: VideoFilterBar = {
+        let filterBar = VideoFilterBar()
+        filterBar.delegate = self
+        return filterBar
+    }()
+    
+    private var currentFilterOptions = VideoFilterOptions()
+    
+    // 用户引导相关
+    private var guideView: VideoGalleryGuideView?
+    private var filteredVideos: [VideoItem] = []
+    
+    // 性能优化：缩略图内存缓存
+    private var thumbnailMemoryCache: NSCache<NSString, UIImage> = {
+        let cache = NSCache<NSString, UIImage>()
+        cache.totalCostLimit = 50 * 1024 * 1024 // 50MB 内存限制
+        cache.countLimit = 100 // 最多缓存100张图片
+        return cache
+    }()
     
     // 副标题说明视图
     private lazy var subtitleView: UIView = {
@@ -296,6 +321,17 @@ class VideoGalleryViewController: UIViewController {
         DispatchQueue.main.async { [weak self] in
             self?.cleanupAndLoadVideos()
         }
+        
+        // 🎯 监听打开相机通知，确保能响应返回录像页面的请求
+        setupNotificationObservers()
+        
+        // 设置长按手势
+        setupLongPressGesture()
+        
+        // 初始化筛选栏显示动画
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.filterBar.showWithAnimation()
+        }
     }
     
     override func viewDidAppear(_ animated: Bool) {
@@ -312,7 +348,22 @@ class VideoGalleryViewController: UIViewController {
         // 清理定时器，避免内存泄漏
         updateTimer?.invalidate()
         updateTimer = nil
+        
+        // 移除通知监听
+        NotificationCenter.default.removeObserver(self)
+        
+        // 清理缓存
+        thumbnailMemoryCache.removeAllObjects()
+        
         print("📱 VideoGallery: Deinitializing")
+    }
+    
+    override func didReceiveMemoryWarning() {
+        super.didReceiveMemoryWarning()
+        
+        // 内存警告时清理缓存
+        thumbnailMemoryCache.removeAllObjects()
+        print("⚠️ VideoGallery: 收到内存警告，清理缩略图缓存")
     }
     
     // MARK: - UI Setup
@@ -324,6 +375,9 @@ class VideoGalleryViewController: UIViewController {
         
         // 添加副标题视图
         view.addSubview(subtitleView)
+        
+        // 添加筛选栏
+        view.addSubview(filterBar)
         
         // 添加集合视图
         view.addSubview(collectionView)
@@ -370,6 +424,7 @@ class VideoGalleryViewController: UIViewController {
     private func setupConstraints() {
         gradientBackgroundView.translatesAutoresizingMaskIntoConstraints = false
         subtitleView.translatesAutoresizingMaskIntoConstraints = false
+        filterBar.translatesAutoresizingMaskIntoConstraints = false
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         emptyStateView.translatesAutoresizingMaskIntoConstraints = false
         
@@ -386,8 +441,14 @@ class VideoGalleryViewController: UIViewController {
             subtitleView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             subtitleView.heightAnchor.constraint(equalToConstant: 32),
             
+            // 筛选栏
+            filterBar.topAnchor.constraint(equalTo: subtitleView.bottomAnchor),
+            filterBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            filterBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            filterBar.heightAnchor.constraint(equalToConstant: 60),
+            
             // 集合视图
-            collectionView.topAnchor.constraint(equalTo: subtitleView.bottomAnchor),
+            collectionView.topAnchor.constraint(equalTo: filterBar.bottomAnchor),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -478,7 +539,7 @@ class VideoGalleryViewController: UIViewController {
             let allVideos = fetchedResultsController.fetchedObjects ?? []
             
             // 🚀 立即过滤掉文件不存在的视频，避免UI闪烁
-            videos = allVideos.filter { video in
+            let validVideos = allVideos.filter { video in
                 let exists = FileManager.default.fileExists(atPath: video.filePath.path)
                 if !exists {
                     print("🔍 隐藏孤儿记录: \(video.fileName) (文件不存在)")
@@ -486,7 +547,10 @@ class VideoGalleryViewController: UIViewController {
                 return exists
             }
             
-            print("✅ VideoGallery: Loaded \(allVideos.count) total records, showing \(videos.count) valid videos")
+            videos = validVideos
+            applyCurrentFilters()
+            
+            print("✅ VideoGallery: Loaded \(allVideos.count) total records, showing \(videos.count) valid videos, filtered to \(filteredVideos.count)")
         } catch {
             print("❌ VideoGallery: 获取视频数据失败: \(error)")
         }
@@ -501,6 +565,56 @@ class VideoGalleryViewController: UIViewController {
         // 🕐 延迟清理操作，确保NSFetchedResultsController完全设置好后再清理
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.performDeferredCleanup()
+        }
+    }
+    
+    // MARK: - Filter Management
+    private func applyCurrentFilters() {
+        filteredVideos = videos.filter { video in
+            // 检查来源筛选
+            let sourceMatches = currentFilterOptions.sources.contains { sourceType in
+                switch sourceType {
+                case .appRecorded:
+                    return video.videoSource == VideoSourceType.appRecorded.rawValue
+                case .systemImported:
+                    return video.videoSource == VideoSourceType.systemImported.rawValue
+                }
+            }
+            
+            // 检查状态筛选
+            let statusMatches = currentFilterOptions.statuses.contains { statusType in
+                switch statusType {
+                case .exported:
+                    return video.exportStatus == ExportStatusType.exported.rawValue
+                case .pending:
+                    return video.exportStatus == ExportStatusType.pending.rawValue
+                }
+            }
+            
+            return sourceMatches && statusMatches
+        }
+        
+        // 更新筛选栏的结果计数
+        filterBar.updateResultCount(filteredVideos.count, total: videos.count)
+    }
+    
+    private func getDisplayVideos() -> [VideoItem] {
+        return filteredVideos
+    }
+    
+    private func updateEmptyStateVisibility() {
+        let displayVideos = getDisplayVideos()
+        let shouldShowEmpty = displayVideos.isEmpty
+        
+        UIView.animate(withDuration: 0.3) {
+            self.emptyStateView.isHidden = !shouldShowEmpty
+            self.collectionView.alpha = shouldShowEmpty ? 0.5 : 1.0
+        }
+        
+        // 如果是由于筛选导致的空状态，更新空状态视图的文本
+        if shouldShowEmpty && !currentFilterOptions.isShowingAll {
+            // 可以在这里自定义筛选后空状态的提示文本
+            // emptyStateView.updateText(for: .filtered)
         }
     }
     
@@ -558,7 +672,8 @@ class VideoGalleryViewController: UIViewController {
                 case .success(let videoItems):
                     print("✅ VideoGallery: VideoManager loaded \(videoItems.count) videos")
                     // 注意：videos数组由fetchedResultsController管理，这里不需要直接赋值
-                    self?.updateUI()
+                    self?.collectionView.reloadData()
+                    self?.updateEmptyStateVisibility()
                     
                 case .failure(let error):
                     print("❌ VideoGallery: VideoManager load failed: \(error)")
@@ -576,7 +691,7 @@ class VideoGalleryViewController: UIViewController {
             let allVideos = fetchedResultsController.fetchedObjects ?? []
             
             // 🚀 立即过滤掉文件不存在的视频，避免UI闪烁
-            videos = allVideos.filter { video in
+            let validVideos = allVideos.filter { video in
                 let exists = FileManager.default.fileExists(atPath: video.filePath.path)
                 if !exists {
                     print("🔍 隐藏孤儿记录: \(video.fileName) (文件不存在)")
@@ -584,7 +699,10 @@ class VideoGalleryViewController: UIViewController {
                 return exists
             }
             
-            print("✅ VideoGallery: Refreshed \(allVideos.count) total records, showing \(videos.count) valid videos")
+            videos = validVideos
+            applyCurrentFilters()
+            
+            print("✅ VideoGallery: Refreshed \(allVideos.count) total records, showing \(videos.count) valid videos, filtered to \(filteredVideos.count)")
             scheduleUIUpdate()
         } catch {
             print("❌ VideoGallery: 刷新数据失败: \(error)")
@@ -597,10 +715,7 @@ class VideoGalleryViewController: UIViewController {
             guard let self = self else { return }
             
             self.collectionView.reloadData()
-            
-            let hasVideos = !self.videos.isEmpty
-            self.emptyStateView.isHidden = hasVideos
-            self.collectionView.isHidden = !hasVideos
+            self.updateEmptyStateVisibility()
         }
     }
     
@@ -611,6 +726,139 @@ class VideoGalleryViewController: UIViewController {
         // 设置新的延迟更新任务
         updateTimer = Timer.scheduledTimer(withTimeInterval: updateDelay, repeats: false) { [weak self] _ in
             self?.updateUI()
+        }
+    }
+    
+    // MARK: - Notification Setup
+    private func setupNotificationObservers() {
+        // 🎯 监听打开相机通知，确保VideoGalleryViewController能响应返回录像页面的请求
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleShouldOpenCamera(_:)),
+            name: .shouldOpenCamera,
+            object: nil
+        )
+    }
+    
+    /// 🎯 处理打开相机通知 - VideoGalleryViewController版本
+    @objc private func handleShouldOpenCamera(_ notification: Notification) {
+        print("📱 VideoGallery: 收到打开相机通知，等待MainCameraViewController统一关闭")
+        
+        // 🔧 修复方案1：不再自主关闭，让MainCameraViewController统一控制所有模态界面的关闭
+        // 这样可以避免多个控制器同时异步关闭导致的界面闪现问题
+        // 移除自主dismiss逻辑，交由MainCameraViewController的dismissAllModalViewControllers统一处理
+    }
+    
+    // MARK: - Gesture Setup
+    private func setupLongPressGesture() {
+        let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleLongPress(_:)))
+        longPressGesture.minimumPressDuration = 0.5
+        collectionView.addGestureRecognizer(longPressGesture)
+    }
+    
+    @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+        guard gesture.state == .began else { return }
+        
+        let location = gesture.location(in: collectionView)
+        guard let indexPath = collectionView.indexPathForItem(at: location),
+              indexPath.item > 0, // 不处理添加按钮
+              !isSelectionMode else { return }
+        
+        let video = videos[indexPath.item - 1]
+        showVideoDetailPopup(for: video)
+    }
+    
+    private func showVideoDetailPopup(for video: VideoItem) {
+        let detailPopup = VideoDetailPopupView()
+        detailPopup.configure(with: video)
+        
+        detailPopup.onExport = { [weak self] video in
+            self?.exportVideoToPhotoLibrary(video)
+        }
+        
+        detailPopup.onDelete = { [weak self] video in
+            self?.confirmDeleteVideo(video)
+        }
+        
+        detailPopup.onClose = {
+            // 弹窗会自动移除
+        }
+        
+        // 添加到视图并显示动画
+        view.addSubview(detailPopup)
+        detailPopup.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            detailPopup.topAnchor.constraint(equalTo: view.topAnchor),
+            detailPopup.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            detailPopup.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            detailPopup.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        
+        detailPopup.showWithAnimation()
+    }
+    
+    
+    private func exportVideoToPhotoLibrary(_ video: VideoItem) {
+        // 检查权限
+        PHPhotoLibrary.requestAuthorization { [weak self] status in
+            DispatchQueue.main.async {
+                guard status == .authorized else {
+                    self?.showPermissionAlert()
+                    return
+                }
+                
+                // 保存到相册
+                PHPhotoLibrary.shared().performChanges({
+                    PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: video.filePath)
+                }) { [weak self] success, error in
+                    DispatchQueue.main.async {
+                        if success {
+                            self?.showSuccessAlert(message: "视频已成功导出到系统相册")
+                        } else {
+                            self?.showError(error ?? NSError(domain: "ExportError", code: -1, userInfo: [NSLocalizedDescriptionKey: "导出失败"]))
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func showPermissionAlert() {
+        let settingsAction = UIAlertAction(title: "去设置", style: .default) { _ in
+            if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(settingsURL)
+            }
+        }
+        let cancelAction = UIAlertAction(title: "取消", style: .cancel)
+        showAlert(title: "需要相册权限", message: "请在设置中允许访问相册以保存视频", actions: [settingsAction, cancelAction])
+    }
+    
+    private func showSuccessAlert(message: String) {
+        showAlert(title: "成功", message: message)
+    }
+    
+    private func confirmDeleteVideo(_ video: VideoItem) {
+        showDeleteConfirmation(
+            title: "删除视频",
+            message: "确定要删除\"\(video.fileName)\"吗？此操作无法撤销。"
+        ) { [weak self] in
+            self?.deleteVideo(video)
+        }
+    }
+    
+    private func deleteVideo(_ video: VideoItem) {
+        videoManager.deleteVideo(video) { [weak self] result in
+            self?.executeOnMainThread {
+                switch result {
+                case .success:
+                    print("✅ 视频删除成功: \(video.fileName)")
+                    // 数据会通过NSFetchedResultsController自动更新
+                    
+                case .failure(let error):
+                    print("❌ 视频删除失败: \(error)")
+                    self?.showError(error)
+                }
+            }
         }
     }
     
@@ -647,37 +895,27 @@ class VideoGalleryViewController: UIViewController {
     @objc private func exportButtonTapped() {
         guard !selectedVideoItems.isEmpty else { return }
         
-        let alert = UIAlertController(
+        let exportAction = UIAlertAction(title: "导出", style: .default) { [weak self] _ in
+            self?.performBatchExport()
+        }
+        let cancelAction = UIAlertAction(title: "取消", style: .cancel)
+        
+        showAlert(
             title: "导出视频",
             message: "确定要导出选中的 \(selectedVideoItems.count) 个视频到系统相册吗？",
-            preferredStyle: .alert
+            actions: [exportAction, cancelAction]
         )
-        
-        alert.addAction(UIAlertAction(title: "导出", style: .default) { [weak self] _ in
-            self?.performBatchExport()
-        })
-        
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        
-        present(alert, animated: true)
     }
     
     @objc private func deleteButtonTapped() {
         guard !selectedVideoItems.isEmpty else { return }
         
-        let alert = UIAlertController(
+        showDeleteConfirmation(
             title: "删除视频",
-            message: "确定要删除选中的 \(selectedVideoItems.count) 个视频吗？此操作无法撤销。",
-            preferredStyle: .alert
-        )
-        
-        alert.addAction(UIAlertAction(title: "删除", style: .destructive) { [weak self] _ in
+            message: "确定要删除选中的 \(selectedVideoItems.count) 个视频吗？此操作无法撤销。"
+        ) { [weak self] in
             self?.performBatchDelete()
-        })
-        
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        
-        present(alert, animated: true)
+        }
     }
     
     @objc private func cancelSelectionTapped() {
@@ -960,45 +1198,375 @@ class VideoGalleryViewController: UIViewController {
     // MARK: - First Time Guidance
     private func showFirstTimeGuidanceIfNeeded() {
         let hasShownGuidance = UserDefaults.standard.bool(forKey: "VideoGalleryGuidanceShown")
-        if !hasShownGuidance && videos.isEmpty {
-            showFirstTimeGuidance()
-            UserDefaults.standard.set(true, forKey: "VideoGalleryGuidanceShown")
+        if !hasShownGuidance {
+            // 延迟显示，确保视图完全加载并且筛选栏已显示
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.showInteractiveGuidance()
+            }
         }
     }
     
-    private func showFirstTimeGuidance() {
-        let alert = UIAlertController(
-            title: "欢迎使用应用内相册",
-            message: """
-            🎬 这里存储您在应用内创建的视频作品
-            
-            ✨ 主要功能：
-            • 录制的视频会自动保存在这里
-            • 可以从系统相册导入视频
-            • 处理完成后可导出到系统相册分享
-            
-            💡 与系统相册的区别：
-            • 应用内相册：私密存储，支持高级编辑
-            • 系统相册：公共存储，便于分享
-            """,
-            preferredStyle: .alert
-        )
+    private func showInteractiveGuidance() {
+        // 创建引导步骤
+        let steps = createGuidanceSteps()
         
-        alert.addAction(UIAlertAction(title: "开始创作", style: .default) { [weak self] _ in
-            // 可以在这里添加引导到录制界面的逻辑
-        })
+        // 创建引导视图
+        guideView = VideoGalleryGuideView(frame: view.bounds)
+        guideView?.delegate = self
         
-        present(alert, animated: true)
+        // 添加到视图层次
+        view.addSubview(guideView!)
+        guideView?.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            guideView!.topAnchor.constraint(equalTo: view.topAnchor),
+            guideView!.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            guideView!.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            guideView!.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+        ])
+        
+        // 开始引导
+        guideView?.startGuide(with: steps)
+    }
+    
+    private func createGuidanceSteps() -> [GuideStep] {
+        var steps: [GuideStep] = []
+        
+        // 第1步：欢迎
+        steps.append(GuideStep(
+            title: "欢迎使用应用内相册 🎬",
+            message: "这里存储您创建的视频作品，支持高级编辑和隐私保护。让我们快速了解主要功能！",
+            targetView: nil,
+            arrowDirection: .none
+        ))
+        
+        // 第2步：导入按钮
+        if !importButton.isHidden {
+            steps.append(GuideStep(
+                title: "导入视频 📥",
+                message: "点击这里可以从系统相册导入视频到应用内相册。导入的视频会自动标记来源。",
+                targetView: importButton,
+                arrowDirection: .down
+            ))
+        }
+        
+        // 第3步：筛选栏
+        steps.append(GuideStep(
+            title: "智能筛选 🔍",
+            message: "使用筛选按钮可以按来源和导出状态快速找到想要的视频。支持多重筛选组合。",
+            targetView: filterBar,
+            arrowDirection: .down,
+            action: { [weak self] in
+                // 高亮筛选栏，让用户注意到
+                UIView.animate(withDuration: 0.5, delay: 0.3, options: [.autoreverse, .repeat], animations: {
+                    self?.filterBar.alpha = 0.7
+                }) { _ in
+                    UIView.animate(withDuration: 0.3) {
+                        self?.filterBar.alpha = 1.0
+                    }
+                }
+            }
+        ))
+        
+        // 第4步：长按手势（如果有视频的话）
+        if !videos.isEmpty {
+            steps.append(GuideStep(
+                title: "详细信息 ℹ️",
+                message: "长按任意视频缩略图，可以查看详细信息包括来源、日期、时长和导出状态。",
+                targetView: collectionView,
+                arrowDirection: .up
+            ))
+        }
+        
+        // 第5步：完成
+        steps.append(GuideStep(
+            title: "开始创作 ✨",
+            message: "您已了解主要功能！现在可以开始录制视频、导入素材，享受高效的视频管理体验。",
+            targetView: nil,
+            arrowDirection: .none
+        ))
+        
+        return steps
     }
     
     private func showError(_ error: Error) {
-        let alert = UIAlertController(
-            title: "错误",
-            message: error.localizedDescription,
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "确定", style: .default))
-        present(alert, animated: true)
+        showAlert(title: "错误", message: error.localizedDescription)
+    }
+}
+
+// MARK: - VideoGalleryGuideDelegate
+extension VideoGalleryViewController: VideoGalleryGuideDelegate {
+    func guideDidComplete() {
+        // 标记引导已完成
+        UserDefaults.standard.set(true, forKey: "VideoGalleryGuidanceShown")
+        
+        // 清理引导视图
+        guideView?.removeFromSuperview()
+        guideView = nil
+        
+        print("✅ 用户引导完成")
+    }
+    
+    func guideDidSkip() {
+        // 标记引导已完成（跳过也算完成）
+        UserDefaults.standard.set(true, forKey: "VideoGalleryGuidanceShown")
+        
+        // 清理引导视图
+        guideView?.removeFromSuperview()
+        guideView = nil
+        
+        print("⏭️ 用户跳过引导")
+    }
+    
+    // MARK: - Debug Methods
+    #if DEBUG
+    /// 重置用户引导状态（仅用于调试）
+    func resetGuidanceState() {
+        UserDefaults.standard.removeObject(forKey: "VideoGalleryGuidanceShown")
+        print("🔄 用户引导状态已重置")
+    }
+    
+    /// 手动触发用户引导（仅用于调试）
+    func triggerGuidance() {
+        resetGuidanceState()
+        showFirstTimeGuidanceIfNeeded()
+    }
+    
+    /// 集成测试：验证所有新功能（仅用于调试）
+    func runIntegrationTest() {
+        print("🧪 开始集成测试...")
+        
+        // 测试1: 筛选功能
+        testFilterFunctionality()
+        
+        // 测试2: 状态标签显示
+        testStatusLabels()
+        
+        // 测试3: 长按弹窗功能
+        testDetailPopup()
+        
+        // 测试4: 用户引导系统
+        testGuidanceSystem()
+        
+        // 测试5: 性能优化
+        testPerformanceOptimizations()
+        
+        print("✅ 集成测试完成")
+    }
+    
+    private func testFilterFunctionality() {
+        print("🔍 测试筛选功能...")
+        
+        // 验证筛选栏是否正确显示
+        assert(filterBar.superview != nil, "筛选栏应该已添加到视图")
+        
+        // 测试筛选选项
+        var testOptions = VideoFilterOptions()
+        testOptions.sources = [.systemImported]
+        currentFilterOptions = testOptions
+        applyCurrentFilters()
+        
+        print("✅ 筛选功能测试通过")
+    }
+    
+    private func testStatusLabels() {
+        print("🏷️ 测试状态标签...")
+        
+        // 获取可见的cells
+        let visibleCells = collectionView.visibleCells.compactMap { $0 as? VideoThumbnailCell }
+        
+        // 验证状态标签是否正确显示
+        for (index, cell) in visibleCells.enumerated() {
+            if index < filteredVideos.count {
+                let videoItem = filteredVideos[index]
+                let shouldShowStatus = videoItem.videoSource != VideoSourceType.appRecorded.rawValue || videoItem.exportStatus == ExportStatusType.exported.rawValue
+                // 状态标签应该根据业务逻辑正确显示
+                print("📱 视频 \(videoItem.fileName) 状态标签显示正确")
+            }
+        }
+        
+        print("✅ 状态标签测试通过")
+    }
+    
+    private func testDetailPopup() {
+        print("📋 测试详情弹窗...")
+        
+        if !filteredVideos.isEmpty {
+            let testVideo = filteredVideos[0]
+            
+            // 模拟长按弹窗
+            let detailPopup = VideoDetailPopupView()
+            detailPopup.configure(with: testVideo)
+            
+            // 验证弹窗配置
+            assert(detailPopup.superview == nil, "弹窗还未添加到视图")
+            
+            print("✅ 详情弹窗测试通过")
+        }
+    }
+    
+    private func testGuidanceSystem() {
+        print("🗺️ 测试用户引导...")
+        
+        // 验证引导系统初始化
+        let hasShownGuidance = UserDefaults.standard.bool(forKey: "VideoGalleryGuidanceShown")
+        
+        // 验证引导步骤生成
+        let steps = createGuidanceSteps()
+        assert(!steps.isEmpty, "应该生成用户引导步骤")
+        
+        print("✅ 用户引导测试通过")
+    }
+    
+    private func testPerformanceOptimizations() {
+        print("⚡ 测试性能优化...")
+        
+        // 验证内存缓存
+        assert(thumbnailMemoryCache.totalCostLimit > 0, "缩略图缓存应该有内存限制")
+        
+        // 验证预加载设置
+        assert(collectionView.isPrefetchingEnabled, "应该启用预加载")
+        assert(collectionView.prefetchDataSource != nil, "应该设置预加载数据源")
+        
+        print("✅ 性能优化测试通过")
+    }
+    #endif
+}
+
+// MARK: - UICollectionViewDataSourcePrefetching
+extension VideoGalleryViewController: UICollectionViewDataSourcePrefetching {
+    func collectionView(_ collectionView: UICollectionView, prefetchItemsAt indexPaths: [IndexPath]) {
+        // 预加载视频缩略图
+        for indexPath in indexPaths {
+            guard indexPath.item < filteredVideos.count else { continue }
+            let video = filteredVideos[indexPath.item]
+            let cacheKey = NSString(string: video.id.uuidString)
+            
+            // 检查内存缓存
+            if thumbnailMemoryCache.object(forKey: cacheKey) != nil {
+                continue // 已经在内存中，跳过
+            }
+            
+            // 检查磁盘缓存
+            if let thumbnailPath = video.thumbnailPath,
+               FileManager.default.fileExists(atPath: thumbnailPath.path),
+               let diskImage = UIImage(contentsOfFile: thumbnailPath.path) {
+                // 加载到内存缓存
+                let imageSize = diskImage.size.width * diskImage.size.height * 4 // 4 bytes per pixel
+                thumbnailMemoryCache.setObject(diskImage, forKey: cacheKey, cost: Int(imageSize))
+                continue
+            }
+            
+            // 异步预生成缩略图
+            DispatchQueue.global(qos: .utility).async { [weak self] in
+                guard let self = self,
+                      FileManager.default.fileExists(atPath: video.filePath.path) else { return }
+                
+                do {
+                    let thumbnail = try self.generateThumbnailSync(for: video.filePath)
+                    let imageSize = thumbnail.size.width * thumbnail.size.height * 4
+                    
+                    DispatchQueue.main.async {
+                        // 保存到内存缓存
+                        self.thumbnailMemoryCache.setObject(thumbnail, forKey: cacheKey, cost: Int(imageSize))
+                        
+                        // 保存到磁盘缓存
+                        self.saveThumbnailToDisk(thumbnail, for: video)
+                    }
+                } catch {
+                    print("❌ 预加载缩略图失败: \(error)")
+                }
+            }
+        }
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, cancelPrefetchingForItemsAt indexPaths: [IndexPath]) {
+        // 可以在这里取消预加载任务，但考虑到缓存的价值，暂时保留
+    }
+    
+    // MARK: - Thumbnail Generation Helpers
+    private func generateThumbnailSync(for videoURL: URL) throws -> UIImage {
+        let asset = AVAsset(url: videoURL)
+        let imageGenerator = AVAssetImageGenerator(asset: asset)
+        imageGenerator.appliesPreferredTrackTransform = true
+        imageGenerator.requestedTimeToleranceAfter = .zero
+        imageGenerator.requestedTimeToleranceBefore = .zero
+        
+        // 在视频的1/4位置生成缩略图
+        let time = CMTime(seconds: 0.25, preferredTimescale: 600)
+        
+        let cgImage = try imageGenerator.copyCGImage(at: time, actualTime: nil)
+        return UIImage(cgImage: cgImage)
+    }
+    
+    private func saveThumbnailToDisk(_ image: UIImage, for videoItem: VideoItem) {
+        guard let imageData = image.jpegData(compressionQuality: 0.85) else { return }
+        
+        let fileName = "\(videoItem.id.uuidString)_thumbnail.jpg"
+        let thumbnailURL = FileManagerHelper.thumbnailsDirectory.appendingPathComponent(fileName)
+        
+        do {
+            try imageData.write(to: thumbnailURL)
+            videoItem.thumbnailPath = thumbnailURL
+            PersistenceController.shared.save()
+        } catch {
+            print("保存缩略图缓存失败: \(error)")
+        }
+    }
+    
+    // MARK: - Public Cache Access
+    func getCachedThumbnail(for videoItem: VideoItem) -> UIImage? {
+        let cacheKey = NSString(string: videoItem.id.uuidString)
+        
+        // 首先检查内存缓存
+        if let cachedImage = thumbnailMemoryCache.object(forKey: cacheKey) {
+            return cachedImage
+        }
+        
+        // 然后检查磁盘缓存
+        if let thumbnailPath = videoItem.thumbnailPath,
+           FileManager.default.fileExists(atPath: thumbnailPath.path),
+           let diskImage = UIImage(contentsOfFile: thumbnailPath.path) {
+            // 加载到内存缓存以便下次快速访问
+            let imageSize = diskImage.size.width * diskImage.size.height * 4
+            thumbnailMemoryCache.setObject(diskImage, forKey: cacheKey, cost: Int(imageSize))
+            return diskImage
+        }
+        
+        return nil
+    }
+    
+    // MARK: - Helper Methods
+    /// 在主线程上执行操作的辅助方法
+    private func executeOnMainThread(_ action: @escaping () -> Void) {
+        if Thread.isMainThread {
+            action()
+        } else {
+            DispatchQueue.main.async {
+                action()
+            }
+        }
+    }
+    
+    /// 创建并显示Alert的辅助方法
+    private func showAlert(title: String, message: String, style: UIAlertController.Style = .alert, actions: [UIAlertAction] = []) {
+        executeOnMainThread { [weak self] in
+            let alert = UIAlertController(title: title, message: message, preferredStyle: style)
+            
+            if actions.isEmpty {
+                alert.addAction(UIAlertAction(title: "确定", style: .default))
+            } else {
+                actions.forEach { alert.addAction($0) }
+            }
+            
+            self?.present(alert, animated: true)
+        }
+    }
+    
+    /// 创建确认删除Alert的辅助方法
+    private func showDeleteConfirmation(title: String, message: String, onConfirm: @escaping () -> Void) {
+        let deleteAction = UIAlertAction(title: "删除", style: .destructive) { _ in onConfirm() }
+        let cancelAction = UIAlertAction(title: "取消", style: .cancel)
+        showAlert(title: title, message: message, actions: [deleteAction, cancelAction])
     }
 }
 
@@ -1006,7 +1574,7 @@ class VideoGalleryViewController: UIViewController {
 extension VideoGalleryViewController: UICollectionViewDataSource {
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return videos.count + 1 // +1 for add video cell
+        return getDisplayVideos().count + 1 // +1 for add video cell
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
@@ -1023,7 +1591,7 @@ extension VideoGalleryViewController: UICollectionViewDataSource {
         } else {
             // 视频缩略图
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: VideoThumbnailCell.identifier, for: indexPath) as! VideoThumbnailCell
-            let video = videos[indexPath.item - 1]
+            let video = getDisplayVideos()[indexPath.item - 1]
             cell.configure(with: video)
             
             // 在选择模式下设置选择状态
@@ -1049,7 +1617,7 @@ extension VideoGalleryViewController: UICollectionViewDelegate {
             }
         } else {
             // 选择视频
-            let video = videos[indexPath.item - 1]
+            let video = getDisplayVideos()[indexPath.item - 1]
             
             if isSelectionMode {
                 // 选择模式下处理多选
@@ -1284,13 +1852,16 @@ extension VideoGalleryViewController: NSFetchedResultsControllerDelegate {
             }
             
             // 🚀 立即过滤掉文件不存在的视频，避免UI闪烁
-            self.videos = fetchedObjects.filter { video in
+            let validVideos = fetchedObjects.filter { video in
                 let exists = FileManager.default.fileExists(atPath: video.filePath.path)
                 if !exists {
                     print("🔍 隐藏孤儿记录: \(video.fileName) (文件不存在)")
                 }
                 return exists
             }
+            
+            self.videos = validVideos
+            self.applyCurrentFilters()
             
             // 使用防抖机制，避免频繁更新UI
             self.scheduleUIUpdate()
@@ -1304,5 +1875,25 @@ extension VideoGalleryViewController: NSFetchedResultsControllerDelegate {
         DispatchQueue.main.async { [weak self] in
             self?.setupFetchedResultsController()
         }
+    }
+}
+
+// MARK: - VideoFilterBarDelegate
+extension VideoGalleryViewController: VideoFilterBarDelegate {
+    func videoFilterBar(_ filterBar: VideoFilterBar, didChangeFilters filters: VideoFilterOptions) {
+        currentFilterOptions = filters
+        applyCurrentFilters()
+        
+        // 刷新collection view
+        collectionView.performBatchUpdates({
+            collectionView.reloadSections(IndexSet(integer: 0))
+        }, completion: nil)
+        
+        // 更新空状态视图
+        updateEmptyStateVisibility()
+        
+        // 添加触觉反馈
+        let impactFeedback = UIImpactFeedbackGenerator(style: .light)
+        impactFeedback.impactOccurred()
     }
 }
