@@ -272,28 +272,29 @@ class BatchImageEnhanceViewController: UIViewController {
             bottomBlurView.bottomAnchor.constraint(equalTo: bottomActionView.bottomAnchor),
             
             // 保存全部按钮
-            saveAllButton.leadingAnchor.constraint(equalTo: bottomActionView.leadingAnchor, constant: 16),
+            saveAllButton.leadingAnchor.constraint(equalTo: bottomActionView.leadingAnchor, constant: 12),
             saveAllButton.centerYAnchor.constraint(equalTo: bottomActionView.centerYAnchor),
-            saveAllButton.widthAnchor.constraint(equalToConstant: 80),
+            saveAllButton.widthAnchor.constraint(equalToConstant: 70),
             saveAllButton.heightAnchor.constraint(equalToConstant: 44),
             
             // 拼图创建按钮
-            createCollageButton.leadingAnchor.constraint(equalTo: saveAllButton.trailingAnchor, constant: 8),
+            createCollageButton.leadingAnchor.constraint(equalTo: saveAllButton.trailingAnchor, constant: 6),
             createCollageButton.centerYAnchor.constraint(equalTo: bottomActionView.centerYAnchor),
-            createCollageButton.widthAnchor.constraint(equalToConstant: 80),
+            createCollageButton.widthAnchor.constraint(equalToConstant: 70),
             createCollageButton.heightAnchor.constraint(equalToConstant: 44),
             
             // 分享全部按钮
-            shareAllButton.leadingAnchor.constraint(equalTo: createCollageButton.trailingAnchor, constant: 8),
+            shareAllButton.leadingAnchor.constraint(equalTo: createCollageButton.trailingAnchor, constant: 6),
             shareAllButton.centerYAnchor.constraint(equalTo: bottomActionView.centerYAnchor),
-            shareAllButton.widthAnchor.constraint(equalToConstant: 80),
+            shareAllButton.widthAnchor.constraint(equalToConstant: 70),
             shareAllButton.heightAnchor.constraint(equalToConstant: 44),
             
-            // 选择模式按钮
-            selectModeButton.leadingAnchor.constraint(equalTo: shareAllButton.trailingAnchor, constant: 8),
-            selectModeButton.trailingAnchor.constraint(equalTo: bottomActionView.trailingAnchor, constant: -16),
+            // 选择模式按钮 - 固定宽度确保文字显示完整
+            selectModeButton.leadingAnchor.constraint(equalTo: shareAllButton.trailingAnchor, constant: 6),
+            selectModeButton.trailingAnchor.constraint(equalTo: bottomActionView.trailingAnchor, constant: -12),
             selectModeButton.centerYAnchor.constraint(equalTo: bottomActionView.centerYAnchor),
-            selectModeButton.heightAnchor.constraint(equalToConstant: 44)
+            selectModeButton.heightAnchor.constraint(equalToConstant: 44),
+            selectModeButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 70) // 确保最小宽度
         ])
     }
     
@@ -434,10 +435,12 @@ class BatchImageEnhanceViewController: UIViewController {
         bottomActionView.addSubview(bottomBlurView)
         
         // 保存全部按钮
-        saveAllButton.setTitle("保存全部", for: .normal)
+        saveAllButton.setTitle("保存", for: .normal) // 缩短文字
         saveAllButton.backgroundColor = ThemeManager.buttonPrimary
         saveAllButton.setTitleColor(.white, for: .normal)
-        saveAllButton.titleLabel?.font = ThemeManager.buttonFont
+        saveAllButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        saveAllButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        saveAllButton.titleLabel?.minimumScaleFactor = 0.8
         saveAllButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         saveAllButton.addTarget(self, action: #selector(saveAllButtonTapped), for: .touchUpInside)
         saveAllButton.isEnabled = false
@@ -445,10 +448,12 @@ class BatchImageEnhanceViewController: UIViewController {
         bottomActionView.addSubview(saveAllButton)
         
         // 分享全部按钮
-        shareAllButton.setTitle("分享全部", for: .normal)
+        shareAllButton.setTitle("分享", for: .normal) // 缩短文字
         shareAllButton.backgroundColor = ThemeManager.buttonSecondary
         shareAllButton.setTitleColor(.white, for: .normal)
-        shareAllButton.titleLabel?.font = ThemeManager.buttonFont
+        shareAllButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        shareAllButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        shareAllButton.titleLabel?.minimumScaleFactor = 0.8
         shareAllButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         shareAllButton.addTarget(self, action: #selector(shareAllButtonTapped), for: .touchUpInside)
         shareAllButton.isEnabled = false
@@ -456,10 +461,12 @@ class BatchImageEnhanceViewController: UIViewController {
         bottomActionView.addSubview(shareAllButton)
         
         // 拼图创建按钮
-        createCollageButton.setTitle("🧩 拼图", for: .normal)
+        createCollageButton.setTitle("拼图", for: .normal) // 去掉emoji，缩短文字
         createCollageButton.backgroundColor = UIColor.systemTeal.withAlphaComponent(0.8)
         createCollageButton.setTitleColor(.white, for: .normal)
-        createCollageButton.titleLabel?.font = ThemeManager.buttonFont
+        createCollageButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        createCollageButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        createCollageButton.titleLabel?.minimumScaleFactor = 0.8
         createCollageButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         createCollageButton.addTarget(self, action: #selector(createCollageButtonTapped), for: .touchUpInside)
         createCollageButton.isEnabled = false
@@ -471,7 +478,9 @@ class BatchImageEnhanceViewController: UIViewController {
         selectModeButton.setTitle("反选", for: .selected)
         selectModeButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
         selectModeButton.setTitleColor(.white, for: .normal)
-        selectModeButton.titleLabel?.font = ThemeManager.buttonFont
+        selectModeButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium) // 优化字体大小
+        selectModeButton.titleLabel?.adjustsFontSizeToFitWidth = true // 自动调整字体大小
+        selectModeButton.titleLabel?.minimumScaleFactor = 0.8 // 最小缩放到80%
         selectModeButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         selectModeButton.addTarget(self, action: #selector(selectModeButtonTapped), for: .touchUpInside)
         selectModeButton.isEnabled = true  // 默认启用
