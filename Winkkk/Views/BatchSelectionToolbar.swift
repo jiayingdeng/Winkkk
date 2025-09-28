@@ -84,48 +84,28 @@ class BatchSelectionToolbar: UIView {
         selectionLabel.textColor = .label
         selectionLabel.text = "未选择"
         
-        // 🌟 全选/全不选按钮 - 圆润胶囊设计
-        selectAllButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
-        selectAllButton.setTitleColor(.white, for: .normal)
+        // 全选/全不选按钮
+        selectAllButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        selectAllButton.setTitleColor(.systemBlue, for: .normal)
         selectAllButton.setTitle("全选", for: .normal)
-        selectAllButton.backgroundColor = UIColor.systemBlue
-        selectAllButton.layer.cornerRadius = 16  // 胶囊形状
-        // 🌟 增加内边距，让文字更舒适
-        selectAllButton.contentEdgeInsets = UIEdgeInsets(top: 10, left: 20, bottom: 10, right: 20)
-        selectAllButton.layer.shadowColor = UIColor.systemBlue.cgColor
-        selectAllButton.layer.shadowOffset = CGSize(width: 0, height: 2)
-        selectAllButton.layer.shadowOpacity = 0.25
-        selectAllButton.layer.shadowRadius = 4
         
         // 操作按钮栈视图
         actionsStackView.axis = .horizontal
         actionsStackView.alignment = .center
         actionsStackView.spacing = 16
         
-        // 🌟 分享按钮 - 现代圆润设计
+        // 分享按钮
         shareButton.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
-        shareButton.tintColor = .white
-        shareButton.backgroundColor = UIColor.systemBlue
-        shareButton.layer.cornerRadius = 22  // 完全圆形
-        shareButton.layer.shadowColor = UIColor.systemBlue.cgColor
-        shareButton.layer.shadowOffset = CGSize(width: 0, height: 4)
-        shareButton.layer.shadowOpacity = 0.3
-        shareButton.layer.shadowRadius = 8
-        shareButton.layer.borderWidth = 2
-        shareButton.layer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
+        shareButton.tintColor = .systemBlue
+        shareButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
+        shareButton.layer.cornerRadius = 22
         shareButton.isEnabled = false
         
-        // 🌟 删除按钮 - 现代圆润设计
+        // 删除按钮
         deleteButton.setImage(UIImage(systemName: "trash"), for: .normal)
-        deleteButton.tintColor = .white
-        deleteButton.backgroundColor = UIColor.systemRed
-        deleteButton.layer.cornerRadius = 22  // 完全圆形
-        deleteButton.layer.shadowColor = UIColor.systemRed.cgColor
-        deleteButton.layer.shadowOffset = CGSize(width: 0, height: 4)
-        deleteButton.layer.shadowOpacity = 0.3
-        deleteButton.layer.shadowRadius = 8
-        deleteButton.layer.borderWidth = 2
-        deleteButton.layer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
+        deleteButton.tintColor = .systemRed
+        deleteButton.backgroundColor = UIColor.systemRed.withAlphaComponent(0.1)
+        deleteButton.layer.cornerRadius = 22
         deleteButton.isEnabled = false
         
         // 添加子视图
@@ -173,29 +153,6 @@ class BatchSelectionToolbar: UIView {
         selectAllButton.addTarget(self, action: #selector(selectAllTapped), for: .touchUpInside)
         shareButton.addTarget(self, action: #selector(shareTapped), for: .touchUpInside)
         deleteButton.addTarget(self, action: #selector(deleteTapped), for: .touchUpInside)
-        
-        // 🌟 添加按钮交互动画
-        addButtonTouchEffects()
-    }
-    
-    // 🌟 添加按钮交互动画效果
-    private func addButtonTouchEffects() {
-        [selectAllButton, shareButton, deleteButton].forEach { button in
-            button.addTarget(self, action: #selector(buttonPressed(_:)), for: .touchDown)
-            button.addTarget(self, action: #selector(buttonReleased(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
-        }
-    }
-    
-    @objc private func buttonPressed(_ button: UIButton) {
-        UIView.animate(withDuration: 0.1, delay: 0, options: [.curveEaseInOut, .allowUserInteraction]) {
-            button.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
-        }
-    }
-    
-    @objc private func buttonReleased(_ button: UIButton) {
-        UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5, options: [.curveEaseInOut, .allowUserInteraction]) {
-            button.transform = .identity
-        }
     }
     
     // MARK: - Actions
@@ -245,25 +202,13 @@ class BatchSelectionToolbar: UIView {
             selectAllButton.setTitle("全选", for: .normal)
         }
         
-        // 🌟 更新操作按钮状态 - 添加动画效果
+        // 更新操作按钮状态
         let hasSelection = count > 0
         shareButton.isEnabled = hasSelection
         deleteButton.isEnabled = hasSelection
         
-        // 使用动画来改变按钮状态
-        UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseInOut) {
-            if hasSelection {
-                self.shareButton.alpha = 1.0
-                self.deleteButton.alpha = 1.0
-                self.shareButton.transform = .identity
-                self.deleteButton.transform = .identity
-            } else {
-                self.shareButton.alpha = 0.4
-                self.deleteButton.alpha = 0.4
-                self.shareButton.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
-                self.deleteButton.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
-            }
-        }
+        shareButton.alpha = hasSelection ? 1.0 : 0.5
+        deleteButton.alpha = hasSelection ? 1.0 : 0.5
     }
     
     private func updateUI() {

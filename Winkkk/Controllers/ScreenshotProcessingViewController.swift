@@ -33,12 +33,12 @@ class ScreenshotProcessingViewController: UIViewController {
     private let collectionView: UICollectionView
     private let collectionFlowLayout = UICollectionViewFlowLayout()
     
-    // 推荐区域
-    private let recommendationCardView = UIView()
-    private let recommendationBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
-    private let recommendationTitleLabel = UILabel()
-    private let recommendationDescriptionLabel = UILabel()
-    private let recommendationActionButton = UIButton(type: .system)
+    // 推荐区域 - 已移除，避免功能重复
+    // private let recommendationCardView = UIView()
+    // private let recommendationBlurView = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
+    // private let recommendationTitleLabel = UILabel()
+    // private let recommendationDescriptionLabel = UILabel()
+    // private let recommendationActionButton = UIButton(type: .system)
 
     // 操作选项区域
     private let optionsTableView = UITableView()
@@ -47,7 +47,8 @@ class ScreenshotProcessingViewController: UIViewController {
     private var previewHeightConstraint: NSLayoutConstraint!
     
     // MARK: - Dependencies
-    private let workflowManager = WorkflowManager.shared
+    // 工作流管理器主要用于智能推荐，现已移除推荐功能
+    // private let workflowManager = WorkflowManager.shared
     
     // MARK: - Initialization
     init(screenshots: [ScreenshotItem], mode: CaptureMode) {
@@ -78,8 +79,8 @@ class ScreenshotProcessingViewController: UIViewController {
         setupProcessingOptions()
         configureNavigationBar()
         
-        // 初始化工作流
-        workflowManager.startNewWorkflow(with: screenshots)
+        // 工作流初始化已移除 - 不再需要智能推荐功能
+        // workflowManager.startNewWorkflow(with: screenshots)
         
         // 进入处理中心的触感反馈
         HapticFeedbackManager.shared.lightImpact()
@@ -94,12 +95,8 @@ class ScreenshotProcessingViewController: UIViewController {
         }
     }
     
-    @objc private func executeRecommendedWorkflow() {
-        guard let recommendation = objc_getAssociatedObject(recommendationActionButton, "recommendation") as? WorkflowRecommendation else { return }
-        
-        HapticFeedbackManager.shared.buttonTap()
-        recommendation.execute(self, screenshots)
-    }
+    // 推荐工作流执行方法已移除 - 因为移除了推荐卡片功能
+    // @objc private func executeRecommendedWorkflow() { ... }
     
     // MARK: - UI Setup
     private func setupUI() {
@@ -119,8 +116,8 @@ class ScreenshotProcessingViewController: UIViewController {
         // 预览区域
         setupPreviewArea()
         
-        // 推荐区域
-        setupRecommendationCard()
+        // 推荐区域 - 已移除，避免功能重复
+        // setupRecommendationCard()
         
         // 操作选项表格
         setupOptionsTableView()
@@ -128,7 +125,7 @@ class ScreenshotProcessingViewController: UIViewController {
         // 添加到内容视图
         contentView.addSubview(headerView)
         contentView.addSubview(previewContainerView)
-        contentView.addSubview(recommendationCardView)
+        // contentView.addSubview(recommendationCardView) // 已移除推荐卡片
         contentView.addSubview(optionsTableView)
     }
     
@@ -175,43 +172,13 @@ class ScreenshotProcessingViewController: UIViewController {
         previewContainerView.addSubview(collectionView)
     }
     
+    // 推荐卡片设置方法已移除 - 避免功能重复，简化界面
+    /*
     private func setupRecommendationCard() {
-        recommendationCardView.backgroundColor = .clear
-        recommendationCardView.layer.cornerRadius = ThemeManager.standardCornerRadius
-        recommendationCardView.clipsToBounds = true
-        
-        // 模糊背景
-        recommendationCardView.addSubview(recommendationBlurView)
-        
-        // 获取智能推荐
-        let recommendation = workflowManager.getBestRecommendation(for: screenshots)
-        
-        // 推荐标题
-        recommendationTitleLabel.font = ThemeManager.buttonFont
-        recommendationTitleLabel.textColor = .white
-        recommendationTitleLabel.text = "💡 " + recommendation.title
-        recommendationTitleLabel.numberOfLines = 1
-        recommendationCardView.addSubview(recommendationTitleLabel)
-        
-        // 推荐描述
-        recommendationDescriptionLabel.font = ThemeManager.captionFont
-        recommendationDescriptionLabel.textColor = UIColor.white.withAlphaComponent(0.8)
-        recommendationDescriptionLabel.text = recommendation.description
-        recommendationDescriptionLabel.numberOfLines = 2
-        recommendationCardView.addSubview(recommendationDescriptionLabel)
-        
-        // 推荐操作按钮
-        recommendationActionButton.setTitle(recommendation.actionTitle, for: .normal)
-        recommendationActionButton.titleLabel?.font = ThemeManager.buttonFont
-        recommendationActionButton.setTitleColor(.white, for: .normal)
-        recommendationActionButton.backgroundColor = recommendation.priority.color
-        recommendationActionButton.layer.cornerRadius = 8
-        recommendationActionButton.addTarget(self, action: #selector(executeRecommendedWorkflow), for: .touchUpInside)
-        recommendationCardView.addSubview(recommendationActionButton)
-        
-        // 存储推荐以供执行使用
-        objc_setAssociatedObject(recommendationActionButton, "recommendation", recommendation, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        // 此方法已被移除，因为推荐功能与下方选项列表重复
+        // 用户可以直接从选项列表中选择需要的功能
     }
+    */
     
     private func setupOptionsTableView() {
         optionsTableView.backgroundColor = .clear
@@ -232,11 +199,12 @@ class ScreenshotProcessingViewController: UIViewController {
         countLabel.translatesAutoresizingMaskIntoConstraints = false
         previewContainerView.translatesAutoresizingMaskIntoConstraints = false
         collectionView.translatesAutoresizingMaskIntoConstraints = false
-        recommendationCardView.translatesAutoresizingMaskIntoConstraints = false
-        recommendationBlurView.translatesAutoresizingMaskIntoConstraints = false
-        recommendationTitleLabel.translatesAutoresizingMaskIntoConstraints = false
-        recommendationDescriptionLabel.translatesAutoresizingMaskIntoConstraints = false
-        recommendationActionButton.translatesAutoresizingMaskIntoConstraints = false
+        // 推荐卡片相关组件已移除
+        // recommendationCardView.translatesAutoresizingMaskIntoConstraints = false
+        // recommendationBlurView.translatesAutoresizingMaskIntoConstraints = false
+        // recommendationTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        // recommendationDescriptionLabel.translatesAutoresizingMaskIntoConstraints = false
+        // recommendationActionButton.translatesAutoresizingMaskIntoConstraints = false
         optionsTableView.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
@@ -288,38 +256,10 @@ class ScreenshotProcessingViewController: UIViewController {
             collectionView.trailingAnchor.constraint(equalTo: previewContainerView.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: previewContainerView.bottomAnchor, constant: -10),
             
-            // 智能推荐卡片
-            recommendationCardView.topAnchor.constraint(equalTo: previewContainerView.bottomAnchor, constant: 16),
-            recommendationCardView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            recommendationCardView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            recommendationCardView.heightAnchor.constraint(equalToConstant: 100),
+            // 智能推荐卡片 - 已移除所有推荐卡片相关约束
             
-            // 推荐卡片模糊背景
-            recommendationBlurView.topAnchor.constraint(equalTo: recommendationCardView.topAnchor),
-            recommendationBlurView.leadingAnchor.constraint(equalTo: recommendationCardView.leadingAnchor),
-            recommendationBlurView.trailingAnchor.constraint(equalTo: recommendationCardView.trailingAnchor),
-            recommendationBlurView.bottomAnchor.constraint(equalTo: recommendationCardView.bottomAnchor),
-            
-            // 推荐标题
-            recommendationTitleLabel.topAnchor.constraint(equalTo: recommendationCardView.topAnchor, constant: 12),
-            recommendationTitleLabel.leadingAnchor.constraint(equalTo: recommendationCardView.leadingAnchor, constant: 16),
-            recommendationTitleLabel.trailingAnchor.constraint(equalTo: recommendationActionButton.leadingAnchor, constant: -12),
-            recommendationTitleLabel.heightAnchor.constraint(equalToConstant: 24),
-            
-            // 推荐描述
-            recommendationDescriptionLabel.topAnchor.constraint(equalTo: recommendationTitleLabel.bottomAnchor, constant: 4),
-            recommendationDescriptionLabel.leadingAnchor.constraint(equalTo: recommendationCardView.leadingAnchor, constant: 16),
-            recommendationDescriptionLabel.trailingAnchor.constraint(equalTo: recommendationActionButton.leadingAnchor, constant: -12),
-            recommendationDescriptionLabel.bottomAnchor.constraint(lessThanOrEqualTo: recommendationCardView.bottomAnchor, constant: -12),
-            
-            // 推荐操作按钮
-            recommendationActionButton.centerYAnchor.constraint(equalTo: recommendationCardView.centerYAnchor),
-            recommendationActionButton.trailingAnchor.constraint(equalTo: recommendationCardView.trailingAnchor, constant: -16),
-            recommendationActionButton.widthAnchor.constraint(equalToConstant: 100),
-            recommendationActionButton.heightAnchor.constraint(equalToConstant: 36),
-            
-            // 操作选项表格
-            optionsTableView.topAnchor.constraint(equalTo: recommendationCardView.bottomAnchor, constant: 20),
+            // 操作选项表格 - 直接连接到预览区域
+            optionsTableView.topAnchor.constraint(equalTo: previewContainerView.bottomAnchor, constant: 20),
             optionsTableView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             optionsTableView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             optionsTableView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),

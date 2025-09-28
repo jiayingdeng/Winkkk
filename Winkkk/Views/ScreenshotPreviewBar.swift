@@ -94,22 +94,13 @@ class ScreenshotPreviewBar: UIView {
         hintLabel.numberOfLines = 1
         headerView.addSubview(hintLabel)
         
-        // 🌟 清空按钮 - 现代圆润设计
+        // 清空按钮
         clearButton.setTitle("🗑", for: .normal)
-        clearButton.setTitleColor(.white, for: .normal)
-        clearButton.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
-        clearButton.backgroundColor = UIColor.systemRed
-        clearButton.layer.cornerRadius = 14  // 更圆润
-        clearButton.layer.shadowColor = UIColor.systemRed.cgColor
-        clearButton.layer.shadowOffset = CGSize(width: 0, height: 2)
-        clearButton.layer.shadowOpacity = 0.3
-        clearButton.layer.shadowRadius = 4
-        clearButton.layer.borderWidth = 1.5
-        clearButton.layer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
+        clearButton.setTitleColor(UIColor.systemRed, for: .normal)
+        clearButton.titleLabel?.font = ThemeManager.captionFont
+        clearButton.backgroundColor = UIColor.systemRed.withAlphaComponent(0.1)
+        clearButton.layer.cornerRadius = ThemeManager.smallCornerRadius
         clearButton.addTarget(self, action: #selector(clearButtonTapped), for: .touchUpInside)
-        
-        // 🌟 添加按钮交互动画
-        addButtonTouchEffects(to: clearButton)
         headerView.addSubview(clearButton)
         
         // 布局
@@ -373,23 +364,6 @@ class ScreenshotPreviewBar: UIView {
         }
     }
     
-    // 🌟 添加按钮交互动画效果
-    private func addButtonTouchEffects(to button: UIButton) {
-        button.addTarget(self, action: #selector(buttonPressed(_:)), for: .touchDown)
-        button.addTarget(self, action: #selector(buttonReleased(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
-    }
-    
-    @objc private func buttonPressed(_ button: UIButton) {
-        UIView.animate(withDuration: 0.1, delay: 0, options: [.curveEaseInOut, .allowUserInteraction]) {
-            button.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
-        }
-    }
-    
-    @objc private func buttonReleased(_ button: UIButton) {
-        UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5, options: [.curveEaseInOut, .allowUserInteraction]) {
-            button.transform = .identity
-        }
-    }
     
     // MARK: - 🆕 Sheet Preview Methods
     private func presentScreenshotDetailSheet(for screenshot: ScreenshotItem, at index: Int) {

@@ -46,7 +46,7 @@ class VideoGalleryViewController: UIViewController {
     // 副标题说明视图
     private lazy var subtitleView: UIView = {
         let containerView = UIView()
-        containerView.backgroundColor = ThemeManager.background.withAlphaComponent(0.95)
+        containerView.backgroundColor = .clear
         
         let label = UILabel()
         label.text = "应用内存储，可导出到系统相册"
@@ -113,36 +113,105 @@ class VideoGalleryViewController: UIViewController {
     private lazy var selectAllButton: UIButton = {
         let button = UIButton(type: .system)
         button.setTitle("全选", for: .normal)
-        button.setTitleColor(ThemeManager.primaryText, for: .normal)
-        button.setTitleColor(ThemeManager.primaryText.withAlphaComponent(0.6), for: .disabled)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .medium)
-        button.backgroundColor = ThemeManager.primaryText.withAlphaComponent(0.1)
-        button.layer.cornerRadius = 8
+        button.setTitleColor(.white, for: .normal)
+        button.setTitleColor(.white.withAlphaComponent(0.6), for: .disabled)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
+        
+        // 胶囊形状设计 - 深紫色与粉紫色背景协调
+        button.backgroundColor = UIColor(red: 0.4, green: 0.2, blue: 0.6, alpha: 1.0) // 深紫色
+        button.layer.cornerRadius = 16
+        
+        // 内边距让按钮更饱满
+        button.contentEdgeInsets = UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 16)
+        
+        // 阴影效果
+        button.layer.shadowColor = UIColor.black.cgColor
+        button.layer.shadowOffset = CGSize(width: 0, height: 2)
+        button.layer.shadowRadius = 4
+        button.layer.shadowOpacity = 0.1
+        
         button.addTarget(self, action: #selector(selectAllButtonTapped), for: .touchUpInside)
+        
+        // 添加交互动画
+        button.addTarget(self, action: #selector(buttonTouchDown(_:)), for: .touchDown)
+        button.addTarget(self, action: #selector(buttonTouchUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        
         return button
     }()
     
     private lazy var exportButton: UIButton = {
         let button = UIButton(type: .system)
-        button.setTitle("导出到相册", for: .normal)
-        button.setTitleColor(UIColor.systemBlue, for: .normal)
-        button.setTitleColor(UIColor.systemBlue.withAlphaComponent(0.6), for: .disabled)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .medium)
-        button.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
-        button.layer.cornerRadius = 8
+        
+        // 使用SF Symbol图标
+        let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
+        let image = UIImage(systemName: "square.and.arrow.up", withConfiguration: config)
+        button.setImage(image, for: .normal)
+        button.setTitle(" 导出", for: .normal)
+        
+        button.setTitleColor(.white, for: .normal)
+        button.setTitleColor(.white.withAlphaComponent(0.6), for: .disabled)
+        button.tintColor = .white
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
+        
+        // 浅紫色背景，与深紫色全选按钮形成层次感
+        button.backgroundColor = UIColor(red: 0.6, green: 0.4, blue: 0.8, alpha: 1.0) // 浅紫色
+        
+        // 胶囊形状设计，与全选按钮保持一致
+        button.layer.cornerRadius = 16
+        
+        // 内边距让按钮更饱满
+        button.contentEdgeInsets = UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 16)
+        
+        // 阴影效果
+        button.layer.shadowColor = UIColor.black.cgColor
+        button.layer.shadowOffset = CGSize(width: 0, height: 2)
+        button.layer.shadowRadius = 4
+        button.layer.shadowOpacity = 0.1
+        
         button.addTarget(self, action: #selector(exportButtonTapped), for: .touchUpInside)
+        
+        // 添加交互动画
+        button.addTarget(self, action: #selector(buttonTouchDown(_:)), for: .touchDown)
+        button.addTarget(self, action: #selector(buttonTouchUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        
         return button
     }()
     
     private lazy var deleteButton: UIButton = {
         let button = UIButton(type: .system)
-        button.setTitle("删除", for: .normal)
-        button.setTitleColor(UIColor.systemRed, for: .normal)
-        button.setTitleColor(UIColor.systemRed.withAlphaComponent(0.6), for: .disabled)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .medium)
-        button.backgroundColor = UIColor.systemRed.withAlphaComponent(0.1)
-        button.layer.cornerRadius = 8
+        
+        // 使用SF Symbol图标
+        let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .medium)
+        let image = UIImage(systemName: "trash", withConfiguration: config)
+        button.setImage(image, for: .normal)
+        button.setTitle(" 删除", for: .normal)
+        
+        button.setTitleColor(.white, for: .normal)
+        button.setTitleColor(.white.withAlphaComponent(0.6), for: .disabled)
+        button.tintColor = .white
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
+        
+        // 极其柔和的淡粉灰色，几乎不刺眼
+        button.backgroundColor = UIColor(red: 0.7, green: 0.5, blue: 0.5, alpha: 1.0) // 淡粉灰色
+        
+        // 胶囊形状设计，与全选按钮保持一致
+        button.layer.cornerRadius = 16
+        
+        // 内边距让按钮更饱满
+        button.contentEdgeInsets = UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 16)
+        
+        // 阴影效果
+        button.layer.shadowColor = UIColor.black.cgColor
+        button.layer.shadowOffset = CGSize(width: 0, height: 2)
+        button.layer.shadowRadius = 4
+        button.layer.shadowOpacity = 0.1
+        
         button.addTarget(self, action: #selector(deleteButtonTapped), for: .touchUpInside)
+        
+        // 添加交互动画
+        button.addTarget(self, action: #selector(buttonTouchDown(_:)), for: .touchDown)
+        button.addTarget(self, action: #selector(buttonTouchUp(_:)), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+        
         return button
     }()
     
@@ -1079,6 +1148,19 @@ extension VideoGalleryViewController: PHPickerViewControllerDelegate {
                 alert.dismiss(animated: true)
             }
         }
+    }
+    
+    // MARK: - 统一交互动画
+    @objc private func buttonTouchDown(_ sender: UIButton) {
+        UIView.animate(withDuration: 0.1, delay: 0, options: [.allowUserInteraction], animations: {
+            sender.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+        })
+    }
+    
+    @objc private func buttonTouchUp(_ sender: UIButton) {
+        UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5, options: [.allowUserInteraction], animations: {
+            sender.transform = CGAffineTransform.identity
+        })
     }
 }
 
