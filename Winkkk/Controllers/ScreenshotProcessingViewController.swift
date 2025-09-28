@@ -753,7 +753,7 @@ extension ScreenshotProcessingViewController {
         }
         
         // 有未保存的内容，显示确认对话框
-        let modeText = mode == .livePhoto ? "Live Photo" : "截图"
+        let modeText = mode == .livePhoto ? "实况照片" : "截图"
         let alert = UIAlertController(
             title: "开始新的创作",
             message: "当前有 \(unsavedScreenshots.count) 张未保存的\(modeText)，确定要放弃并开始新的创作吗？",

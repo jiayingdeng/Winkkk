@@ -490,9 +490,8 @@ class VideoPlayerViewController: UIViewController {
     }
     
     private func setupMultiScreenshotSystem() {
-        // 设置初始模式
-        captureModeSwitcher.setCurrentMode(CaptureMode.stillImage)
-        
+        // 🆕 移除硬编码的初始模式设置，让会话加载时自动设置正确的模式
+        // captureModeSwitcher.setCurrentMode(CaptureMode.stillImage) // 🔧 已移除
         
         // 订阅截图状态变化
         screenshotManager.$screenshots
@@ -546,6 +545,10 @@ class VideoPlayerViewController: UIViewController {
             // Live Photo模式：显示3秒范围指示
             timelineView.setLivePhotoMode(true)
         }
+        
+        // 🆕 关键修复：同步更新模式切换器的UI状态
+        captureModeSwitcher.setCurrentMode(mode)
+        print("📸 界面模式已同步更新: \(mode.displayName)")
     }
     
     // MARK: - Flow Control (编辑器模式)
@@ -1183,7 +1186,7 @@ class VideoPlayerViewController: UIViewController {
     
     private func showCancelConfirmationAlert(screenshotCount: Int) {
         let mode = screenshotManager.currentMode
-        let modeText = mode == .livePhoto ? "Live Photo" : "截图"
+        let modeText = mode == .livePhoto ? "实况照片" : "截图"
         
         let alert = UIAlertController(
             title: "确定要取消吗？",

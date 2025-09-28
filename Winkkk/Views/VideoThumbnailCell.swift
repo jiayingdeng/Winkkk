@@ -196,7 +196,19 @@ class VideoThumbnailCell: UICollectionViewCell {
         loadThumbnail(for: videoItem)
     }
     
+    // MARK: - Selection
+    func setSelected(_ selected: Bool) {
+        selectionIndicatorView.isHidden = !selected
+        
+        UIView.animate(withDuration: 0.2) {
+            self.contentView.transform = selected ? CGAffineTransform(scaleX: 0.95, y: 0.95) : .identity
+        }
+    }
+    
     private func loadThumbnail(for videoItem: VideoItem) {
+        // 取消之前的任务
+        thumbnailTask?.cancel()
+        
         // 首先检查是否有缓存的缩略图
         if let thumbnailPath = videoItem.thumbnailPath,
            FileManager.default.fileExists(atPath: thumbnailPath.path) {
@@ -204,23 +216,37 @@ class VideoThumbnailCell: UICollectionViewCell {
             return
         }
         
+        // 检查文件是否存在，避免尝试为不存在的文件生成缩略图
+        guard FileManager.default.fileExists(atPath: videoItem.filePath.path) else {
+            print("❌ VideoThumbnailCell: 视频文件不存在: \(videoItem.filePath.path)")
+            thumbnailImageView.image = UIImage(systemName: "video.slash")
+            thumbnailImageView.tintColor = ThemeManager.secondaryText
+            return
+        }
+        
         // 异步生成缩略图
-        thumbnailTask = Task {
+        thumbnailTask = Task { @MainActor [weak self] in
+            guard let self = self else { return }
+            
             do {
-                let thumbnail = try await generateThumbnail(for: videoItem.filePath)
+                let thumbnail = try await self.generateThumbnail(for: videoItem.filePath)
                 
-                await MainActor.run {
-                    guard self.videoItem?.id == videoItem.id else { return }
-                    self.thumbnailImageView.image = thumbnail
-                    
-                    // 保存缩略图缓存
-                    self.saveThumbnailCache(thumbnail, for: videoItem)
-                }
+                // 确保cell没有被重用
+                guard self.videoItem?.id == videoItem.id else { return }
+                
+                self.thumbnailImageView.image = thumbnail
+                
+                // 保存缩略图缓存
+                self.saveThumbnailCache(thumbnail, for: videoItem)
+                
             } catch {
-                await MainActor.run {
-                    self.thumbnailImageView.image = UIImage(systemName: "video.slash")
-                    self.thumbnailImageView.tintColor = ThemeManager.secondaryText
-                }
+                print("❌ VideoThumbnailCell: 缩略图生成失败: \(error)")
+                
+                // 确保cell没有被重用
+                guard self.videoItem?.id == videoItem.id else { return }
+                
+                self.thumbnailImageView.image = UIImage(systemName: "video.slash")
+                self.thumbnailImageView.tintColor = ThemeManager.secondaryText
             }
         }
     }

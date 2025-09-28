@@ -103,7 +103,7 @@ class CaptureModeSwitcher: UIView {
     }
     
     private func setupLivePhotoButton() {
-        livePhotoButton.setTitle("Live Photo", for: .normal)
+        livePhotoButton.setTitle("实况照片", for: .normal)
         livePhotoButton.setImage(UIImage(systemName: "livephoto"), for: .normal)
         livePhotoButton.titleLabel?.font = ThemeManager.buttonFont
         livePhotoButton.contentHorizontalAlignment = .center

@@ -19,7 +19,7 @@ enum CaptureMode: String, CaseIterable {
         case .stillImage:
             return "普通截图"
         case .livePhoto:
-            return "Live Photo"
+            return "实况照片"
         }
     }
     

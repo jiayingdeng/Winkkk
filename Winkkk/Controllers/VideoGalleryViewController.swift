@@ -52,11 +52,81 @@ class VideoGalleryViewController: UIViewController {
         return button
     }()
     
+    private lazy var selectButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("选择", for: .normal)
+        button.setTitleColor(ThemeManager.primaryText, for: .normal)
+        button.titleLabel?.font = ThemeManager.bodyFont
+        button.addTarget(self, action: #selector(selectButtonTapped), for: .touchUpInside)
+        return button
+    }()
+    
     private lazy var closeButton: UIButton = {
         let button = UIButton(type: .system)
         button.setImage(UIImage(systemName: "xmark"), for: .normal)
         button.tintColor = ThemeManager.primaryText
         button.addTarget(self, action: #selector(closeButtonTapped), for: .touchUpInside)
+        return button
+    }()
+    
+    // MARK: - Selection Mode
+    private var isSelectionMode = false
+    private var selectedVideoItems = Set<VideoItem>()
+    
+    // 底部工具栏
+    private lazy var bottomToolbar: UIView = {
+        let view = UIView()
+        view.backgroundColor = ThemeManager.cardBackground
+        view.layer.shadowColor = UIColor.black.withAlphaComponent(0.1).cgColor
+        view.layer.shadowOffset = CGSize(width: 0, height: -2)
+        view.layer.shadowRadius = 4
+        view.layer.shadowOpacity = 1.0
+        view.isHidden = true
+        return view
+    }()
+    
+    private lazy var selectAllButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("全选", for: .normal)
+        button.setTitleColor(ThemeManager.primaryText, for: .normal)
+        button.setTitleColor(ThemeManager.primaryText.withAlphaComponent(0.6), for: .disabled)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        button.backgroundColor = ThemeManager.primaryText.withAlphaComponent(0.1)
+        button.layer.cornerRadius = 8
+        button.addTarget(self, action: #selector(selectAllButtonTapped), for: .touchUpInside)
+        return button
+    }()
+    
+    private lazy var exportButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("导出", for: .normal)
+        button.setTitleColor(UIColor.systemBlue, for: .normal)
+        button.setTitleColor(UIColor.systemBlue.withAlphaComponent(0.6), for: .disabled)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        button.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
+        button.layer.cornerRadius = 8
+        button.addTarget(self, action: #selector(exportButtonTapped), for: .touchUpInside)
+        return button
+    }()
+    
+    private lazy var deleteButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("删除", for: .normal)
+        button.setTitleColor(UIColor.systemRed, for: .normal)
+        button.setTitleColor(UIColor.systemRed.withAlphaComponent(0.6), for: .disabled)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        button.backgroundColor = UIColor.systemRed.withAlphaComponent(0.1)
+        button.layer.cornerRadius = 8
+        button.addTarget(self, action: #selector(deleteButtonTapped), for: .touchUpInside)
+        return button
+    }()
+    
+    private lazy var cancelButton: UIButton = {
+        let button = UIButton(type: .system)
+        button.setTitle("取消", for: .normal)
+        button.setTitleColor(ThemeManager.primaryText, for: .normal)
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        button.addTarget(self, action: #selector(cancelSelectionTapped), for: .touchUpInside)
         return button
     }()
     
@@ -76,7 +146,7 @@ class VideoGalleryViewController: UIViewController {
         setupNavigationBar()
         setupConstraints()
         setupFetchedResultsController()
-        loadVideos()
+        cleanupAndLoadVideos()
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -104,10 +174,14 @@ class VideoGalleryViewController: UIViewController {
         // 添加空状态视图
         view.addSubview(emptyStateView)
         emptyStateView.isHidden = true
+        
+        // 添加底部工具栏
+        view.addSubview(bottomToolbar)
+        setupBottomToolbar()
     }
     
     private func setupNavigationBar() {
-        title = "我的视频"
+        title = "应用内视频"
         
         // 自定义导航栏外观
         navigationController?.navigationBar.prefersLargeTitles = false
@@ -115,15 +189,28 @@ class VideoGalleryViewController: UIViewController {
         navigationController?.navigationBar.shadowImage = UIImage()
         navigationController?.navigationBar.isTranslucent = true
         
-        // 设置导航栏按钮
-        navigationItem.leftBarButtonItem = UIBarButtonItem(customView: closeButton)
-        navigationItem.rightBarButtonItem = UIBarButtonItem(customView: importButton)
+        updateNavigationBarButtons()
         
         // 设置标题样式
         navigationController?.navigationBar.titleTextAttributes = [
             .foregroundColor: ThemeManager.primaryText,
             .font: ThemeManager.headlineFont
         ]
+    }
+    
+    private func updateNavigationBarButtons() {
+        navigationItem.leftBarButtonItem = UIBarButtonItem(customView: closeButton)
+        
+        if isSelectionMode {
+            navigationItem.rightBarButtonItem = UIBarButtonItem(customView: cancelButton)
+        } else {
+            // 创建右侧按钮栈
+            let stackView = UIStackView(arrangedSubviews: [selectButton, importButton])
+            stackView.axis = .horizontal
+            stackView.spacing = 16
+            stackView.alignment = .center
+            navigationItem.rightBarButtonItem = UIBarButtonItem(customView: stackView)
+        }
     }
     
     private func setupConstraints() {
@@ -148,7 +235,13 @@ class VideoGalleryViewController: UIViewController {
             emptyStateView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             emptyStateView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
             emptyStateView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
-            emptyStateView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32)
+            emptyStateView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
+            
+            // 底部工具栏
+            bottomToolbar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bottomToolbar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bottomToolbar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            bottomToolbar.heightAnchor.constraint(equalToConstant: 60)
         ])
     }
     
@@ -178,6 +271,31 @@ class VideoGalleryViewController: UIViewController {
         return UICollectionViewCompositionalLayout(section: section)
     }
     
+    private func setupBottomToolbar() {
+        bottomToolbar.translatesAutoresizingMaskIntoConstraints = false
+        
+        let stackView = UIStackView(arrangedSubviews: [selectAllButton, exportButton, deleteButton])
+        stackView.axis = .horizontal
+        stackView.distribution = .fillEqually
+        stackView.alignment = .center
+        stackView.spacing = 12
+        stackView.translatesAutoresizingMaskIntoConstraints = false
+        
+        bottomToolbar.addSubview(stackView)
+        
+        // 为每个按钮设置高度约束
+        [selectAllButton, exportButton, deleteButton].forEach { button in
+            button.heightAnchor.constraint(equalToConstant: 44).isActive = true
+        }
+        
+        NSLayoutConstraint.activate([
+            stackView.centerXAnchor.constraint(equalTo: bottomToolbar.centerXAnchor),
+            stackView.centerYAnchor.constraint(equalTo: bottomToolbar.centerYAnchor),
+            stackView.leadingAnchor.constraint(greaterThanOrEqualTo: bottomToolbar.leadingAnchor, constant: 16),
+            stackView.trailingAnchor.constraint(lessThanOrEqualTo: bottomToolbar.trailingAnchor, constant: -16)
+        ])
+    }
+    
     // MARK: - Data Management
     private func setupFetchedResultsController() {
         print("📱 VideoGallery: Setting up Core Data fetched results controller")
@@ -200,6 +318,40 @@ class VideoGalleryViewController: UIViewController {
             print("✅ VideoGallery: Loaded \(videos.count) videos")
         } catch {
             print("❌ VideoGallery: 获取视频数据失败: \(error)")
+        }
+    }
+    
+    private func cleanupAndLoadVideos() {
+        print("📱 VideoGallery: 开始清理数据库并加载视频")
+        
+        // 检查是否需要清理（只在首次启动或检测到问题时清理）
+        let lastCleanupKey = "LastDatabaseCleanup"
+        let lastCleanup = UserDefaults.standard.double(forKey: lastCleanupKey)
+        let now = Date().timeIntervalSince1970
+        let shouldCleanup = (now - lastCleanup) > 24 * 60 * 60 // 24小时清理一次
+        
+        if shouldCleanup {
+            print("🧹 VideoGallery: 执行定期数据库清理")
+            videoManager.forceCleanupOrphanRecords { [weak self] result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success(let deletedCount):
+                        if deletedCount > 0 {
+                            print("✅ VideoGallery: 清理了 \(deletedCount) 个孤儿记录")
+                        }
+                        // 记录清理时间
+                        UserDefaults.standard.set(now, forKey: lastCleanupKey)
+                        self?.loadVideos()
+                        
+                    case .failure(let error):
+                        print("❌ VideoGallery: 清理失败: \(error)")
+                        self?.loadVideos() // 即使清理失败也要加载视频
+                    }
+                }
+            }
+        } else {
+            print("⏭️ VideoGallery: 跳过清理，直接加载视频")
+            loadVideos()
         }
     }
     
@@ -271,6 +423,62 @@ class VideoGalleryViewController: UIViewController {
         presentVideoImportOptions()
     }
     
+    @objc private func selectButtonTapped() {
+        enterSelectionMode()
+    }
+    
+    @objc private func selectAllButtonTapped() {
+        if selectedVideoItems.count == videos.count {
+            // 已全选，执行反选
+            selectedVideoItems.removeAll()
+            selectAllButton.setTitle("全选", for: .normal)
+        } else {
+            // 执行全选
+            selectedVideoItems = Set(videos)
+            selectAllButton.setTitle("取消全选", for: .normal)
+        }
+        updateSelectionUI()
+    }
+    
+    @objc private func exportButtonTapped() {
+        guard !selectedVideoItems.isEmpty else { return }
+        
+        let alert = UIAlertController(
+            title: "导出视频",
+            message: "确定要导出选中的 \(selectedVideoItems.count) 个视频到系统相册吗？",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "导出", style: .default) { [weak self] _ in
+            self?.performBatchExport()
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        present(alert, animated: true)
+    }
+    
+    @objc private func deleteButtonTapped() {
+        guard !selectedVideoItems.isEmpty else { return }
+        
+        let alert = UIAlertController(
+            title: "删除视频",
+            message: "确定要删除选中的 \(selectedVideoItems.count) 个视频吗？此操作无法撤销。",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "删除", style: .destructive) { [weak self] _ in
+            self?.performBatchDelete()
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        present(alert, animated: true)
+    }
+    
+    @objc private func cancelSelectionTapped() {
+        exitSelectionMode()
+    }
     
     private func presentVideoImportOptions() {
         let alert = UIAlertController(title: "添加视频", message: "选择视频来源", preferredStyle: .actionSheet)
@@ -378,6 +586,164 @@ class VideoGalleryViewController: UIViewController {
         }
     }
     
+    // MARK: - Selection Mode Methods
+    private func enterSelectionMode() {
+        isSelectionMode = true
+        selectedVideoItems.removeAll()
+        updateToolbarForSelectionMode()
+        updateSelectionUI()
+        
+        // 动画更新collection view
+        UIView.animate(withDuration: 0.3) {
+            self.collectionView.reloadData()
+        }
+    }
+    
+    private func exitSelectionMode() {
+        isSelectionMode = false
+        selectedVideoItems.removeAll()
+        updateToolbarForNormalMode()
+        
+        // 动画更新collection view
+        UIView.animate(withDuration: 0.3) {
+            self.collectionView.reloadData()
+        }
+    }
+    
+    private func updateSelectionUI() {
+        guard isSelectionMode else { return }
+        
+        // 更新全选按钮状态
+        if selectedVideoItems.count == videos.count && !videos.isEmpty {
+            selectAllButton.setTitle("取消全选", for: .normal)
+        } else {
+            selectAllButton.setTitle("全选", for: .normal)
+        }
+        
+        // 更新操作按钮状态
+        let hasSelection = !selectedVideoItems.isEmpty
+        exportButton.isEnabled = hasSelection
+        deleteButton.isEnabled = hasSelection
+        
+        // 更新按钮透明度
+        exportButton.alpha = hasSelection ? 1.0 : 0.5
+        deleteButton.alpha = hasSelection ? 1.0 : 0.5
+        
+        // 更新选择计数显示
+        let selectedCount = selectedVideoItems.count
+        if selectedCount > 0 {
+            title = "已选择 \(selectedCount) 个视频"
+        } else {
+            title = "选择视频"
+        }
+    }
+    
+    private func updateToolbarForSelectionMode() {
+        // 更新导航栏右侧按钮
+        navigationItem.rightBarButtonItem = UIBarButtonItem(customView: cancelButton)
+        
+        // 设置工具栏按钮
+        let flexibleSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
+        
+        let selectAllBarButton = UIBarButtonItem(customView: selectAllButton)
+        let exportBarButton = UIBarButtonItem(customView: exportButton)
+        let deleteBarButton = UIBarButtonItem(customView: deleteButton)
+        
+        setToolbarItems([
+            selectAllBarButton,
+            flexibleSpace,
+            exportBarButton,
+            flexibleSpace,
+            deleteBarButton
+        ], animated: true)
+        
+        // 显示工具栏
+        navigationController?.setToolbarHidden(false, animated: true)
+    }
+    
+    private func updateToolbarForNormalMode() {
+        // 恢复原来的导航栏按钮
+        setupNavigationBar()
+        
+        // 隐藏工具栏
+        navigationController?.setToolbarHidden(true, animated: true)
+        setToolbarItems(nil, animated: true)
+        
+        // 恢复标题
+        title = navigationItem.title
+    }
+    
+    private func performBatchExport() {
+        let selectedVideos = Array(selectedVideoItems)
+        var completedCount = 0
+        var failedCount = 0
+        
+        // 显示进度提示
+        let progressAlert = UIAlertController(
+            title: "导出进行中",
+            message: "正在导出视频到相册...",
+            preferredStyle: .alert
+        )
+        present(progressAlert, animated: true)
+        
+        let dispatchGroup = DispatchGroup()
+        
+        for video in selectedVideos {
+            dispatchGroup.enter()
+            
+            videoManager.exportToPhotoLibrary(video: video) { result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success:
+                        completedCount += 1
+                    case .failure:
+                        failedCount += 1
+                    }
+                    dispatchGroup.leave()
+                }
+            }
+        }
+        
+        dispatchGroup.notify(queue: .main) { [weak self] in
+            progressAlert.dismiss(animated: true) {
+                self?.showBatchExportResult(completed: completedCount, failed: failedCount)
+                self?.exitSelectionMode()
+            }
+        }
+    }
+    
+    private func showBatchExportResult(completed: Int, failed: Int) {
+        let title = "导出完成"
+        var message = "成功导出 \(completed) 个视频"
+        if failed > 0 {
+            message += "，\(failed) 个视频导出失败"
+        }
+        
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
+    }
+    
+    private func performBatchDelete() {
+        let selectedVideos = Array(selectedVideoItems)
+        
+        for video in selectedVideos {
+            videoManager.deleteVideo(video) { [weak self] result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success:
+                        // Core Data会自动更新UI
+                        break
+                    case .failure(let error):
+                        self?.showError(error)
+                    }
+                }
+            }
+        }
+        
+        exitSelectionMode()
+    }
+    
     private func showError(_ error: Error) {
         let alert = UIAlertController(
             title: "错误",
@@ -401,12 +767,23 @@ extension VideoGalleryViewController: UICollectionViewDataSource {
             // 添加视频按钮
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: AddVideoCell.identifier, for: indexPath) as! AddVideoCell
             cell.configure()
+            
+            // 在选择模式下隐藏添加按钮
+            cell.alpha = isSelectionMode ? 0.3 : 1.0
+            cell.isUserInteractionEnabled = !isSelectionMode
+            
             return cell
         } else {
             // 视频缩略图
             let cell = collectionView.dequeueReusableCell(withReuseIdentifier: VideoThumbnailCell.identifier, for: indexPath) as! VideoThumbnailCell
             let video = videos[indexPath.item - 1]
             cell.configure(with: video)
+            
+            // 在选择模式下设置选择状态
+            if isSelectionMode {
+                cell.setSelected(selectedVideoItems.contains(video))
+            }
+            
             return cell
         }
     }
@@ -420,14 +797,33 @@ extension VideoGalleryViewController: UICollectionViewDelegate {
         
         if indexPath.item == 0 {
             // 添加视频按钮
-            importButtonTapped()
+            if !isSelectionMode {
+                importButtonTapped()
+            }
         } else {
             // 选择视频
             let video = videos[indexPath.item - 1]
-            if let delegate = delegate {
-                delegate.videoGalleryViewController(self, didSelectVideo: video)
+            
+            if isSelectionMode {
+                // 选择模式下处理多选
+                if selectedVideoItems.contains(video) {
+                    selectedVideoItems.remove(video)
+                } else {
+                    selectedVideoItems.insert(video)
+                }
+                updateSelectionUI()
+                
+                // 更新对应的cell
+                if let cell = collectionView.cellForItem(at: indexPath) as? VideoThumbnailCell {
+                    cell.setSelected(selectedVideoItems.contains(video))
+                }
             } else {
-                openVideoEditor(with: video)
+                // 正常模式下的视频选择
+                if let delegate = delegate {
+                    delegate.videoGalleryViewController(self, didSelectVideo: video)
+                } else {
+                    openVideoEditor(with: video)
+                }
             }
         }
     }

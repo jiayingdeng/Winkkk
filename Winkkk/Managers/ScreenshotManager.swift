@@ -205,17 +205,30 @@ class ScreenshotManager: ObservableObject {
                 screenshots = loadedScreenshots
                 selectedScreenshots = loadedScreenshots.filter { $0.isSelected }
                 
+                // 🆕 关键修复：根据加载的截图类型自动设置正确的模式
+                if let firstScreenshot = loadedScreenshots.first {
+                    let detectedMode = firstScreenshot.mode
+                    currentMode = detectedMode
+                    print("📸 检测到历史模式: \(detectedMode.displayName)")
+                } else {
+                    // 有VideoItem但无截图数据，保持默认模式
+                    currentMode = .stillImage
+                    print("📸 VideoItem存在但无截图，使用默认模式")
+                }
+                
                 print("📸 已加载会话数据: \(videoURL.lastPathComponent) - \(screenshots.count)张截图")
             } else {
                 // 没有找到对应的VideoItem，说明是第一次打开这个视频
                 screenshots.removeAll()
                 selectedScreenshots.removeAll()
-                print("📸 新视频会话: \(videoURL.lastPathComponent) - 无历史截图")
+                currentMode = .stillImage  // 🆕 新视频默认使用普通截图模式
+                print("📸 新视频会话: \(videoURL.lastPathComponent) - 无历史截图，默认普通模式")
             }
         } catch {
             print("❌ 加载截图数据失败: \(error)")
             screenshots.removeAll()
             selectedScreenshots.removeAll()
+            currentMode = .stillImage  // 🆕 出错时也使用默认模式
         }
     }
     

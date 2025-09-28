@@ -35,23 +35,75 @@ class VideoManager {
             
             do {
                 let videos = try self.backgroundContext.fetch(request)
+                print("📱 VideoManager: 从数据库加载了 \(videos.count) 个视频记录")
                 
                 // 验证文件是否存在，清理无效记录
+                var deletedCount = 0
                 let validVideos = videos.filter { video in
                     let exists = self.fileManager.fileExists(atPath: video.filePath.path)
                     if !exists {
+                        print("❌ VideoManager: 发现孤儿记录，文件不存在: \(video.filePath.path)")
                         self.backgroundContext.delete(video)
+                        deletedCount += 1
                     }
                     return exists
                 }
                 
                 // 如果有删除操作，保存上下文
-                if validVideos.count != videos.count {
+                if deletedCount > 0 {
+                    print("🗑️ VideoManager: 清理了 \(deletedCount) 个孤儿记录")
                     try self.backgroundContext.save()
+                    
+                    // 通知主上下文更新
+                    DispatchQueue.main.async {
+                        try? PersistenceController.shared.container.viewContext.save()
+                    }
                 }
                 
                 DispatchQueue.main.async {
                     completion(.success(validVideos))
+                }
+                
+            } catch {
+                print("❌ VideoManager: 加载视频失败: \(error)")
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+            }
+        }
+    }
+    
+    // MARK: - Database Cleanup
+    func forceCleanupOrphanRecords(completion: @escaping (Result<Int, Error>) -> Void) {
+        backgroundContext.perform { [weak self] in
+            guard let self = self else { return }
+            
+            do {
+                let request: NSFetchRequest<VideoItem> = VideoItem.fetchRequest()
+                let allVideos = try self.backgroundContext.fetch(request)
+                
+                var deletedCount = 0
+                for video in allVideos {
+                    if !self.fileManager.fileExists(atPath: video.filePath.path) {
+                        print("🗑️ 删除孤儿记录: \(video.fileName)")
+                        self.backgroundContext.delete(video)
+                        deletedCount += 1
+                    }
+                }
+                
+                if deletedCount > 0 {
+                    try self.backgroundContext.save()
+                    
+                    // 强制同步到主上下文
+                    DispatchQueue.main.async {
+                        let mainContext = PersistenceController.shared.container.viewContext
+                        mainContext.refreshAllObjects()
+                        try? mainContext.save()
+                    }
+                }
+                
+                DispatchQueue.main.async {
+                    completion(.success(deletedCount))
                 }
                 
             } catch {
@@ -393,6 +445,39 @@ class VideoManager {
                 }
             }
         }
+    }
+    
+    // MARK: - Export to Photo Library
+    func exportToPhotoLibrary(video: VideoItem, completion: @escaping (Result<Void, Error>) -> Void) {
+        // 检查文件是否存在
+        guard FileManager.default.fileExists(atPath: video.filePath.path) else {
+            completion(.failure(VideoManagerError.fileNotFound))
+            return
+        }
+        
+        // 使用UISaveVideoAtPathToSavedPhotosAlbum保存视频
+        UISaveVideoAtPathToSavedPhotosAlbum(video.filePath.path, self, #selector(videoExportCompleted(_:didFinishSavingWithError:contextInfo:)), Unmanaged.passRetained(CompletionWrapper(completion: completion)).toOpaque())
+    }
+    
+    @objc private func videoExportCompleted(_ videoPath: String, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
+        let wrapper = Unmanaged<CompletionWrapper>.fromOpaque(contextInfo).takeRetainedValue()
+        
+        DispatchQueue.main.async {
+            if let error = error {
+                wrapper.completion(.failure(error))
+            } else {
+                wrapper.completion(.success(()))
+            }
+        }
+    }
+}
+
+// MARK: - Helper Classes
+private class CompletionWrapper {
+    let completion: (Result<Void, Error>) -> Void
+    
+    init(completion: @escaping (Result<Void, Error>) -> Void) {
+        self.completion = completion
     }
 }
 
