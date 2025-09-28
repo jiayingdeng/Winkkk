@@ -1121,20 +1121,80 @@ class VideoPlayerViewController: UIViewController {
     }
     
     private func showSaveProgressAndNavigate(savedCount: Int, totalCount: Int) {
-        // 显示保存成功提示
+        // 显示简短的保存成功提示
         let message = totalCount == savedCount ? 
             "已将 \(savedCount) 张截图保存到相册" : 
             "已保存 \(savedCount)/\(totalCount) 张截图到相册"
         
-        let alert = UIAlertController(title: "保存完成", message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "继续处理", style: .default) { [weak self] _ in
+        // 短暂显示成功提示后直接跳转
+        showBriefSuccessMessage(message) { [weak self] in
             self?.navigateToScreenshotProcessing()
-        })
-        alert.addAction(UIAlertAction(title: "完成", style: .cancel) { [weak self] _ in
-            self?.dismiss(animated: true)
-        })
+        }
+    }
+    
+    private func showBriefSuccessMessage(_ message: String, completion: @escaping () -> Void) {
+        // 创建简洁的成功提示视图
+        let successView = UIView()
+        successView.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.9)
+        successView.layer.cornerRadius = 12
+        successView.translatesAutoresizingMaskIntoConstraints = false
         
-        present(alert, animated: true)
+        let checkmarkLabel = UILabel()
+        checkmarkLabel.text = "✅"
+        checkmarkLabel.font = .systemFont(ofSize: 24)
+        checkmarkLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        let messageLabel = UILabel()
+        messageLabel.text = message
+        messageLabel.textColor = .white
+        messageLabel.font = .systemFont(ofSize: 16, weight: .medium)
+        messageLabel.textAlignment = .center
+        messageLabel.numberOfLines = 2
+        messageLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        successView.addSubview(checkmarkLabel)
+        successView.addSubview(messageLabel)
+        view.addSubview(successView)
+        
+        // 布局约束
+        NSLayoutConstraint.activate([
+            successView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            successView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            successView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 40),
+            successView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -40),
+            successView.heightAnchor.constraint(equalToConstant: 100),
+            
+            checkmarkLabel.topAnchor.constraint(equalTo: successView.topAnchor, constant: 12),
+            checkmarkLabel.centerXAnchor.constraint(equalTo: successView.centerXAnchor),
+            
+            messageLabel.topAnchor.constraint(equalTo: checkmarkLabel.bottomAnchor, constant: 8),
+            messageLabel.leadingAnchor.constraint(equalTo: successView.leadingAnchor, constant: 16),
+            messageLabel.trailingAnchor.constraint(equalTo: successView.trailingAnchor, constant: -16),
+            messageLabel.bottomAnchor.constraint(equalTo: successView.bottomAnchor, constant: -12)
+        ])
+        
+        // 动画显示
+        successView.alpha = 0
+        successView.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+        
+        UIView.animate(withDuration: 0.3, animations: {
+            successView.alpha = 1
+            successView.transform = .identity
+        }) { _ in
+            // 1.5秒后自动消失并跳转
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                UIView.animate(withDuration: 0.3, animations: {
+                    successView.alpha = 0
+                    successView.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+                }) { _ in
+                    successView.removeFromSuperview()
+                    completion()
+                }
+            }
+        }
+        
+        // 触觉反馈
+        HapticFeedbackManager.shared.notificationSuccess()
     }
     
     private func showPhotosPermissionDeniedAlert() {
