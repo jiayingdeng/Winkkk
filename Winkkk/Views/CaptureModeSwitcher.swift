@@ -86,8 +86,8 @@ class CaptureModeSwitcher: UIView {
         stillImageButton.titleLabel?.font = ThemeManager.buttonFont.withSize(ThemeManager.buttonFont.pointSize + 1)  // 🌟 稍大字体
         stillImageButton.contentHorizontalAlignment = .center
         stillImageButton.semanticContentAttribute = .forceLeftToRight
-        // 🌟 添加按钮内边距，让文字和按钮边缘有舒适间隙
-        stillImageButton.contentEdgeInsets = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16)
+        // 🌟 现在有了固定高度，可以安全使用内容边距
+        stillImageButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 16, bottom: 12, right: 16)
         stillImageButton.imageEdgeInsets = UIEdgeInsets(top: 0, left: -8, bottom: 0, right: 8)
         stillImageButton.titleEdgeInsets = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: -8)
         
@@ -110,8 +110,8 @@ class CaptureModeSwitcher: UIView {
         livePhotoButton.titleLabel?.font = ThemeManager.buttonFont
         livePhotoButton.contentHorizontalAlignment = .center
         livePhotoButton.semanticContentAttribute = .forceLeftToRight
-        // 🌟 添加按钮内边距，让文字和按钮边缘有舒适间隙
-        livePhotoButton.contentEdgeInsets = UIEdgeInsets(top: 10, left: 16, bottom: 10, right: 16)
+        // 🌟 现在有了固定高度，可以安全使用内容边距
+        livePhotoButton.contentEdgeInsets = UIEdgeInsets(top: 12, left: 16, bottom: 12, right: 16)
         livePhotoButton.imageEdgeInsets = UIEdgeInsets(top: 0, left: -8, bottom: 0, right: 8)
         livePhotoButton.titleEdgeInsets = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: -8)
         
@@ -148,11 +148,12 @@ class CaptureModeSwitcher: UIView {
             blurEffectView.trailingAnchor.constraint(equalTo: trailingAnchor),
             blurEffectView.bottomAnchor.constraint(equalTo: bottomAnchor),
             
-            // 容器视图
+            // 容器视图 - 🌟 设置明确的高度以确保内边距效果
             containerView.topAnchor.constraint(equalTo: blurEffectView.contentView.topAnchor, constant: 8),
             containerView.leadingAnchor.constraint(equalTo: blurEffectView.contentView.leadingAnchor, constant: 12),
             containerView.trailingAnchor.constraint(equalTo: blurEffectView.contentView.trailingAnchor, constant: -12),
             containerView.bottomAnchor.constraint(equalTo: blurEffectView.contentView.bottomAnchor, constant: -8),
+            containerView.heightAnchor.constraint(equalToConstant: 60),  // 🌟 设置明确高度，为内边距留空间
             
             // 普通截图按钮
             stillImageButton.topAnchor.constraint(equalTo: containerView.topAnchor),

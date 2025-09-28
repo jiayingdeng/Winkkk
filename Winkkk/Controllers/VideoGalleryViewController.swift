@@ -43,6 +43,31 @@ class VideoGalleryViewController: UIViewController {
     private let gradientBackgroundView = GradientBackgroundView()
     private let emptyStateView = EmptyStateView()
     
+    // 副标题说明视图
+    private lazy var subtitleView: UIView = {
+        let containerView = UIView()
+        containerView.backgroundColor = ThemeManager.background.withAlphaComponent(0.95)
+        
+        let label = UILabel()
+        label.text = "应用内存储，可导出到系统相册"
+        label.font = UIFont.systemFont(ofSize: 12, weight: .regular)
+        label.textColor = ThemeManager.secondaryText
+        label.textAlignment = .center
+        label.numberOfLines = 1
+        
+        containerView.addSubview(label)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        
+        NSLayoutConstraint.activate([
+            label.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            label.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+            label.leadingAnchor.constraint(greaterThanOrEqualTo: containerView.leadingAnchor, constant: 16),
+            label.trailingAnchor.constraint(lessThanOrEqualTo: containerView.trailingAnchor, constant: -16)
+        ])
+        
+        return containerView
+    }()
+    
     // 导航栏按钮
     private lazy var importButton: UIButton = {
         let button = UIButton(type: .system)
@@ -149,6 +174,11 @@ class VideoGalleryViewController: UIViewController {
         cleanupAndLoadVideos()
     }
     
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        showFirstTimeGuidanceIfNeeded()
+    }
+    
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         refreshData()
@@ -167,6 +197,9 @@ class VideoGalleryViewController: UIViewController {
         
         // 添加渐变背景
         view.addSubview(gradientBackgroundView)
+        
+        // 添加副标题视图
+        view.addSubview(subtitleView)
         
         // 添加集合视图
         view.addSubview(collectionView)
@@ -215,6 +248,7 @@ class VideoGalleryViewController: UIViewController {
     
     private func setupConstraints() {
         gradientBackgroundView.translatesAutoresizingMaskIntoConstraints = false
+        subtitleView.translatesAutoresizingMaskIntoConstraints = false
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         emptyStateView.translatesAutoresizingMaskIntoConstraints = false
         
@@ -225,8 +259,14 @@ class VideoGalleryViewController: UIViewController {
             gradientBackgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             gradientBackgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
+            // 副标题视图
+            subtitleView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            subtitleView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            subtitleView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            subtitleView.heightAnchor.constraint(equalToConstant: 32),
+            
             // 集合视图
-            collectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            collectionView.topAnchor.constraint(equalTo: subtitleView.bottomAnchor),
             collectionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             collectionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
@@ -742,6 +782,40 @@ class VideoGalleryViewController: UIViewController {
         }
         
         exitSelectionMode()
+    }
+    
+    // MARK: - First Time Guidance
+    private func showFirstTimeGuidanceIfNeeded() {
+        let hasShownGuidance = UserDefaults.standard.bool(forKey: "VideoGalleryGuidanceShown")
+        if !hasShownGuidance && videos.isEmpty {
+            showFirstTimeGuidance()
+            UserDefaults.standard.set(true, forKey: "VideoGalleryGuidanceShown")
+        }
+    }
+    
+    private func showFirstTimeGuidance() {
+        let alert = UIAlertController(
+            title: "欢迎使用应用内相册",
+            message: """
+            🎬 这里存储您在应用内创建的视频作品
+            
+            ✨ 主要功能：
+            • 录制的视频会自动保存在这里
+            • 可以从系统相册导入视频
+            • 处理完成后可导出到系统相册分享
+            
+            💡 与系统相册的区别：
+            • 应用内相册：私密存储，支持高级编辑
+            • 系统相册：公共存储，便于分享
+            """,
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "开始创作", style: .default) { [weak self] _ in
+            // 可以在这里添加引导到录制界面的逻辑
+        })
+        
+        present(alert, animated: true)
     }
     
     private func showError(_ error: Error) {
