@@ -418,10 +418,10 @@ class MainCameraViewController: UIViewController {
                     self.isTimeSequenceMode = false
                     self.updateModeSwitcherDisplay()
                     
-                    // 确保相机预览正常启动
-                    self.startCameraPreview()
+                    // 🚀 优化：快速检查相机状态并启动
+                    self.ensureCameraReady()
                     
-                    // 可选：显示提示消息
+                    // 保留成功提示消息（按用户要求）
                     let alert = UIAlertController(
                         title: "✨ 已回到录像页面",
                         message: "可以开始新的创作了！",
@@ -437,25 +437,60 @@ class MainCameraViewController: UIViewController {
                 self.isTimeSequenceMode = false
                 self.updateModeSwitcherDisplay()
                 
-                // 确保相机预览正常启动
-                self.startCameraPreview()
+                // 🚀 优化：快速检查相机状态并启动
+                self.ensureCameraReady()
             }
         }
     }
     
-    /// 递归关闭所有模态界面
-    private func dismissAllModalViewControllers(completion: @escaping () -> Void) {
-        if let presented = presentedViewController {
-            print("🔄 发现模态界面: \(type(of: presented))，准备关闭...")
-            
-            presented.dismiss(animated: true) { [weak self] in
-                print("✅ 模态界面已关闭，检查是否还有其他模态界面...")
-                // 递归检查是否还有其他模态界面
-                self?.dismissAllModalViewControllers(completion: completion)
+    /// 🚀 新增：确保相机处于就绪状态
+    private func ensureCameraReady() {
+        // 如果相机已经在运行，直接返回
+        if cameraManager.previewSession.isRunning {
+            print("✅ 相机已在运行，无需重启")
+            return
+        }
+        
+        // 异步启动相机，避免阻塞UI
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            DispatchQueue.main.async {
+                self?.startCameraPreview()
+                print("✅ 相机已重新启动")
             }
-        } else {
-            print("✅ 所有模态界面已关闭")
+        }
+    }
+    
+    /// 优化的模态界面关闭方法 - 减少递归层级
+    private func dismissAllModalViewControllers(completion: @escaping () -> Void) {
+        // 🚀 优化：收集所有需要关闭的模态界面
+        var modalsToClose: [UIViewController] = []
+        var current = presentedViewController
+        
+        while let presented = current {
+            modalsToClose.append(presented)
+            current = presented.presentedViewController
+        }
+        
+        guard !modalsToClose.isEmpty else {
+            print("✅ 没有模态界面需要关闭")
             completion()
+            return
+        }
+        
+        print("🔄 发现 \(modalsToClose.count) 个模态界面需要关闭")
+        
+        // 🚀 优化：一次性关闭最顶层的模态界面，系统会自动处理下层
+        // 这比递归关闭更快且更稳定
+        if let topModal = modalsToClose.first {
+            print("🔄 关闭顶层模态界面: \(type(of: topModal))")
+            
+            topModal.dismiss(animated: true) { [weak self] in
+                // 🚀 优化：使用短延迟确保界面完全关闭后再执行回调
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    print("✅ 所有模态界面已关闭")
+                    completion()
+                }
+            }
         }
     }
     

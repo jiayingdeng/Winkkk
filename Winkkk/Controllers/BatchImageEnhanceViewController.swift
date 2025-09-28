@@ -105,8 +105,8 @@ class BatchImageEnhanceViewController: UIViewController {
             return BatchEnhanceItem(originalImage: image)
         }
         
-        // 默认全选所有图片
-        selectedIndices = Set(0..<enhanceItems.count)
+        // 默认不选择任何图片，让用户手动选择
+        selectedIndices = Set<Int>()
     }
     
     required init?(coder: NSCoder) {
@@ -212,7 +212,7 @@ class BatchImageEnhanceViewController: UIViewController {
             // 开始按钮
             startButton.topAnchor.constraint(equalTo: levelSegmentedControl.bottomAnchor, constant: 16),
             startButton.leadingAnchor.constraint(equalTo: controlPanelView.leadingAnchor, constant: 16),
-            startButton.widthAnchor.constraint(equalToConstant: 120),
+            startButton.widthAnchor.constraint(equalToConstant: 180),
             startButton.heightAnchor.constraint(equalToConstant: 40),
             
             // 暂停按钮
@@ -227,29 +227,30 @@ class BatchImageEnhanceViewController: UIViewController {
             resetButton.widthAnchor.constraint(equalToConstant: 80),
             resetButton.heightAnchor.constraint(equalToConstant: 40),
             
-            // 进度容器
+            // 进度容器 - 动态高度
             progressContainerView.topAnchor.constraint(equalTo: controlPanelView.bottomAnchor, constant: 16),
             progressContainerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             progressContainerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            progressContainerView.heightAnchor.constraint(equalToConstant: 80),
+            progressContainerView.heightAnchor.constraint(greaterThanOrEqualToConstant: 50),
             
-            // 总体进度条
-            overallProgressView.topAnchor.constraint(equalTo: progressContainerView.topAnchor, constant: 16),
+            // 总体进度条 - 优化间距
+            overallProgressView.topAnchor.constraint(equalTo: progressContainerView.topAnchor, constant: 12),
             overallProgressView.leadingAnchor.constraint(equalTo: progressContainerView.leadingAnchor, constant: 16),
             overallProgressView.trailingAnchor.constraint(equalTo: progressContainerView.trailingAnchor, constant: -16),
             overallProgressView.heightAnchor.constraint(equalToConstant: 4),
             
-            // 进度标签
-            progressLabel.topAnchor.constraint(equalTo: overallProgressView.bottomAnchor, constant: 8),
+            // 进度标签 - 减小间距
+            progressLabel.topAnchor.constraint(equalTo: overallProgressView.bottomAnchor, constant: 6),
             progressLabel.leadingAnchor.constraint(equalTo: progressContainerView.leadingAnchor, constant: 16),
             progressLabel.trailingAnchor.constraint(equalTo: progressContainerView.trailingAnchor, constant: -16),
-            progressLabel.heightAnchor.constraint(equalToConstant: 20),
+            progressLabel.heightAnchor.constraint(equalToConstant: 18),
             
-            // 状态标签
-            statusLabel.topAnchor.constraint(equalTo: progressLabel.bottomAnchor, constant: 4),
+            // 状态标签 - 减小间距，并固定底部约束
+            statusLabel.topAnchor.constraint(equalTo: progressLabel.bottomAnchor, constant: 2),
             statusLabel.leadingAnchor.constraint(equalTo: progressContainerView.leadingAnchor, constant: 16),
             statusLabel.trailingAnchor.constraint(equalTo: progressContainerView.trailingAnchor, constant: -16),
-            statusLabel.heightAnchor.constraint(equalToConstant: 20),
+            statusLabel.bottomAnchor.constraint(equalTo: progressContainerView.bottomAnchor, constant: -12),
+            statusLabel.heightAnchor.constraint(equalToConstant: 18),
             
             // 集合视图
             collectionView.topAnchor.constraint(equalTo: progressContainerView.bottomAnchor, constant: 20),
@@ -336,7 +337,7 @@ class BatchImageEnhanceViewController: UIViewController {
         countLabel.font = ThemeManager.captionFont
         countLabel.textColor = UIColor.white.withAlphaComponent(0.8)
         countLabel.textAlignment = .center
-        countLabel.text = "共 \(enhanceItems.count) 张图片待处理"
+        countLabel.text = "共 \(enhanceItems.count) 张图片，请选择需要修复的图片"
         headerView.addSubview(countLabel)
     }
     
@@ -358,8 +359,8 @@ class BatchImageEnhanceViewController: UIViewController {
         controlPanelView.addSubview(levelSegmentedControl)
         
         // 开始按钮
-        startButton.setTitle("开始修复选中图片", for: .normal)
-        startButton.setTitle("处理中...", for: .disabled)
+        startButton.setTitle("开始修复", for: .normal)
+        // 注意：禁用状态的文案在updateStartButtonText()中动态设置
         startButton.backgroundColor = ThemeManager.buttonPrimary
         startButton.setTitleColor(.white, for: .normal)
         startButton.titleLabel?.font = ThemeManager.buttonFont
@@ -575,13 +576,30 @@ extension BatchImageEnhanceViewController {
     }
     
     @objc private func cancelButtonTapped() {
+        // 🚀 优化：立即触感反馈提升响应感
         HapticFeedbackManager.shared.buttonTap()
         
         if isProcessing {
             showCancelConfirmation()
         } else {
+            // 🚀 优化：立即开始返回动画，提升响应感
             navigationController?.popViewController(animated: true)
+            
+            // 🚀 优化：异步清理资源，避免阻塞UI
+            DispatchQueue.global(qos: .utility).async {
+                // 清理大图片资源，释放内存
+                self.cleanupImageResources()
+            }
         }
+    }
+    
+    /// 🚀 新增：清理图片资源，优化内存使用
+    private func cleanupImageResources() {
+        // 清理增强后的大图片，避免内存泄漏
+        for item in enhanceItems {
+            item.enhancedImage = nil
+        }
+        print("✅ 批量修复页面：图片资源已清理")
     }
 }
 
@@ -717,8 +735,15 @@ extension BatchImageEnhanceViewController {
     }
     
     private func updateProcessingState() {
-        startButton.isEnabled = !isProcessing
-        startButton.alpha = isProcessing ? 0.6 : 1.0
+        // 更新按钮状态和文案
+        if isProcessing {
+            startButton.isEnabled = false
+            startButton.alpha = 0.6
+            startButton.setTitle("处理中...", for: .normal)
+        } else {
+            // 根据选择状态更新按钮
+            updateStartButtonText()
+        }
         
         pauseButton.isHidden = !isProcessing
         resetButton.isHidden = !isProcessing
@@ -739,17 +764,21 @@ extension BatchImageEnhanceViewController {
     private func updateCountLabel() {
         let totalCount = enhanceItems.count
         let selectedCount = selectedIndices.count
-        countLabel.text = "共\(totalCount)张图片，已选择\(selectedCount)张"
+        if selectedCount > 0 {
+            countLabel.text = "共\(totalCount)张图片，已选择\(selectedCount)张"
+        } else {
+            countLabel.text = "共\(totalCount)张图片，请选择需要修复的图片"
+        }
     }
     
     private func updateStartButtonText() {
         let selectedCount = selectedIndices.count
         if selectedCount > 0 {
-            startButton.setTitle("开始修复选中图片(\(selectedCount))", for: .normal)
+            startButton.setTitle("开始修复(\(selectedCount)张)", for: .normal)
             startButton.isEnabled = true
             startButton.alpha = 1.0
         } else {
-            startButton.setTitle("请至少选择一张图片", for: .normal)
+            startButton.setTitle("请先选择图片", for: .normal)
             startButton.isEnabled = false
             startButton.alpha = 0.6
         }
@@ -918,8 +947,8 @@ extension BatchImageEnhanceViewController {
         completedCount = 0
         failedCount = 0
         
-        // 重置为默认全选状态
-        selectedIndices = Set(0..<enhanceItems.count)
+        // 重置为默认未选择状态
+        selectedIndices = Set<Int>()
         
         progressContainerView.isHidden = true
         overallProgressView.progress = 0.0

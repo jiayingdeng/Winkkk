@@ -239,8 +239,14 @@ class VideoGalleryViewController: UIViewController {
         setupUI()
         setupNavigationBar()
         setupConstraints()
+        
+        // 🔧 修复死锁问题：确保设置顺序，添加错误保护
         setupFetchedResultsController()
-        cleanupAndLoadVideos()
+        
+        // 🕐 稍微延迟cleanupAndLoadVideos，确保视图完全加载
+        DispatchQueue.main.async { [weak self] in
+            self?.cleanupAndLoadVideos()
+        }
     }
     
     override func viewDidAppear(_ animated: Bool) {
@@ -433,34 +439,57 @@ class VideoGalleryViewController: UIViewController {
     private func cleanupAndLoadVideos() {
         print("📱 VideoGallery: 开始清理数据库并加载视频")
         
-        // 检查是否需要清理（只在首次启动或检测到问题时清理）
-        let lastCleanupKey = "LastDatabaseCleanup"
-        let lastCleanup = UserDefaults.standard.double(forKey: lastCleanupKey)
-        let now = Date().timeIntervalSince1970
-        let shouldCleanup = (now - lastCleanup) > 24 * 60 * 60 // 24小时清理一次
+        // 🔧 修复死锁问题：先加载视频，延迟执行清理
+        loadVideos()
         
-        if shouldCleanup {
-            print("🧹 VideoGallery: 执行定期数据库清理")
-            videoManager.forceCleanupOrphanRecords { [weak self] result in
-                DispatchQueue.main.async {
-                    switch result {
-                    case .success(let deletedCount):
-                        if deletedCount > 0 {
-                            print("✅ VideoGallery: 清理了 \(deletedCount) 个孤儿记录")
-                        }
-                        // 记录清理时间
-                        UserDefaults.standard.set(now, forKey: lastCleanupKey)
-                        self?.loadVideos()
-                        
-                    case .failure(let error):
-                        print("❌ VideoGallery: 清理失败: \(error)")
-                        self?.loadVideos() // 即使清理失败也要加载视频
+        // 🕐 延迟清理操作，确保NSFetchedResultsController完全设置好后再清理
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.performDeferredCleanup()
+        }
+    }
+    
+    // 🆕 延迟清理方法 - 避免与NSFetchedResultsController初始化冲突
+    private func performDeferredCleanup() {
+        print("📱 VideoGallery: 开始延迟清理检查")
+        
+        // 🔧 修改清理策略：每次启动都检查孤儿记录，但智能决定是否执行清理
+        videoManager.checkForOrphanRecords { [weak self] result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let orphanCount):
+                    if orphanCount > 0 {
+                        print("🧹 VideoGallery: 发现 \(orphanCount) 个孤儿记录，开始清理")
+                        self?.executeCleanup()
+                    } else {
+                        print("✅ VideoGallery: 没有发现孤儿记录，跳过清理")
                     }
+                case .failure(let error):
+                    print("❌ VideoGallery: 检查孤儿记录失败: \(error)")
+                    // 如果检查失败，执行一次清理确保数据一致性
+                    self?.executeCleanup()
                 }
             }
-        } else {
-            print("⏭️ VideoGallery: 跳过清理，直接加载视频")
-            loadVideos()
+        }
+    }
+    
+    // 🆕 执行清理操作
+    private func executeCleanup() {
+        videoManager.forceCleanupOrphanRecords { [weak self] result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let deletedCount):
+                    if deletedCount > 0 {
+                        print("✅ VideoGallery: 清理了 \(deletedCount) 个孤儿记录")
+                        // 清理完成后刷新界面
+                        self?.refreshData()
+                    }
+                    // 记录清理时间
+                    UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "LastDatabaseCleanup")
+                    
+                case .failure(let error):
+                    print("❌ VideoGallery: 清理失败: \(error)")
+                }
+            }
         }
     }
     
@@ -1169,9 +1198,28 @@ extension VideoGalleryViewController: NSFetchedResultsControllerDelegate {
     
     func controllerDidChangeContent(_ controller: NSFetchedResultsController<NSFetchRequestResult>) {
         print("📱 VideoGallery: Core Data content changed")
-        videos = fetchedResultsController.fetchedObjects ?? []
         
-        // 使用防抖机制，避免频繁更新UI
-        scheduleUIUpdate()
+        // 🔧 添加错误保护，确保在主线程执行
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self,
+                  let fetchedObjects = self.fetchedResultsController.fetchedObjects else {
+                print("⚠️ VideoGallery: fetchedResultsController无效或已被释放")
+                return
+            }
+            
+            self.videos = fetchedObjects
+            
+            // 使用防抖机制，避免频繁更新UI
+            self.scheduleUIUpdate()
+        }
+    }
+    
+    func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>, didFailWithError error: Error) {
+        print("❌ VideoGallery: NSFetchedResultsController错误: \(error)")
+        
+        // 错误恢复：重新设置fetchedResultsController
+        DispatchQueue.main.async { [weak self] in
+            self?.setupFetchedResultsController()
+        }
     }
 }

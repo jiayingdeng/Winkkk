@@ -27,45 +27,54 @@ class VideoManager {
     
     // MARK: - Video Loading
     func loadVideos(completion: @escaping (Result<[VideoItem], Error>) -> Void) {
-        backgroundContext.perform { [weak self] in
+        // 🔧 修复死锁问题：使用主上下文进行简单查询，避免与NSFetchedResultsController冲突
+        DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
+            let mainContext = PersistenceController.shared.container.viewContext
             let request: NSFetchRequest<VideoItem> = VideoItem.fetchRequest()
             request.sortDescriptors = [NSSortDescriptor(key: "createdDate", ascending: false)]
             
             do {
-                let videos = try self.backgroundContext.fetch(request)
-                print("📱 VideoManager: 从数据库加载了 \(videos.count) 个视频记录")
+                let videos = try mainContext.fetch(request)
+                print("📱 VideoManager: 从主上下文加载了 \(videos.count) 个视频记录")
                 
-                // 验证文件是否存在，清理无效记录
-                var deletedCount = 0
-                let validVideos = videos.filter { video in
-                    let exists = self.fileManager.fileExists(atPath: video.filePath.path)
-                    if !exists {
-                        print("❌ VideoManager: 发现孤儿记录，文件不存在: \(video.filePath.path)")
-                        self.backgroundContext.delete(video)
-                        deletedCount += 1
-                    }
-                    return exists
-                }
+                // 🔧 不在这里进行孤儿记录清理，避免与NSFetchedResultsController冲突
+                // 孤儿记录清理已移到延迟执行的performDeferredCleanup中
                 
-                // 如果有删除操作，保存上下文
-                if deletedCount > 0 {
-                    print("🗑️ VideoManager: 清理了 \(deletedCount) 个孤儿记录")
-                    try self.backgroundContext.save()
-                    
-                    // 通知主上下文更新
-                    DispatchQueue.main.async {
-                        try? PersistenceController.shared.container.viewContext.save()
+                completion(.success(videos))
+                
+            } catch {
+                print("❌ VideoManager: 加载视频失败: \(error)")
+                completion(.failure(error))
+            }
+        }
+    }
+    
+    // MARK: - Database Cleanup
+    
+    // 🆕 检查孤儿记录数量（不执行删除）
+    func checkForOrphanRecords(completion: @escaping (Result<Int, Error>) -> Void) {
+        backgroundContext.perform { [weak self] in
+            guard let self = self else { return }
+            
+            do {
+                let request: NSFetchRequest<VideoItem> = VideoItem.fetchRequest()
+                let allVideos = try self.backgroundContext.fetch(request)
+                
+                var orphanCount = 0
+                for video in allVideos {
+                    if !self.fileManager.fileExists(atPath: video.filePath.path) {
+                        orphanCount += 1
+                        print("🔍 发现孤儿记录: \(video.fileName) (文件不存在: \(video.filePath.path))")
                     }
                 }
                 
                 DispatchQueue.main.async {
-                    completion(.success(validVideos))
+                    completion(.success(orphanCount))
                 }
                 
             } catch {
-                print("❌ VideoManager: 加载视频失败: \(error)")
                 DispatchQueue.main.async {
                     completion(.failure(error))
                 }
@@ -73,7 +82,6 @@ class VideoManager {
         }
     }
     
-    // MARK: - Database Cleanup
     func forceCleanupOrphanRecords(completion: @escaping (Result<Int, Error>) -> Void) {
         backgroundContext.perform { [weak self] in
             guard let self = self else { return }
@@ -94,12 +102,9 @@ class VideoManager {
                 if deletedCount > 0 {
                     try self.backgroundContext.save()
                     
-                    // 强制同步到主上下文
-                    DispatchQueue.main.async {
-                        let mainContext = PersistenceController.shared.container.viewContext
-                        mainContext.refreshAllObjects()
-                        try? mainContext.save()
-                    }
+                    // 🔧 修复死锁问题：使用通知而不是强制刷新主上下文
+                    // Core Data会自动通过NSPersistentContainer同步上下文变化
+                    print("✅ VideoManager: 后台上下文已保存，等待自动同步到主上下文")
                 }
                 
                 DispatchQueue.main.async {
@@ -146,6 +151,15 @@ class VideoManager {
                 // 获取视频信息
                 let videoInfo = try self.extractVideoInfo(from: destinationURL)
                 
+                // 🔧 二次确认文件复制成功，避免孤儿记录
+                guard self.fileManager.fileExists(atPath: destinationURL.path) else {
+                    print("❌ VideoManager: 文件复制后验证失败，文件不存在: \(destinationURL.path)")
+                    DispatchQueue.main.async {
+                        completion(.failure(VideoManagerError.fileCopyFailed))
+                    }
+                    return
+                }
+                
                 // 创建数据库记录
                 let videoItem = self.persistenceController.createVideoItem(
                     fileName: fileName,
@@ -162,6 +176,7 @@ class VideoManager {
                     await self.generateThumbnail(for: videoItem)
                 }
                 
+                print("✅ VideoManager: 视频导入完成，数据库记录已创建")
                 DispatchQueue.main.async {
                     completion(.success(videoItem))
                 }
@@ -494,6 +509,7 @@ struct VideoInfo {
 enum VideoManagerError: LocalizedError {
     case invalidVideoFile
     case fileNotFound
+    case fileCopyFailed
     case thumbnailGenerationFailed
     case thumbnailSaveFailed
     case insufficientStorage
@@ -506,6 +522,8 @@ enum VideoManagerError: LocalizedError {
             return "无效的视频文件"
         case .fileNotFound:
             return "文件不存在"
+        case .fileCopyFailed:
+            return "文件复制失败"
         case .thumbnailGenerationFailed:
             return "缩略图生成失败"
         case .thumbnailSaveFailed:

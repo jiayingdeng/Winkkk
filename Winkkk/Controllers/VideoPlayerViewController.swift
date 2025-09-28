@@ -1102,9 +1102,9 @@ class VideoPlayerViewController: UIViewController {
     @objc private func image(_ image: UIImage, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
         // 这个方法会在每张图片保存完成后被调用
         if let error = error {
-            print("❌ 截图保存到相册失败: \(error.localizedDescription)")
+            print("❌ 截图保存到系统相册失败: \(error.localizedDescription)")
         } else {
-            print("✅ 截图已保存到相册")
+            print("✅ 截图已保存到系统相册")
             // 🎯 更新所有截图的保存状态
             updateScreenshotsSaveStatus()
         }
@@ -1123,8 +1123,8 @@ class VideoPlayerViewController: UIViewController {
     private func showSaveProgressAndNavigate(savedCount: Int, totalCount: Int) {
         // 显示简短的保存成功提示
         let message = totalCount == savedCount ? 
-            "已将 \(savedCount) 张截图保存到相册" : 
-            "已保存 \(savedCount)/\(totalCount) 张截图到相册"
+            "已将 \(savedCount) 张截图保存到系统相册" : 
+            "已保存 \(savedCount)/\(totalCount) 张截图到系统相册"
         
         // 短暂显示成功提示后直接跳转
         showBriefSuccessMessage(message) { [weak self] in
@@ -1135,7 +1135,7 @@ class VideoPlayerViewController: UIViewController {
     private func showBriefSuccessMessage(_ message: String, completion: @escaping () -> Void) {
         // 创建简洁的成功提示视图
         let successView = UIView()
-        successView.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.9)
+        successView.backgroundColor = UIColor(red: 255/255, green: 252/255, blue: 240/255, alpha: 0.95) // 温暖的米白色
         successView.layer.cornerRadius = 12
         successView.translatesAutoresizingMaskIntoConstraints = false
         
@@ -1146,7 +1146,7 @@ class VideoPlayerViewController: UIViewController {
         
         let messageLabel = UILabel()
         messageLabel.text = message
-        messageLabel.textColor = .white
+        messageLabel.textColor = ThemeManager.primaryText
         messageLabel.font = .systemFont(ofSize: 16, weight: .medium)
         messageLabel.textAlignment = .center
         messageLabel.numberOfLines = 2
@@ -1199,8 +1199,8 @@ class VideoPlayerViewController: UIViewController {
     
     private func showPhotosPermissionDeniedAlert() {
         let alert = UIAlertController(
-            title: "需要相册权限",
-            message: "请在设置中允许访问相册，以保存截图",
+            title: "需要系统相册权限",
+            message: "请在设置中允许访问系统相册，以保存截图",
             preferredStyle: .alert
         )
         
@@ -1224,7 +1224,7 @@ class VideoPlayerViewController: UIViewController {
     private func showSaveFailureAlert() {
         let alert = UIAlertController(
             title: "保存失败",
-            message: "无法保存截图到相册，请检查权限设置",
+            message: "无法保存截图到系统相册，请检查权限设置",
             preferredStyle: .alert
         )
         

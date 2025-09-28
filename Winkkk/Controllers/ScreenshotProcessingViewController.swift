@@ -672,9 +672,12 @@ extension ScreenshotProcessingViewController {
         present(activityVC, animated: true)
     }
     
-    /// 开始新的创作 - 返回录制页面
+    /// 开始新的创作 - 返回录制页面 - 优化版本
     private func startNewCreation() {
         print("✨ 开始新的创作")
+        
+        // 🚀 优化：立即触感反馈提升响应感
+        HapticFeedbackManager.shared.lightImpact()
         
         // 检查是否有内容需要放弃
         guard !screenshots.isEmpty else {
@@ -701,7 +704,13 @@ extension ScreenshotProcessingViewController {
         )
         
         alert.addAction(UIAlertAction(title: "确定开始", style: .destructive) { [weak self] _ in
-            self?.clearCurrentContentAndNavigateBack()
+            // 🚀 优化：用户确认后立即显示加载状态
+            self?.showReturnLoadingState()
+            
+            // 🚀 优化：短延迟后执行返回，让用户看到响应
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self?.clearCurrentContentAndNavigateBack()
+            }
         })
         
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
@@ -709,10 +718,45 @@ extension ScreenshotProcessingViewController {
         present(alert, animated: true)
     }
     
+    /// 🚀 新增：显示返回加载状态
+    private func showReturnLoadingState() {
+        // 在视图上方显示一个简单的加载指示器
+        let loadingView = UIView()
+        loadingView.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        loadingView.layer.cornerRadius = 8
+        
+        let loadingLabel = UILabel()
+        loadingLabel.text = "正在返回录制页面..."
+        loadingLabel.textColor = .white
+        loadingLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        loadingLabel.textAlignment = .center
+        
+        loadingView.addSubview(loadingLabel)
+        view.addSubview(loadingView)
+        
+        loadingView.translatesAutoresizingMaskIntoConstraints = false
+        loadingLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        NSLayoutConstraint.activate([
+            loadingView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            loadingView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            loadingView.widthAnchor.constraint(equalToConstant: 200),
+            loadingView.heightAnchor.constraint(equalToConstant: 50),
+            
+            loadingLabel.centerXAnchor.constraint(equalTo: loadingView.centerXAnchor),
+            loadingLabel.centerYAnchor.constraint(equalTo: loadingView.centerYAnchor)
+        ])
+        
+        // 🚀 优化：添加淡入动画
+        loadingView.alpha = 0
+        UIView.animate(withDuration: 0.2) {
+            loadingView.alpha = 1
+        }
+    }
+    
     /// 清空当前内容并返回录制页面
     private func clearCurrentContentAndNavigateBack() {
-        // 触觉反馈
-        HapticFeedbackManager.shared.lightImpact()
+        // 🚀 优化：移除重复的触感反馈，已在startNewCreation中处理
         
         // 清空当前截图数据
         // 注意：这里不能直接调用screenshotManager.clearAllScreenshots()
@@ -722,29 +766,37 @@ extension ScreenshotProcessingViewController {
         navigateBackToVideoPlayer()
     }
     
-    /// 导航回到录制页面
+    /// 导航回到录制页面 - 优化版本
     private func navigateBackToVideoPlayer() {
         print("🔄 开始导航回到录制页面...")
         
-        // 清空截图数据和重置模式（在导航前就清空，确保状态正确）
-        ScreenshotManager.shared.clearAllScreenshots()
-        TimeSequenceModeManager.shared.switchToNormalMode()
+        // 🚀 优化1：异步清理数据，避免阻塞UI动画
+        let mode = self.mode // 保存模式信息，避免闭包中访问self
         
-        // 🎯 Live Photo模式下的特殊处理
-        if mode == .livePhoto {
-            print("📸 Live Photo模式：确保清理相关数据")
-            // Live Photo的清理已经在ScreenshotManager.clearAllScreenshots()中处理
-            // 这里添加日志确认清理完成
-        }
-        
-        // 🔧 优化策略：直接使用通知机制，让MainCameraViewController统一处理
-        // 这样避免了复杂的导航层次判断，更加可靠
-        print("📡 使用通知机制返回主录像页面")
+        // 🚀 优化2：立即开始关闭动画，不等待数据清理完成
         dismiss(animated: true) {
-            print("✨ 已关闭\(self.mode == .livePhoto ? "Live Photo" : "截图")处理页面，发送打开相机通知")
-            // 🎯 通过通知中心发送打开相机的通知
-            // MainCameraViewController会接收此通知并关闭所有模态界面
-            NotificationCenter.default.post(name: .shouldOpenCamera, object: nil)
+            print("✨ 已关闭\(mode == .livePhoto ? "Live Photo" : "截图")处理页面")
+            
+            // 🚀 优化3：数据清理在后台异步执行
+            DispatchQueue.global(qos: .userInitiated).async {
+                print("🧹 开始异步清理数据...")
+                
+                // 清空截图数据和重置模式
+                ScreenshotManager.shared.clearAllScreenshots()
+                TimeSequenceModeManager.shared.switchToNormalMode()
+                
+                // Live Photo模式下的特殊处理
+                if mode == .livePhoto {
+                    print("📸 Live Photo模式：数据清理完成")
+                }
+                
+                print("✅ 数据清理完成，发送打开相机通知")
+                
+                // 回到主线程发送通知
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .shouldOpenCamera, object: nil)
+                }
+            }
         }
     }
     
