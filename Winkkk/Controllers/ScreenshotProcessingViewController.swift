@@ -679,6 +679,13 @@ extension ScreenshotProcessingViewController {
         // 🚀 优化：立即触感反馈提升响应感
         HapticFeedbackManager.shared.lightImpact()
         
+        // 🎯 Live图模式直接返回，无需保存确认
+        if mode == .livePhoto {
+            print("📸 Live图模式：直接返回，无需保存确认")
+            navigateBackToVideoPlayer()
+            return
+        }
+        
         // 检查是否有内容需要放弃
         guard !screenshots.isEmpty else {
             // 没有内容，直接返回
