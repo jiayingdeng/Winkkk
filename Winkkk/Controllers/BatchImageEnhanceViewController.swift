@@ -591,14 +591,64 @@ extension BatchImageEnhanceViewController {
         if isProcessing {
             showCancelConfirmation()
         } else {
-            // 🚀 优化：立即开始返回动画，提升响应感
-            navigationController?.popViewController(animated: true)
+            // 检查是否有修复完成但未保存的图片
+            let completedItems = enhanceItems.filter { $0.processingState == .completed }
             
-            // 🚀 优化：异步清理资源，避免阻塞UI
-            DispatchQueue.global(qos: .utility).async {
-                // 清理大图片资源，释放内存
-                self.cleanupImageResources()
+            if !completedItems.isEmpty {
+                // 有完成的修复但可能未保存，显示确认对话框
+                let alert = UIAlertController(
+                    title: "确定要退出吗？",
+                    message: "已完成修复 \(completedItems.count) 张图片，退出后可在截图处理中心继续操作",
+                    preferredStyle: .alert
+                )
+                
+                alert.addAction(UIAlertAction(title: "退出", style: .default) { [weak self] _ in
+                    self?.performReturn()
+                })
+                
+                alert.addAction(UIAlertAction(title: "继续修复", style: .cancel))
+                
+                present(alert, animated: true)
+            } else {
+                // 没有完成的修复，直接返回
+                performReturn()
             }
+        }
+    }
+    
+    /// 执行返回操作
+    private func performReturn() {
+        // 🚀 优化：智能返回路径判断
+        guard let navigationController = navigationController else { return }
+        
+        // 检查导航栈中是否有ScreenshotProcessingViewController
+        let hasScreenshotProcessingVC = navigationController.viewControllers.contains { viewController in
+            return viewController is ScreenshotProcessingViewController
+        }
+        
+        if hasScreenshotProcessingVC {
+            // 如果有截图处理中心，返回到那里
+            let targetViewController = navigationController.viewControllers.first { viewController in
+                return viewController is ScreenshotProcessingViewController
+            }
+            
+            if let targetVC = targetViewController {
+                navigationController.popToViewController(targetVC, animated: true)
+                
+                // 🚀 优化：异步清理资源，避免阻塞UI
+                DispatchQueue.global(qos: .utility).async {
+                    self.cleanupImageResources()
+                }
+                return
+            }
+        }
+        
+        // 默认返回上一页
+        navigationController.popViewController(animated: true)
+        
+        // 🚀 优化：异步清理资源，避免阻塞UI
+        DispatchQueue.global(qos: .utility).async {
+            self.cleanupImageResources()
         }
     }
     

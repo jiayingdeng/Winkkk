@@ -20,6 +20,7 @@ class ImageComparisonView: UIView {
     private let dividerView = UIView()
     private let originalLabel = UILabel()
     private let enhancedLabel = UILabel()
+    private let instructionLabel = UILabel() // 滑动指引标签
     
     // 滑动控制
     private let sliderHandle = UIView()
@@ -71,6 +72,9 @@ class ImageComparisonView: UIView {
         // 标签
         setupLabels()
         
+        // 滑动指引标签
+        setupInstructionLabel()
+        
         // 拖拽手柄
         setupSliderHandle()
         
@@ -98,6 +102,18 @@ class ImageComparisonView: UIView {
         enhancedLabel.layer.masksToBounds = true
         enhancedLabel.alpha = 0
         addSubview(enhancedLabel)
+    }
+    
+    private func setupInstructionLabel() {
+        instructionLabel.text = "← 拖动或点击滑块对比效果 →"
+        instructionLabel.textColor = .white
+        instructionLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        instructionLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        instructionLabel.textAlignment = .center
+        instructionLabel.layer.cornerRadius = 12
+        instructionLabel.layer.masksToBounds = true
+        instructionLabel.alpha = 0 // 初始隐藏
+        addSubview(instructionLabel)
     }
     
     private func setupSliderHandle() {
@@ -135,6 +151,7 @@ class ImageComparisonView: UIView {
         dividerView.translatesAutoresizingMaskIntoConstraints = false
         originalLabel.translatesAutoresizingMaskIntoConstraints = false
         enhancedLabel.translatesAutoresizingMaskIntoConstraints = false
+        instructionLabel.translatesAutoresizingMaskIntoConstraints = false
         sliderHandle.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
@@ -166,6 +183,13 @@ class ImageComparisonView: UIView {
             enhancedLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12),
             enhancedLabel.widthAnchor.constraint(equalToConstant: 60),
             enhancedLabel.heightAnchor.constraint(equalToConstant: 24),
+            
+            // 滑动指引标签
+            instructionLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
+            instructionLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
+            instructionLabel.heightAnchor.constraint(equalToConstant: 32),
+            instructionLabel.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 20),
+            instructionLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -20),
             
             // 拖拽手柄 - 垂直约束
             sliderHandle.centerYAnchor.constraint(equalTo: centerYAnchor),
@@ -199,6 +223,7 @@ class ImageComparisonView: UIView {
         UIView.animate(withDuration: 0.3) {
             self.enhancedImageView.alpha = image != nil ? 1.0 : 0.0
             self.enhancedLabel.alpha = image != nil ? 1.0 : 0.0
+            self.instructionLabel.alpha = image != nil ? 1.0 : 0.0
         }
         
         if image != nil {
@@ -218,6 +243,11 @@ class ImageComparisonView: UIView {
             // 放大滑块手柄
             UIView.animate(withDuration: 0.2) {
                 self.sliderHandle.transform = CGAffineTransform(scaleX: 1.2, y: 1.2)
+            }
+            
+            // 用户开始交互时隐藏指引标签
+            UIView.animate(withDuration: 0.2) {
+                self.instructionLabel.alpha = 0
             }
             
             // 触觉反馈
@@ -251,6 +281,11 @@ class ImageComparisonView: UIView {
         
         let location = gesture.location(in: self)
         let newPosition = max(0, min(1, location.x / bounds.width))
+        
+        // 用户点击时隐藏指引标签
+        UIView.animate(withDuration: 0.2) {
+            self.instructionLabel.alpha = 0
+        }
         
         UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5) {
             self.dividerPosition = newPosition
@@ -372,10 +407,10 @@ class ImageComparisonView: UIView {
             self.updateSliderHandleShadow()
         }
         
-        // 自动演示滑动效果
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            self.demonstrateSliding()
-        }
+        // 注释掉自动演示滑动效果 - 改为静态提示引导用户手动滑动
+        // DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        //     self.demonstrateSliding()
+        // }
     }
     
     private func demonstrateSliding() {

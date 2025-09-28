@@ -435,14 +435,38 @@ class ShareViewController: UIViewController {
     
     // MARK: - Actions
     @objc private func cancelButtonTapped() {
-        // 智能判断导航方式
-        if let navigationController = navigationController,
-           navigationController.presentingViewController != nil {
-            // 如果是模态展示的，使用dismiss
+        HapticFeedbackManager.shared.buttonTap()
+        
+        // 🚀 优化：智能判断返回路径，优先返回到截图处理中心
+        guard let navigationController = navigationController else { return }
+        
+        // 检查导航栈中是否有ScreenshotProcessingViewController
+        let hasScreenshotProcessingVC = navigationController.viewControllers.contains { viewController in
+            return viewController is ScreenshotProcessingViewController
+        }
+        
+        if hasScreenshotProcessingVC {
+            // 如果导航栈中有截图处理中心，返回到那里
+            let targetViewController = navigationController.viewControllers.first { viewController in
+                return viewController is ScreenshotProcessingViewController
+            }
+            
+            if let targetVC = targetViewController {
+                navigationController.popToViewController(targetVC, animated: true)
+                return
+            }
+        }
+        
+        // 🎯 智能判断其他导航方式
+        if navigationController.presentingViewController != nil {
+            // 如果整个导航控制器是模态展示的，使用dismiss
             navigationController.dismiss(animated: true)
+        } else if navigationController.viewControllers.count > 1 {
+            // 如果是push的且有多个视图控制器，使用popViewController
+            navigationController.popViewController(animated: true)
         } else {
-            // 如果是push的，使用popViewController
-            navigationController?.popViewController(animated: true)
+            // 如果是根视图控制器，直接dismiss
+            dismiss(animated: true)
         }
     }
 }
