@@ -10,12 +10,13 @@ import Foundation
 import AVFoundation
 import UIKit
 import CoreData
+import Photos
 
-class VideoManager {
+class VideoManager: NSObject {
     
     // MARK: - Singleton
     static let shared = VideoManager()
-    private init() {}
+    private override init() {}
     
     // MARK: - Properties
     private let fileManager = FileManager.default
@@ -296,10 +297,33 @@ class VideoManager {
             let thumbnail = try await generateThumbnailImage(from: videoItem.filePath)
             let thumbnailURL = try saveThumbnail(thumbnail, for: videoItem)
             
-            // 更新数据库记录
-            await MainActor.run {
-                videoItem.thumbnailPath = thumbnailURL
-                self.persistenceController.save()
+            // 使用后台上下文更新数据库记录，避免递归保存
+            await withCheckedContinuation { continuation in
+                backgroundContext.perform { [weak self] in
+                    guard let self = self else {
+                        continuation.resume()
+                        return
+                    }
+                    
+                    // 在后台上下文中找到对应的对象
+                    do {
+                        let request: NSFetchRequest<VideoItem> = VideoItem.fetchRequest()
+                        request.predicate = NSPredicate(format: "id == %@", videoItem.id as CVarArg)
+                        request.fetchLimit = 1
+                        
+                        if let bgVideoItem = try self.backgroundContext.fetch(request).first {
+                            bgVideoItem.thumbnailPath = thumbnailURL
+                            
+                            if self.backgroundContext.hasChanges {
+                                try self.backgroundContext.save()
+                            }
+                        }
+                    } catch {
+                        print("更新缩略图路径失败: \(error)")
+                    }
+                    
+                    continuation.resume()
+                }
             }
             
         } catch {
@@ -470,8 +494,21 @@ class VideoManager {
             return
         }
         
-        // 使用UISaveVideoAtPathToSavedPhotosAlbum保存视频
-        UISaveVideoAtPathToSavedPhotosAlbum(video.filePath.path, self, #selector(videoExportCompleted(_:didFinishSavingWithError:contextInfo:)), Unmanaged.passRetained(CompletionWrapper(completion: completion)).toOpaque())
+        // 使用 async/await 检查权限
+        Task {
+            do {
+                try await checkPhotoLibraryPermission()
+                
+                // 权限获得，执行导出
+                DispatchQueue.main.async {
+                    UISaveVideoAtPathToSavedPhotosAlbum(video.filePath.path, self, #selector(self.videoExportCompleted(_:didFinishSavingWithError:contextInfo:)), Unmanaged.passRetained(CompletionWrapper(completion: completion)).toOpaque())
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    completion(.failure(error))
+                }
+            }
+        }
     }
     
     @objc private func videoExportCompleted(_ videoPath: String, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
@@ -483,6 +520,25 @@ class VideoManager {
             } else {
                 wrapper.completion(.success(()))
             }
+        }
+    }
+    
+    // MARK: - Permission Management
+    private func checkPhotoLibraryPermission() async throws {
+        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        
+        switch status {
+        case .authorized, .limited:
+            return
+        case .denied, .restricted:
+            throw VideoManagerError.permissionDenied
+        case .notDetermined:
+            let newStatus = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+            if newStatus != .authorized && newStatus != .limited {
+                throw VideoManagerError.permissionDenied
+            }
+        @unknown default:
+            throw VideoManagerError.permissionDenied
         }
     }
 }

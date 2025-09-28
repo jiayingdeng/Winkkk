@@ -72,7 +72,17 @@ class VideoGalleryViewController: UIViewController {
     private lazy var importButton: UIButton = {
         let button = UIButton(type: .system)
         button.setImage(UIImage(systemName: "plus"), for: .normal)
-        button.tintColor = ThemeManager.primaryText
+        
+        // 添加背景色强调重要性
+        button.backgroundColor = ThemeManager.buttonPrimary
+        button.tintColor = .white
+        button.layer.cornerRadius = 16
+        button.layer.masksToBounds = true
+        
+        // 设置固定尺寸确保圆形外观
+        button.widthAnchor.constraint(equalToConstant: 32).isActive = true
+        button.heightAnchor.constraint(equalToConstant: 32).isActive = true
+        
         button.addTarget(self, action: #selector(importButtonTapped), for: .touchUpInside)
         return button
     }()
@@ -312,7 +322,7 @@ class VideoGalleryViewController: UIViewController {
         if isSelectionMode {
             navigationItem.rightBarButtonItem = UIBarButtonItem(customView: cancelButton)
         } else {
-            // 创建右侧按钮栈
+            // 创建右侧按钮栈 - 将加号按钮放在最显眼的位置（最右侧）
             let stackView = UIStackView(arrangedSubviews: [selectButton, importButton])
             stackView.axis = .horizontal
             stackView.spacing = 16
@@ -1048,66 +1058,67 @@ extension VideoGalleryViewController: UICollectionViewDelegate {
     }
     
     private func exportVideoToSystemLibrary(_ video: VideoItem) {
-        print("导出视频到系统相册: \(video.fileName)")
-        
-        // 检查文件是否存在
-        let fileManager = FileManager.default
-        if !fileManager.fileExists(atPath: video.filePath.path) {
-            print("❌ 视频文件不存在: \(video.filePath.path)")
-            let alert = UIAlertController(
-                title: "导出失败",
-                message: "视频文件不存在，无法导出到系统相册",
-                preferredStyle: .alert
-            )
-            alert.addAction(UIAlertAction(title: "确定", style: .default))
-            present(alert, animated: true)
-            return
-        }
-        
-        print("✅ 视频文件存在，开始导出到系统相册")
+        print("🔄 开始单个视频导出到系统相册: \(video.fileName)")
         
         // 显示导出进度指示器
         let loadingAlert = UIAlertController(title: "导出中", message: "正在导出视频到系统相册...", preferredStyle: .alert)
         present(loadingAlert, animated: true)
         
-        // 导出视频到系统相册
-        UISaveVideoAtPathToSavedPhotosAlbum(video.filePath.path, self, #selector(videoExportComplete(_:didFinishSavingWithError:contextInfo:)), nil)
-        print("🔄 UISaveVideoAtPathToSavedPhotosAlbum已调用")
-    }
-    
-    @objc private func videoExportComplete(_ videoPath: String, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
-        print("🎬 视频导出回调被调用")
-        print("   路径: \(videoPath)")
-        print("   错误: \(error?.localizedDescription ?? "无错误")")
-        
-        // 关闭进度指示器
-        dismiss(animated: true) { [weak self] in
-            if let error = error {
-                print("❌ 视频导出到系统相册失败: \(error.localizedDescription)")
-                
-                // 显示错误消息
-                let alert = UIAlertController(
-                    title: "导出失败", 
-                    message: "无法导出视频到系统相册: \(error.localizedDescription)",
-                    preferredStyle: .alert
-                )
-                alert.addAction(UIAlertAction(title: "确定", style: .default))
-                self?.present(alert, animated: true)
-                
-            } else {
-                print("✅ 视频成功导出到系统相册")
-                
-                // 显示成功消息
-                let alert = UIAlertController(
-                    title: "导出成功", 
-                    message: "视频已成功导出到系统相册",
-                    preferredStyle: .alert
-                )
-                alert.addAction(UIAlertAction(title: "确定", style: .default))
-                self?.present(alert, animated: true)
+        // 使用 VideoManager 统一的导出方法
+        videoManager.exportToPhotoLibrary(video: video) { [weak self] result in
+            DispatchQueue.main.async {
+                // 关闭进度指示器
+                loadingAlert.dismiss(animated: true) {
+                    switch result {
+                    case .success:
+                        print("✅ 单个视频成功导出到系统相册")
+                        self?.showVideoExportSuccessAlert()
+                    case .failure(let error):
+                        print("❌ 单个视频导出失败: \(error.localizedDescription)")
+                        self?.showVideoExportErrorAlert(error)
+                    }
+                }
             }
         }
     }
+    
+    private func showVideoExportPermissionDeniedAlert() {
+        let alert = UIAlertController(
+            title: "需要相册权限",
+            message: "请在设置中允许访问相册以保存视频。",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "去设置", style: .default) { _ in
+            if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                UIApplication.shared.open(settingsUrl)
+            }
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        present(alert, animated: true)
+    }
+    
+    private func showVideoExportSuccessAlert() {
+        let alert = UIAlertController(
+            title: "导出成功",
+            message: "视频已成功导出到系统相册",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
+    }
+    
+    private func showVideoExportErrorAlert(_ error: Error) {
+        let alert = UIAlertController(
+            title: "导出失败",
+            message: "无法导出视频到系统相册: \(error.localizedDescription)",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
+    }
+    
 }
 
 // MARK: - PHPickerViewControllerDelegate

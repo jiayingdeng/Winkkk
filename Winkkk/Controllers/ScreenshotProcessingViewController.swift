@@ -569,8 +569,9 @@ extension ScreenshotProcessingViewController {
             return
         }
         
-        // 获取第一张图片作为主要分享对象
-        guard let firstImage = screenshots.first?.image else {
+        // 提取所有图片
+        let images = screenshots.compactMap { $0.image }
+        guard !images.isEmpty else {
             showAlert(title: "错误", message: "无法加载图片")
             return
         }
@@ -578,12 +579,20 @@ extension ScreenshotProcessingViewController {
         // 触觉反馈
         HapticFeedbackManager.shared.buttonTap()
         
-        // 跳转到分享页面
-        let shareVC = ShareViewController(
-            image: firstImage,
-            originalImage: firstImage
+        // 直接使用系统分享 Sheet
+        let activityVC = UIActivityViewController(
+            activityItems: images,
+            applicationActivities: nil
         )
-        navigationController?.pushViewController(shareVC, animated: true)
+        
+        // iPad适配
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = CGRect(x: view.bounds.midX, y: view.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+        
+        present(activityVC, animated: true)
     }
     
     private func playLivePhotos() {

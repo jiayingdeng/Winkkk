@@ -526,9 +526,21 @@ class ImageEnhanceViewController: UIViewController {
     @objc private func shareButtonTapped() {
         guard let enhanced = enhancedImage else { return }
         
-        let shareVC = ShareViewController(image: enhanced, originalImage: originalImage)
-        let navController = UINavigationController(rootViewController: shareVC)
-        present(navController, animated: true)
+        HapticFeedbackManager.shared.buttonTap()
+        
+        // 直接使用系统分享 Sheet
+        let activityVC = UIActivityViewController(
+            activityItems: [enhanced],
+            applicationActivities: nil
+        )
+        
+        // iPad适配
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = shareButton
+            popover.sourceRect = shareButton.bounds
+        }
+        
+        present(activityVC, animated: true)
     }
     
     // MARK: - Save & Share

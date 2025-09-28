@@ -27,6 +27,7 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     private let navigationBar = UIView()
     private let titleLabel = UILabel()
     private let closeButton = UIButton()
+    private let shareButton = UIButton()
     
     // MARK: - Initialization
     init(screenshots: [ScreenshotItem], currentIndex: Int = 0) {
@@ -100,8 +101,14 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
         closeButton.titleLabel?.font = .systemFont(ofSize: 18, weight: .medium)
         closeButton.addTarget(self, action: #selector(closeButtonTapped), for: .touchUpInside)
         
+        // 分享按钮
+        shareButton.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
+        shareButton.tintColor = .label
+        shareButton.addTarget(self, action: #selector(shareButtonTapped), for: .touchUpInside)
+        
         navigationBar.addSubview(titleLabel)
         navigationBar.addSubview(closeButton)
+        navigationBar.addSubview(shareButton)
     }
     
     private func setupScrollView() {
@@ -264,6 +271,7 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
         stackView.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         closeButton.translatesAutoresizingMaskIntoConstraints = false
+        shareButton.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
             // 导航栏
@@ -280,6 +288,11 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
             closeButton.centerYAnchor.constraint(equalTo: navigationBar.centerYAnchor),
             closeButton.widthAnchor.constraint(equalToConstant: 44),
             closeButton.heightAnchor.constraint(equalToConstant: 44),
+            
+            shareButton.trailingAnchor.constraint(equalTo: navigationBar.trailingAnchor, constant: -16),
+            shareButton.centerYAnchor.constraint(equalTo: navigationBar.centerYAnchor),
+            shareButton.widthAnchor.constraint(equalToConstant: 44),
+            shareButton.heightAnchor.constraint(equalToConstant: 44),
             
             // 滚动视图
             scrollView.topAnchor.constraint(equalTo: navigationBar.bottomAnchor),
@@ -306,6 +319,49 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     // MARK: - Actions
     @objc private func closeButtonTapped() {
         dismiss(animated: true)
+    }
+    
+    @objc private func shareButtonTapped() {
+        HapticFeedbackManager.shared.buttonTap()
+        
+        let currentScreenshot = screenshots[currentIndex]
+        
+        // 根据截图类型准备分享内容
+        var activityItems: [Any] = []
+        
+        if currentScreenshot.isLivePhoto,
+           let livePhotoVideoPath = currentScreenshot.livePhotoVideoPath,
+           FileManager.default.fileExists(atPath: livePhotoVideoPath.path) {
+            // Live Photo 分享视频文件
+            activityItems.append(livePhotoVideoPath)
+        } else if let image = currentScreenshot.image {
+            // 普通截图分享图片
+            activityItems.append(image)
+        } else {
+            // 无法加载图片，显示错误提示
+            let alert = UIAlertController(
+                title: "分享失败",
+                message: "无法加载当前图片",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "确定", style: .default))
+            present(alert, animated: true)
+            return
+        }
+        
+        // 创建分享 Sheet
+        let activityVC = UIActivityViewController(
+            activityItems: activityItems,
+            applicationActivities: nil
+        )
+        
+        // iPad 适配
+        if let popover = activityVC.popoverPresentationController {
+            popover.sourceView = shareButton
+            popover.sourceRect = shareButton.bounds
+        }
+        
+        present(activityVC, animated: true)
     }
     
     
