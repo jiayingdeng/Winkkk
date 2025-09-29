@@ -71,10 +71,17 @@ class CollageViewController: UIViewController {
     
     // 底部按钮
     private let bottomButtonsView = UIView()
+    
+    // 第一行按钮
+    private let firstRowButtonsView = UIView()
     private let saveButton = UIButton()
     private let shareButton = UIButton()
     private let resetButton = UIButton()
-    private let enhanceButton = UIButton() // 新增画质修复按钮
+    
+    // 第二行按钮
+    private let secondRowButtonsView = UIView()
+    private let backToProcessingButton = UIButton() // 返回截图中心按钮
+    private let enhanceButton = UIButton() // 画质修复按钮
     
     // MARK: - Initialization
     init(images: [UIImage]) {
@@ -335,16 +342,19 @@ class CollageViewController: UIViewController {
     private func setupBottomButtons() {
         bottomButtonsView.backgroundColor = .clear
         
-        // 重置按钮
-        resetButton.setTitle("🔄 重置", for: .normal)
-        resetButton.titleLabel?.font = ThemeManager.buttonFont
-        resetButton.setTitleColor(.white, for: .normal)
-        resetButton.backgroundColor = UIColor.white.withAlphaComponent(0.2)
-        resetButton.layer.cornerRadius = ThemeManager.standardCornerRadius
-        resetButton.addTarget(self, action: #selector(resetCollage), for: .touchUpInside)
-        resetButton.isEnabled = true  // 重置按钮始终可用
-        resetButton.alpha = 1.0
-        bottomButtonsView.addSubview(resetButton)
+        // 设置第一行按钮容器
+        setupFirstRowButtons()
+        
+        // 设置第二行按钮容器
+        setupSecondRowButtons()
+        
+        // 添加容器到主视图
+        bottomButtonsView.addSubview(firstRowButtonsView)
+        bottomButtonsView.addSubview(secondRowButtonsView)
+    }
+    
+    private func setupFirstRowButtons() {
+        firstRowButtonsView.backgroundColor = .clear
         
         // 保存按钮
         saveButton.setTitle("💾 保存", for: .normal)
@@ -355,7 +365,7 @@ class CollageViewController: UIViewController {
         saveButton.addTarget(self, action: #selector(saveCollage), for: .touchUpInside)
         saveButton.isEnabled = false  // 初始禁用，拼图生成后启用
         saveButton.alpha = 0.5
-        bottomButtonsView.addSubview(saveButton)
+        firstRowButtonsView.addSubview(saveButton)
         
         // 分享按钮
         shareButton.setTitle("📤 分享", for: .normal)
@@ -366,7 +376,33 @@ class CollageViewController: UIViewController {
         shareButton.addTarget(self, action: #selector(shareCollage), for: .touchUpInside)
         shareButton.isEnabled = false
         shareButton.alpha = 0.5
-        bottomButtonsView.addSubview(shareButton)
+        firstRowButtonsView.addSubview(shareButton)
+        
+        // 重置按钮
+        resetButton.setTitle("🔄 重置", for: .normal)
+        resetButton.titleLabel?.font = ThemeManager.buttonFont
+        resetButton.setTitleColor(.white, for: .normal)
+        resetButton.backgroundColor = UIColor.white.withAlphaComponent(0.2)
+        resetButton.layer.cornerRadius = ThemeManager.standardCornerRadius
+        resetButton.addTarget(self, action: #selector(resetCollage), for: .touchUpInside)
+        resetButton.isEnabled = true  // 重置按钮始终可用
+        resetButton.alpha = 1.0
+        firstRowButtonsView.addSubview(resetButton)
+    }
+    
+    private func setupSecondRowButtons() {
+        secondRowButtonsView.backgroundColor = .clear
+        
+        // 返回截图中心按钮
+        backToProcessingButton.setTitle("📷 返回截图中心", for: .normal)
+        backToProcessingButton.titleLabel?.font = ThemeManager.buttonFont
+        backToProcessingButton.setTitleColor(.white, for: .normal)
+        backToProcessingButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
+        backToProcessingButton.layer.cornerRadius = ThemeManager.standardCornerRadius
+        backToProcessingButton.addTarget(self, action: #selector(backToProcessingTapped), for: .touchUpInside)
+        backToProcessingButton.isEnabled = true  // 始终可用
+        backToProcessingButton.alpha = 1.0
+        secondRowButtonsView.addSubview(backToProcessingButton)
         
         // 画质修复按钮
         enhanceButton.setTitle("🎨 画质修复", for: .normal)
@@ -377,7 +413,7 @@ class CollageViewController: UIViewController {
         enhanceButton.addTarget(self, action: #selector(enhanceCollageTapped), for: .touchUpInside)
         enhanceButton.isEnabled = false
         enhanceButton.alpha = 0.5
-        bottomButtonsView.addSubview(enhanceButton)
+        secondRowButtonsView.addSubview(enhanceButton)
     }
     
     private func setupConstraints() {
@@ -407,9 +443,16 @@ class CollageViewController: UIViewController {
         resetEditingButton.translatesAutoresizingMaskIntoConstraints = false
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         bottomButtonsView.translatesAutoresizingMaskIntoConstraints = false
-        resetButton.translatesAutoresizingMaskIntoConstraints = false
+        
+        // 第一行按钮
+        firstRowButtonsView.translatesAutoresizingMaskIntoConstraints = false
         saveButton.translatesAutoresizingMaskIntoConstraints = false
         shareButton.translatesAutoresizingMaskIntoConstraints = false
+        resetButton.translatesAutoresizingMaskIntoConstraints = false
+        
+        // 第二行按钮
+        secondRowButtonsView.translatesAutoresizingMaskIntoConstraints = false
+        backToProcessingButton.translatesAutoresizingMaskIntoConstraints = false
         enhanceButton.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
@@ -554,26 +597,45 @@ class CollageViewController: UIViewController {
             bottomButtonsView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             bottomButtonsView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             bottomButtonsView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -30),
-            bottomButtonsView.heightAnchor.constraint(equalToConstant: 52),
+            bottomButtonsView.heightAnchor.constraint(equalToConstant: 116), // 双行高度: 52 + 8 + 52 + 4
             
-            resetButton.leadingAnchor.constraint(equalTo: bottomButtonsView.leadingAnchor),
-            resetButton.centerYAnchor.constraint(equalTo: bottomButtonsView.centerYAnchor),
-            resetButton.widthAnchor.constraint(equalTo: bottomButtonsView.widthAnchor, multiplier: 0.2),
-            resetButton.heightAnchor.constraint(equalToConstant: 52),
+            // 第一行按钮容器
+            firstRowButtonsView.topAnchor.constraint(equalTo: bottomButtonsView.topAnchor),
+            firstRowButtonsView.leadingAnchor.constraint(equalTo: bottomButtonsView.leadingAnchor),
+            firstRowButtonsView.trailingAnchor.constraint(equalTo: bottomButtonsView.trailingAnchor),
+            firstRowButtonsView.heightAnchor.constraint(equalToConstant: 52),
             
-            saveButton.leadingAnchor.constraint(equalTo: resetButton.trailingAnchor, constant: 8),
-            saveButton.centerYAnchor.constraint(equalTo: bottomButtonsView.centerYAnchor),
-            saveButton.widthAnchor.constraint(equalTo: bottomButtonsView.widthAnchor, multiplier: 0.25),
+            // 第一行按钮: 保存、分享、重置
+            saveButton.leadingAnchor.constraint(equalTo: firstRowButtonsView.leadingAnchor),
+            saveButton.centerYAnchor.constraint(equalTo: firstRowButtonsView.centerYAnchor),
+            saveButton.widthAnchor.constraint(equalTo: firstRowButtonsView.widthAnchor, multiplier: 0.32),
             saveButton.heightAnchor.constraint(equalToConstant: 52),
             
-            shareButton.leadingAnchor.constraint(equalTo: saveButton.trailingAnchor, constant: 8),
-            shareButton.centerYAnchor.constraint(equalTo: bottomButtonsView.centerYAnchor),
-            shareButton.widthAnchor.constraint(equalTo: bottomButtonsView.widthAnchor, multiplier: 0.25),
+            shareButton.centerXAnchor.constraint(equalTo: firstRowButtonsView.centerXAnchor),
+            shareButton.centerYAnchor.constraint(equalTo: firstRowButtonsView.centerYAnchor),
+            shareButton.widthAnchor.constraint(equalTo: firstRowButtonsView.widthAnchor, multiplier: 0.32),
             shareButton.heightAnchor.constraint(equalToConstant: 52),
             
-            enhanceButton.leadingAnchor.constraint(equalTo: shareButton.trailingAnchor, constant: 8),
-            enhanceButton.trailingAnchor.constraint(equalTo: bottomButtonsView.trailingAnchor),
-            enhanceButton.centerYAnchor.constraint(equalTo: bottomButtonsView.centerYAnchor),
+            resetButton.trailingAnchor.constraint(equalTo: firstRowButtonsView.trailingAnchor),
+            resetButton.centerYAnchor.constraint(equalTo: firstRowButtonsView.centerYAnchor),
+            resetButton.widthAnchor.constraint(equalTo: firstRowButtonsView.widthAnchor, multiplier: 0.32),
+            resetButton.heightAnchor.constraint(equalToConstant: 52),
+            
+            // 第二行按钮容器
+            secondRowButtonsView.topAnchor.constraint(equalTo: firstRowButtonsView.bottomAnchor, constant: 12),
+            secondRowButtonsView.leadingAnchor.constraint(equalTo: bottomButtonsView.leadingAnchor),
+            secondRowButtonsView.trailingAnchor.constraint(equalTo: bottomButtonsView.trailingAnchor),
+            secondRowButtonsView.heightAnchor.constraint(equalToConstant: 52),
+            
+            // 第二行按钮: 返回截图中心、画质修复
+            backToProcessingButton.leadingAnchor.constraint(equalTo: secondRowButtonsView.leadingAnchor),
+            backToProcessingButton.centerYAnchor.constraint(equalTo: secondRowButtonsView.centerYAnchor),
+            backToProcessingButton.widthAnchor.constraint(equalTo: secondRowButtonsView.widthAnchor, multiplier: 0.48),
+            backToProcessingButton.heightAnchor.constraint(equalToConstant: 52),
+            
+            enhanceButton.trailingAnchor.constraint(equalTo: secondRowButtonsView.trailingAnchor),
+            enhanceButton.centerYAnchor.constraint(equalTo: secondRowButtonsView.centerYAnchor),
+            enhanceButton.widthAnchor.constraint(equalTo: secondRowButtonsView.widthAnchor, multiplier: 0.48),
             enhanceButton.heightAnchor.constraint(equalToConstant: 52)
         ])
         
@@ -809,6 +871,22 @@ class CollageViewController: UIViewController {
         navigationController?.pushViewController(imageEnhanceVC, animated: true)
     }
     
+    @objc private func backToProcessingTapped() {
+        HapticFeedbackManager.shared.buttonTap()
+        
+        // 返回到截图处理中心
+        // 查找导航堆栈中的 ScreenshotProcessingViewController
+        for viewController in navigationController?.viewControllers.reversed() ?? [] {
+            if viewController is ScreenshotProcessingViewController {
+                navigationController?.popToViewController(viewController, animated: true)
+                return
+            }
+        }
+        
+        // 如果找不到截图处理中心，则返回上一级页面
+        navigationController?.popViewController(animated: true)
+    }
+    
     // MARK: - Helper Methods
     private func updatePreview() {
         // 自动生成预览拼图
@@ -853,17 +931,20 @@ class CollageViewController: UIViewController {
     
     
     private func enableBottomButtons(_ enabled: Bool) {
-        // 重置按钮始终可用
-        resetButton.isEnabled = true
-        resetButton.alpha = 1.0
-        
-        // 其他按钮根据拼图生成状态调整
+        // 第一行按钮状态
         saveButton.isEnabled = enabled
         shareButton.isEnabled = enabled
-        enhanceButton.isEnabled = enabled
+        resetButton.isEnabled = true  // 重置按钮始终可用
         
         saveButton.alpha = enabled ? 1.0 : 0.5
         shareButton.alpha = enabled ? 1.0 : 0.5
+        resetButton.alpha = 1.0
+        
+        // 第二行按钮状态
+        backToProcessingButton.isEnabled = true  // 返回按钮始终可用
+        enhanceButton.isEnabled = enabled
+        
+        backToProcessingButton.alpha = 1.0
         enhanceButton.alpha = enabled ? 1.0 : 0.5
     }
     

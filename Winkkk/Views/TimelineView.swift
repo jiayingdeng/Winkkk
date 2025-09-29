@@ -320,39 +320,78 @@ class TimelineView: UIView {
         }
     }
     
-    // 更新Live Photo范围位置（基于屏幕中心的白色竖线位置）
+    // 🎯 修复：更新Live Photo范围位置（智能居中，基于白色竖线屏幕位置）
     private func updateLivePhotoRangePosition() {
         guard isLivePhotoMode, duration > 0, timeToPixelRatio > 0 else { return }
+        
+        // 🎯 正确获取白色竖线相对于TimelineView的位置
+        // 白色竖线被约束到屏幕中心，需要计算屏幕中心相对于当前滚动视图内容的位置
+        guard let parentView = superview else { return }
+        
+        // 🎯 正确计算白色竖线在TimelineView中的位置
+        // 白色竖线应该在TimelineView的可见区域中心
+        let timelineVisibleWidth = scrollView.bounds.width
+        let playheadScreenX = scrollView.contentOffset.x + timelineVisibleWidth / 2
         
         // 🎯 获取当前白色竖线对应的时间
         let currentTime = getCurrentCaptureTime()
         
-        // 🎯 计算实际截图的时间范围（与ScreenshotEngine逻辑一致）
-        // Live Photo配置：1.5秒偏移，总共3秒时长
+        // 🎯 计算Live Photo的时间范围（与ScreenshotEngine逻辑一致）
         let keyPhotoOffset: Double = 1.5
         let livePhotoDuration: Double = 3.0
         
-        let actualStartTime = max(0, currentTime - keyPhotoOffset)
-        let actualEndTime = min(duration, actualStartTime + livePhotoDuration)
+        let idealStartTime = currentTime - keyPhotoOffset
+        let idealEndTime = idealStartTime + livePhotoDuration
+        
+        // 🎯 实际可用的时间范围（考虑视频边界）
+        let actualStartTime = max(0, idealStartTime)
+        let actualEndTime = min(duration, idealEndTime)
         let actualDuration = actualEndTime - actualStartTime
         
-        // 🎯 将实际截图时间范围转换为屏幕坐标
-        let actualStartX = timeToCoordinate(actualStartTime)
-        let actualEndX = timeToCoordinate(actualEndTime)
-        let actualWidth = actualEndX - actualStartX
+        // 🎯 计算3秒范围的显示宽度
+        let idealRangeWidth = CGFloat(livePhotoDuration * timeToPixelRatio)
+        let actualRangeWidth = CGFloat(actualDuration * timeToPixelRatio)
         
-        // 🎯 边界检查：基于实际视频内容区域
-        let actualVideoWidth = getActualVideoWidth()
-        let videoContentStartX = leftPadding
-        let videoContentEndX = leftPadding + actualVideoWidth
+        // 🎯 智能定位：粉色轴始终以白色竖线为中心，但受视频边界限制
+        var rangeStartX: CGFloat
         
-        // 🎯 确保范围不超出视频内容边界
-        let clampedStartX = max(videoContentStartX, actualStartX)
-        let clampedEndX = min(videoContentEndX, actualEndX)
-        let finalWidth = max(0, clampedEndX - clampedStartX)
+        // 🎯 首先尝试以白色竖线为中心
+        let centerBasedStartX = playheadScreenX - idealRangeWidth / 2
+        
+        // 🔍 详细调试信息
+        print("🔍 [LivePhoto居中调试]")
+        print("   playheadScreenX: \(playheadScreenX)")
+        print("   idealRangeWidth: \(idealRangeWidth)")
+        print("   centerBasedStartX: \(centerBasedStartX)")
+        print("   leftPadding: \(leftPadding)")
+        print("   getActualVideoWidth(): \(getActualVideoWidth())")
+        print("   右边界: \(leftPadding + getActualVideoWidth())")
+        
+        if centerBasedStartX < leftPadding {
+            // 🎯 如果居中会导致粉色轴超出左边界，则左对齐边界
+            rangeStartX = leftPadding
+            print("   ❌ 超出左边界，使用左对齐: \(rangeStartX)")
+        } else if centerBasedStartX + idealRangeWidth > leftPadding + getActualVideoWidth() {
+            // 🎯 如果居中会导致粉色轴超出右边界，则右对齐边界
+            rangeStartX = leftPadding + getActualVideoWidth() - idealRangeWidth
+            print("   ❌ 超出右边界，使用右对齐: \(rangeStartX)")
+        } else {
+            // 🎯 可以完美居中
+            rangeStartX = centerBasedStartX
+            print("   ✅ 完美居中: \(rangeStartX)")
+        }
+        
+        // 🎯 边界检查已在上面处理，这里使用实际范围宽度
+        // 如果实际范围宽度与理想宽度不同，需要重新调整位置
+        if actualRangeWidth != idealRangeWidth {
+            // 重新计算基于实际宽度的居中位置
+            let actualCenterBasedStartX = playheadScreenX - actualRangeWidth / 2
+            rangeStartX = max(leftPadding, actualCenterBasedStartX)
+            rangeStartX = min(leftPadding + getActualVideoWidth() - actualRangeWidth, rangeStartX)
+        }
         
         // 🎯 如果没有有效的截图范围，则隐藏指示器
-        if finalWidth <= 0 || actualDuration < 0.1 {
+        if actualDuration < 0.1 || actualRangeWidth <= 0 {
             livePhotoRangeView.isHidden = true
             return
         } else {
@@ -360,16 +399,16 @@ class TimelineView: UIView {
         }
         
         livePhotoRangeView.frame = CGRect(
-            x: clampedStartX,
+            x: rangeStartX,
             y: timeScaleView.frame.minY,
-            width: finalWidth,
+            width: actualRangeWidth,
             height: timeScaleView.frame.height
         )
         
         // 🎯 动态更新标签显示实际时长
         updateLivePhotoRangeLabel(actualDuration)
         
-        print("🎥 Live Photo范围修复: currentTime=\(currentTime), actualRange=\(actualStartTime)-\(actualEndTime), actualDuration=\(actualDuration), finalWidth=\(finalWidth)")
+        print("🎥 Live Photo智能居中: currentTime=\(String(format: "%.2f", currentTime)), playheadX=\(playheadScreenX), centerBasedStartX=\(centerBasedStartX), rangeStartX=\(rangeStartX), idealWidth=\(idealRangeWidth), actualWidth=\(actualRangeWidth), actualDuration=\(String(format: "%.2f", actualDuration))")
     }
     
     /// 🎯 更新Live Photo范围标签显示实际时长
@@ -511,14 +550,11 @@ class TimelineView: UIView {
         contentView.frame = CGRect(x: 0, y: 0, width: currentContentWidth, height: bounds.height)
         scrollView.contentSize = CGSize(width: currentContentWidth, height: bounds.height)
         
-        print("🔍 DEBUG-P4: updateContentSize - bounds.width=\(bounds.width), leftPadding=\(leftPadding), rightPadding=\(rightPadding)")
-        print("🔍 DEBUG-P4: updateContentSize - currentContentWidth=\(currentContentWidth), scrollView.contentSize=\(scrollView.contentSize)")
-        
         // 🎯 更新时间到像素的转换比例（基于实际视频内容宽度，不包含padding）
         if duration > 0 {
             let actualVideoWidth = getActualVideoWidth()
             timeToPixelRatio = Double(actualVideoWidth) / duration
-            print("🔍 DEBUG-P4: updateContentSize - duration=\(duration), actualVideoWidth=\(actualVideoWidth), timeToPixelRatio=\(timeToPixelRatio)")
+            print("🎯 [简化] 内容更新: duration=\(duration.formattedTimeString()), videoWidth=\(Int(actualVideoWidth))px, 比例=\(String(format: "%.1f", timeToPixelRatio))px/s")
         }
     }
     
@@ -535,7 +571,9 @@ class TimelineView: UIView {
         guard timeToPixelRatio > 0 else { return 0 }
         // 总像素位置 → 减去leftPadding得到视频内容区域位置 → 转换为时间
         let videoContentX = x - leftPadding
-        return max(0, Double(videoContentX) / timeToPixelRatio)
+        let time = Double(videoContentX) / timeToPixelRatio
+        // 🎯 修复：添加上界约束，防止时间刻度溢出视频时长
+        return max(0, min(duration, time))
     }
     
     /// 🎯 Wink风格：获取当前竖线位置对应的截取时间
@@ -587,16 +625,7 @@ class TimelineView: UIView {
         let validMin = minScrollOffset  // 允许负偏移，确保视频开头能到达中心竖线
         let validMax = max(validMin, maxScrollOffset)
         
-        print("🔍 DEBUG-P4: getValidScrollRange calculations:")
-        print("🔍 DEBUG-P4:   centerX=\(centerX)")
-        print("🔍 DEBUG-P4:   timeToCoordinate(0)=\(timeZeroCoordinate)")
-        print("🔍 DEBUG-P4:   timeToCoordinate(\(duration))=\(timeDurationCoordinate)")
-        print("🔍 DEBUG-P4:   minScrollOffset=\(minScrollOffset) (before max)")
-        print("🔍 DEBUG-P4:   maxScrollOffset=\(maxScrollOffset)")
-        print("🔍 DEBUG-P4:   validMin=\(validMin) (after max(0,...))")
-        print("🔍 DEBUG-P4:   validMax=\(validMax)")
-        print("🔍 DEBUG-P4:   UIScrollView.contentSize=\(scrollView.contentSize)")
-        print("🔍 DEBUG-P4:   UIScrollView theoretical max=\(max(0, scrollView.contentSize.width - scrollView.bounds.width))")
+        print("🎯 [简化] 滚动边界: 0秒@\(Int(timeZeroCoordinate))px, \(duration.formattedTimeString())@\(Int(timeDurationCoordinate))px, 中心@\(Int(centerX))px")
         
         return (min: validMin, max: validMax)
     }
@@ -614,6 +643,8 @@ class TimelineView: UIView {
         let scrollRange = getValidScrollRange()
         let clampedOffset = max(scrollRange.min, min(scrollRange.max, scrollOffsetX))
         
+        print("🎯 [粉色轴] 滚动到\(time.formattedTimeString()): 目标@\(Int(targetX))px, 中心@\(Int(centerX))px, 偏移\(Int(clampedOffset))")
+        
         scrollView.setContentOffset(CGPoint(x: clampedOffset, y: 0), animated: true)
         
         // 🎯 滚动后更新Live Photo范围指示器
@@ -626,12 +657,10 @@ class TimelineView: UIView {
     
     // MARK: - Public Methods
     func setDuration(_ duration: Double) {
-        print("🔍 DEBUG-P4: setDuration called with duration = \(duration)")
         self.duration = duration
         updateContentSize()
         generateThumbnails()
         updateTimeResolution()
-        print("🔍 DEBUG-P4: setDuration completed, self.duration = \(self.duration)")
     }
     
     func setVideoURL(_ url: URL) {
@@ -670,21 +699,21 @@ class TimelineView: UIView {
     }
     
     func setProgress(_ progress: Double) {
-        // 🎯 恢复播放时的进度更新功能
-        guard isPlaying else {
-            // 非播放状态下保持原有的编辑器模式：不执行任何操作
-            return
-        }
-        
-        // 播放状态下，同步时间轴位置到播放进度
-        isPlaybackProgressUpdate = true
+        // 🎯 修复：播放时允许进度更新，但区分播放和手动操作
         currentProgress = progress
         let targetTime = progress * duration
-        scrollToCaptureTime(targetTime)
         
-        // 🎯 播放时更新Live Photo范围指示器
-        if isLivePhotoMode {
-            updateLivePhotoRangePosition()
+        // 🎯 关键修复：播放时标记为播放进度更新，避免触发反向同步
+        isPlaybackProgressUpdate = true
+        
+        // 🎯 播放状态下，同步时间轴滚动位置到播放进度
+        if isPlaying {
+            scrollToCaptureTime(targetTime)
+            
+            // 🎯 播放时更新Live Photo范围指示器
+            if isLivePhotoMode {
+                updateLivePhotoRangePosition()
+            }
         }
         
         isPlaybackProgressUpdate = false
@@ -748,15 +777,23 @@ class TimelineView: UIView {
         let visibleStartOffset = scrollView.contentOffset.x
         let visibleEndOffset = visibleStartOffset + scrollView.bounds.width
         
-        let startTime = coordinateToTime(visibleStartOffset)
-        let endTime = coordinateToTime(visibleEndOffset)
+        // 🎯 修复：正确计算可见时间范围，确保不会因为padding产生负时间
+        let startTime = max(0, coordinateToTime(visibleStartOffset))
+        let endTime = min(duration, coordinateToTime(visibleEndOffset))
         
         // 🎯 第3步：获取刻度间隔并计算起始时间
         let interval = getCurrentTimeInterval()
-        var currentTime = ceil(startTime / interval) * interval
+        
+        // 🎯 修复：确保从0秒开始绘制时间刻度，即使不在可见范围内
+        // 这样能确保0秒、结尾秒等关键时间点总是正确对齐
+        var currentTime = floor(startTime / interval) * interval
+        if currentTime < 0 {
+            currentTime = 0  // 不绘制负时间刻度
+        }
         
         // 🎯 第4步：循环绘制每个刻度
-        while currentTime <= endTime {
+        var tickCount = 0
+        while currentTime <= endTime && currentTime <= duration {
             // 将时间转换为contentView中的绝对X坐标
             let absoluteX = timeToCoordinate(currentTime)
             
@@ -766,12 +803,18 @@ class TimelineView: UIView {
             // 只绘制在timeScaleView范围内的刻度
             if relativeX >= 0 && relativeX <= timeScaleView.bounds.width {
                 drawTickMark(at: relativeX, for: currentTime, interval: interval)
+                tickCount += 1
+                
+                // 🔍 关键刻度调试
+                if currentTime == 0 || abs(currentTime - duration) < 0.1 {
+                    print("🎯 [关键] \(currentTime == 0 ? "起点" : "终点")刻度: \(currentTime.formattedTimeString())@\(Int(absoluteX))px")
+                }
             }
             
             currentTime += interval
         }
         
-        print("🎯 时间刻度更新: \(currentTimeResolution.displayName) @ \(zoomScale)x, 范围: \(startTime.formattedTimeString())-\(endTime.formattedTimeString())")
+        print("🎯 [简化] 刻度更新: \(tickCount)个刻度, 时间范围\(startTime.formattedTimeString())-\(endTime.formattedTimeString())")
     }
     
     /// 绘制单个刻度线和文字

@@ -573,6 +573,9 @@ class VideoPlayerViewController: UIViewController {
         player?.play()
         player?.rate = Float(currentFlowSpeed.multiplier)
         
+        // 🎯 关键修复：设置时间轴播放状态为true
+        timelineView.setPlaybackState(true)
+        
         // 启动定时器，让内容流动
         flowTimer?.invalidate()
         flowTimer = Timer.scheduledTimer(withTimeInterval: 1.0/30.0, repeats: true) { [weak self] _ in
@@ -588,6 +591,9 @@ class VideoPlayerViewController: UIViewController {
         // 🆕 暂停AVPlayer播放
         player?.pause()
         
+        // 🎯 关键修复：设置时间轴播放状态为false
+        timelineView.setPlaybackState(false)
+        
         // 停止时间轴滚动定时器
         flowTimer?.invalidate()
         flowTimer = nil
@@ -602,26 +608,32 @@ class VideoPlayerViewController: UIViewController {
     
     // 🎯 更新流动位置 (双轨同步：时间轴 + 视频播放)
     private func updateFlowPosition(speed: CGFloat) {
-        let currentOffset = timelineView.timelineScrollView.contentOffset.x
-        let newOffset = currentOffset + (speed / 30.0)  // 30fps
-        let maxOffset = timelineView.timelineScrollView.contentSize.width - timelineView.timelineScrollView.bounds.width
+        // 🎯 关键修复：基于视频播放进度更新时间轴，而不是基于滚动速度
+        guard let currentPlayerTime = player?.currentTime() else { return }
         
-        if newOffset >= maxOffset {
-            // 流动到末尾，停止双轨同步
-            timelineView.timelineScrollView.setContentOffset(CGPoint(x: maxOffset, y: 0), animated: false)
+        let currentVideoProgress = currentPlayerTime.seconds / videoDuration.seconds
+        
+        // 🎯 检查是否播放完毕
+        if currentVideoProgress >= 1.0 {
+            // 播放到末尾，停止双轨同步
+            timelineView.setProgress(1.0)
             stopFlowing()  // 自动停止时间轴滚动和视频播放
         } else {
-            // 更新时间轴位置
-            timelineView.timelineScrollView.setContentOffset(CGPoint(x: newOffset, y: 0), animated: false)
-            
-            // 🆕 同步视频播放进度：确保视频播放位置与时间轴位置匹配
-            syncVideoPositionWithTimeline()
+            // 🎯 修复：直接基于视频播放进度更新时间轴
+            timelineView.setProgress(currentVideoProgress)
         }
+        
+        // 🎯 移除原有的反向同步逻辑，避免强制跳转
+        // syncVideoPositionWithTimeline() - 不再需要
     }
     
     // 🆕 双轨同步：确保视频播放位置与时间轴位置匹配
     private func syncVideoPositionWithTimeline() {
         guard isFlowing, videoDuration.seconds > 0 else { return }
+        
+        // 🎯 关键修复：播放时不进行同步，避免强制跳转
+        // 播放状态下，时间轴应该跟随视频播放进度，而不是反向控制
+        // 只有在用户手动操作时间轴时才需要同步视频位置
         
         // 获取当前时间轴对应的时间位置
         let currentCaptureTime = timelineView.getCurrentCaptureTime()
@@ -630,17 +642,26 @@ class VideoPlayerViewController: UIViewController {
         // 获取当前视频播放时间
         guard let currentPlayerTime = player?.currentTime() else { return }
         
-        // 计算时间差，如果差异过大则进行同步调整
-        let timeDifference = abs(currentCaptureTime - currentPlayerTime.seconds)
+        // 🎯 修复：检查时间轴是否正在被用户手动操作
+        let isTimelineBeingManipulated = timelineView.timelineScrollView.isTracking || 
+                                        timelineView.timelineScrollView.isDragging ||
+                                        timelineView.timelineScrollView.isDecelerating
         
-        if timeDifference > 0.5 { // 如果差异超过0.5秒，进行同步调整
-            player?.seek(to: targetTime, toleranceBefore: CMTime.zero, toleranceAfter: CMTime.zero) { [weak self] completed in
-                if completed {
-                    // 恢复播放速度
-                    self?.player?.rate = Float(self?.currentFlowSpeed.multiplier ?? 1.0)
+        // 🎯 只有在时间轴被手动操作且差异较大时才进行同步
+        if isTimelineBeingManipulated {
+            let timeDifference = abs(currentCaptureTime - currentPlayerTime.seconds)
+            
+            if timeDifference > 0.5 { // 如果差异超过0.5秒，进行同步调整
+                print("🔄 用户操作时间轴，同步视频到: \(currentCaptureTime)s (差异: \(timeDifference)s)")
+                player?.seek(to: targetTime, toleranceBefore: CMTime.zero, toleranceAfter: CMTime.zero) { [weak self] completed in
+                    if completed {
+                        // 恢复播放速度
+                        self?.player?.rate = Float(self?.currentFlowSpeed.multiplier ?? 1.0)
+                    }
                 }
             }
         }
+        // 🎯 播放时不进行反向同步，让时间轴跟随视频播放进度
     }
     
     private func seekToTime(_ time: CMTime) {
@@ -1363,6 +1384,7 @@ class VideoPlayerViewController: UIViewController {
         
         // 🎯 动态调整控制面板高度，确保适配不同设备
         updateControlPanelHeight()
+        
     }
     
     // 🎯 三分屏布局响应式适配

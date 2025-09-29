@@ -87,7 +87,7 @@ class BatchImageEnhanceViewController: UIViewController {
     // 第二行按钮
     private let secondRowStackView = UIStackView()
     private let selectModeButton = UIButton()
-    private let reselectButton = UIButton() // 新增重新选择按钮
+    private let reselectButton = UIButton() // 新增重新开始按钮
     private let returnToCenterButton = UIButton() // 新增返回截图中心按钮
     
     // MARK: - Dependencies
@@ -514,8 +514,8 @@ class BatchImageEnhanceViewController: UIViewController {
         selectModeButton.alpha = 1.0
         secondRowStackView.addArrangedSubview(selectModeButton)
         
-        // 重新选择按钮
-        reselectButton.setTitle("重新选择", for: .normal)
+        // 重新开始按钮
+        reselectButton.setTitle("重新开始", for: .normal)
         reselectButton.backgroundColor = UIColor.systemOrange.withAlphaComponent(0.8)
         reselectButton.setTitleColor(.white, for: .normal)
         reselectButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
@@ -1051,13 +1051,13 @@ extension BatchImageEnhanceViewController {
     
     private func showReselectConfirmation() {
         let alert = UIAlertController(
-            title: "重新选择确认",
-            message: "这将清除所有修复结果，返回选择状态，确定要重新选择吗？",
+            title: "重新开始确认",
+            message: "这将清除所有修复结果，返回选择状态，确定要重新开始吗？",
             preferredStyle: .alert
         )
         
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        alert.addAction(UIAlertAction(title: "重新选择", style: .destructive) { _ in
+        alert.addAction(UIAlertAction(title: "重新开始", style: .destructive) { _ in
             self.resetToSelectingState()
         })
         
@@ -1158,7 +1158,7 @@ extension BatchImageEnhanceViewController {
         
         // 根据状态显示/隐藏按钮
         if hasCompleted && !hasProcessing {
-            // 有完成的项目且没有正在处理的项目，显示重新选择和返回按钮
+            // 有完成的项目且没有正在处理的项目，显示重新开始和返回按钮
             reselectButton.isHidden = false
             returnToCenterButton.isHidden = false
         } else {
@@ -1195,6 +1195,10 @@ extension BatchImageEnhanceViewController {
         startButton.isEnabled = true
         startButton.alpha = 1.0
         
+        // 恢复反选按钮的可点击状态
+        selectModeButton.isEnabled = true
+        selectModeButton.alpha = 1.0
+        
         // 隐藏处理相关按钮
         pauseButton.isHidden = true
         resetButton.isHidden = true
@@ -1224,9 +1228,13 @@ extension BatchImageEnhanceViewController {
         startButton.isHidden = false
         
         // 更新开始按钮为不可点击的成功状态
-        startButton.setTitle("已成功修复！", for: .normal)
+        startButton.setTitle("已成功修复", for: .normal)
         startButton.isEnabled = false
         startButton.alpha = 0.6
+        
+        // 禁用反选按钮，修复完成后不允许更改选择
+        selectModeButton.isEnabled = false
+        selectModeButton.alpha = 0.6
         
         // 保存和分享按钮的显示由updateBottomButtonsForCompletion控制
     }
@@ -1306,6 +1314,48 @@ extension BatchImageEnhanceViewController {
     }
 }
 
+// MARK: - BatchEnhanceCellDelegate
+extension BatchImageEnhanceViewController: BatchEnhanceCellDelegate {
+    
+    func cellDidRequestSelection(_ cell: BatchEnhanceCell, at index: Int) {
+        // 处理选择/取消选择逻辑
+        if selectedIndices.contains(index) {
+            selectedIndices.remove(index)
+        } else {
+            selectedIndices.insert(index)
+        }
+        updateSelectionUI()
+    }
+    
+    func cellDidRequestSingleEnhance(_ cell: BatchEnhanceCell, at index: Int) {
+        let item = enhanceItems[index]
+        
+        // 根据图片处理状态决定行为
+        switch item.processingState {
+        case .completed:
+            // 已完成：查看详情页面
+            showDetailView(for: item, at: index)
+            
+        case .pending, .failed:
+            // 等待处理或失败：进入单独修复（但需要确保不在全局处理中）
+            if !isProcessing {
+                // 从选择列表中移除该图片（避免重复处理）
+                if selectedIndices.contains(index) {
+                    selectedIndices.remove(index)
+                    updateSelectionUI()
+                }
+                
+                // 进入单独修复页面
+                showDetailView(for: item, at: index)
+            }
+            
+        case .processing:
+            // 处理中：不响应点击（已在Cell中通过isEnabled控制）
+            break
+        }
+    }
+}
+
 // MARK: - UICollectionViewDataSource
 extension BatchImageEnhanceViewController: UICollectionViewDataSource {
     
@@ -1316,35 +1366,18 @@ extension BatchImageEnhanceViewController: UICollectionViewDataSource {
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "BatchEnhanceCell", for: indexPath) as! BatchEnhanceCell
         let item = enhanceItems[indexPath.item]
-        cell.configure(with: item, isSelected: selectedIndices.contains(indexPath.item))
+        
+        // 设置委托和配置
+        cell.delegate = self
+        cell.configure(with: item, isSelected: selectedIndices.contains(indexPath.item), at: indexPath)
+        
         return cell
     }
 }
 
 // MARK: - UICollectionViewDelegate
 extension BatchImageEnhanceViewController: UICollectionViewDelegate {
-    
-    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        let item = enhanceItems[indexPath.item]
-        
-        // 优先检查是否可以查看详细（已完成的图片随时可以查看详细）
-        if item.processingState == .completed {
-            showDetailView(for: item, at: indexPath.item)
-        } else if !isProcessing {
-            // 未完成且非处理状态时，进入单独修复
-            // 同时从选择列表中移除该图片（避免重复处理）
-            if selectedIndices.contains(indexPath.item) {
-                selectedIndices.remove(indexPath.item)
-                updateSelectionUI()
-            }
-            
-            // 进入单独修复页面
-            showDetailView(for: item, at: indexPath.item)
-        }
-        // 处理中的图片不响应点击
-        
-        HapticFeedbackManager.shared.lightImpact()
-    }
+    // 移除原有的didSelectItemAt方法，现在通过BatchEnhanceCellDelegate处理点击事件
 }
 
 // MARK: - UICollectionViewDelegateFlowLayout
@@ -1360,8 +1393,18 @@ extension BatchImageEnhanceViewController: UICollectionViewDelegateFlowLayout {
     }
 }
 
+// MARK: - BatchEnhanceCellDelegate
+protocol BatchEnhanceCellDelegate: AnyObject {
+    func cellDidRequestSelection(_ cell: BatchEnhanceCell, at index: Int)
+    func cellDidRequestSingleEnhance(_ cell: BatchEnhanceCell, at index: Int)
+}
+
 // MARK: - BatchEnhanceCell
 class BatchEnhanceCell: UICollectionViewCell {
+    
+    // MARK: - Delegate
+    weak var delegate: BatchEnhanceCellDelegate?
+    private var indexPath: IndexPath?
     
     // MARK: - UI Components
     private let containerView = UIView()
@@ -1383,6 +1426,10 @@ class BatchEnhanceCell: UICollectionViewCell {
     
     // 覆盖层
     private let overlayView = UIView()
+    
+    // MARK: - Interactive Buttons
+    private let selectionButton = UIButton()    // 选择框区域按钮
+    private let imageContentButton = UIButton() // 图片内容区域按钮
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -1483,6 +1530,68 @@ class BatchEnhanceCell: UICollectionViewCell {
         overlayView.layer.cornerRadius = 12
         overlayView.isHidden = true
         contentView.addSubview(overlayView)
+        
+        // 交互按钮设置
+        setupInteractiveButtons()
+    }
+    
+    private func setupInteractiveButtons() {
+        // 选择区域按钮 - 覆盖选择框及其周围区域
+        selectionButton.backgroundColor = UIColor.clear
+        selectionButton.addTarget(self, action: #selector(selectionButtonTapped), for: .touchUpInside)
+        contentView.addSubview(selectionButton)
+        
+        // 图片内容区域按钮 - 覆盖图片主体区域
+        imageContentButton.backgroundColor = UIColor.clear
+        imageContentButton.addTarget(self, action: #selector(imageContentButtonTapped), for: .touchUpInside)
+        contentView.addSubview(imageContentButton)
+    }
+    
+    @objc private func selectionButtonTapped() {
+        // 触觉反馈
+        HapticFeedbackManager.shared.lightImpact()
+        
+        // 视觉反馈 - 选择框轻微放大动画
+        animateSelectionFeedback()
+        
+        if let indexPath = indexPath {
+            delegate?.cellDidRequestSelection(self, at: indexPath.item)
+        }
+    }
+    
+    @objc private func imageContentButtonTapped() {
+        // 只有按钮可用时才响应
+        guard imageContentButton.isEnabled else { return }
+        
+        // 触觉反馈
+        HapticFeedbackManager.shared.buttonTap()
+        
+        // 视觉反馈 - 图片内容轻微缩放动画
+        animateImageContentFeedback()
+        
+        if let indexPath = indexPath {
+            delegate?.cellDidRequestSingleEnhance(self, at: indexPath.item)
+        }
+    }
+    
+    private func animateSelectionFeedback() {
+        UIView.animate(withDuration: 0.1, animations: {
+            self.selectionIndicatorView.transform = CGAffineTransform(scaleX: 1.2, y: 1.2)
+        }) { _ in
+            UIView.animate(withDuration: 0.1) {
+                self.selectionIndicatorView.transform = .identity
+            }
+        }
+    }
+    
+    private func animateImageContentFeedback() {
+        UIView.animate(withDuration: 0.1, animations: {
+            self.containerView.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+        }) { _ in
+            UIView.animate(withDuration: 0.1) {
+                self.containerView.transform = .identity
+            }
+        }
     }
     
     private func setupConstraints() {
@@ -1499,6 +1608,8 @@ class BatchEnhanceCell: UICollectionViewCell {
         selectionIndicatorView.translatesAutoresizingMaskIntoConstraints = false
         checkmarkImageView.translatesAutoresizingMaskIntoConstraints = false
         overlayView.translatesAutoresizingMaskIntoConstraints = false
+        selectionButton.translatesAutoresizingMaskIntoConstraints = false
+        imageContentButton.translatesAutoresizingMaskIntoConstraints = false
         
         let imageHeight = frame.width // 正方形图片区域
         
@@ -1578,11 +1689,26 @@ class BatchEnhanceCell: UICollectionViewCell {
             overlayView.topAnchor.constraint(equalTo: containerView.topAnchor),
             overlayView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
             overlayView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-            overlayView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
+            overlayView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
+            
+            // 选择按钮 - 覆盖右上角选择框区域 (带扩展热区)
+            selectionButton.topAnchor.constraint(equalTo: contentView.topAnchor),
+            selectionButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            selectionButton.widthAnchor.constraint(equalToConstant: 44), // 扩展热区
+            selectionButton.heightAnchor.constraint(equalToConstant: 44), // 扩展热区
+            
+            // 图片内容按钮 - 覆盖剩余区域
+            imageContentButton.topAnchor.constraint(equalTo: contentView.topAnchor),
+            imageContentButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            imageContentButton.trailingAnchor.constraint(equalTo: selectionButton.leadingAnchor),
+            imageContentButton.bottomAnchor.constraint(equalTo: containerView.bottomAnchor)
         ])
     }
     
-    func configure(with item: BatchEnhanceItem, isSelected: Bool) {
+    func configure(with item: BatchEnhanceItem, isSelected: Bool, at indexPath: IndexPath) {
+        // 保存indexPath用于委托回调
+        self.indexPath = indexPath
+        
         // 设置原图
         originalImageView.image = item.originalImage
         
@@ -1606,6 +1732,37 @@ class BatchEnhanceCell: UICollectionViewCell {
         selectionIndicatorView.backgroundColor = isSelected ? ThemeManager.buttonPrimary : UIColor.white.withAlphaComponent(0.3)
         checkmarkImageView.isHidden = !isSelected
         overlayView.isHidden = !isSelected
+        
+        // 根据状态设置按钮可用性
+        updateButtonStates(for: item.processingState)
+    }
+    
+    private func updateButtonStates(for processingState: BatchEnhanceItem.ProcessingState) {
+        switch processingState {
+        case .pending:
+            // 等待状态：选择框可用，图片内容可用（进入单独修复）
+            selectionButton.isEnabled = true
+            imageContentButton.isEnabled = true
+            imageContentButton.alpha = 1.0
+            
+        case .processing:
+            // 处理中：选择框可用，图片内容不可用
+            selectionButton.isEnabled = true
+            imageContentButton.isEnabled = false
+            imageContentButton.alpha = 0.5 // 视觉提示不可用
+            
+        case .completed:
+            // 完成状态：选择框可用，图片内容可用（查看详情）
+            selectionButton.isEnabled = true
+            imageContentButton.isEnabled = true
+            imageContentButton.alpha = 1.0
+            
+        case .failed:
+            // 失败状态：选择框可用，图片内容可用（重新修复）
+            selectionButton.isEnabled = true
+            imageContentButton.isEnabled = true
+            imageContentButton.alpha = 1.0
+        }
     }
     
     private func configureForPendingState() {

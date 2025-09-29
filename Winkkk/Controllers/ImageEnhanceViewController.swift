@@ -84,6 +84,7 @@ class ImageEnhanceViewController: UIViewController {
     private let resetButton = UIButton()
     private let saveButton = UIButton()
     private let shareButton = UIButton()
+    private let returnToCenterButton = UIButton() // 🆕 返回截图中心按钮
     
     // MARK: - Dependencies
     private let imageEnhancer = ImageEnhancer()
@@ -168,10 +169,11 @@ class ImageEnhanceViewController: UIViewController {
         
         // 动态调整控制面板高度，确保适配不同设备
         let safeAreaBottom = view.safeAreaInsets.bottom
-        // 增加基础高度以适应所有内容：
-        // segmentedControl(32) + enhanceButton(40) + progressView(6) + statusLabel(20) + bottomButtons(36) + 间距(20+16+12+8+16) = 约154px
-        // 加上上下内边距20px共约174px，保留一些额外空间使用260px
-        let panelHeight = 260 + safeAreaBottom
+        // 🔧 调整基础高度以适应双行按钮布局：
+        // segmentedControl(32) + enhanceButton(40) + progressView(6) + statusLabel(20) + 第一行按钮(36) + 第二行按钮(40) + 间距(20+16+12+8+16+12) = 约218px
+        // 加上上下内边距20px共约238px，保留额外空间使用300px
+        let hasReturnButton = sourceType == .fromBatch || sourceType == .fromBatchCompleted
+        let panelHeight = (hasReturnButton ? 300 : 260) + safeAreaBottom
         
         // 调整最大高度比例从40%到45%，给小屏幕设备更多空间
         let maxHeight = view.bounds.height * 0.45
@@ -230,15 +232,8 @@ class ImageEnhanceViewController: UIViewController {
             action: #selector(cancelButtonTapped)
         )
         
-        // 添加返回截图中心的快捷按钮（需求5）
-        if sourceType == .fromBatch || sourceType == .fromBatchCompleted {
-            navigationItem.rightBarButtonItem = UIBarButtonItem(
-                title: "截图中心",
-                style: .plain,
-                target: self,
-                action: #selector(returnToScreenshotCenterTapped)
-            )
-        }
+        // 🔧 移除导航栏右侧按钮，改为底部按钮
+        // 返回截图中心按钮现在位于控制面板底部
         
         // 如果是批量模式，可以考虑添加左右切换按钮（Phase 2实现）
         if batchContext != nil {
@@ -263,6 +258,11 @@ class ImageEnhanceViewController: UIViewController {
         // 底部按钮
         setupBottomButtons()
         
+        // 🆕 返回截图中心按钮（条件显示）
+        if sourceType == .fromBatch || sourceType == .fromBatchCompleted {
+            setupReturnToCenterButton()
+        }
+        
         // 添加到控制面板
         controlPanelBlurView.contentView.addSubview(levelSegmentedControl)
         controlPanelBlurView.contentView.addSubview(enhanceButton)
@@ -271,6 +271,11 @@ class ImageEnhanceViewController: UIViewController {
         controlPanelBlurView.contentView.addSubview(resetButton)
         controlPanelBlurView.contentView.addSubview(saveButton)
         controlPanelBlurView.contentView.addSubview(shareButton)
+        
+        // 🆕 条件添加返回截图中心按钮
+        if sourceType == .fromBatch || sourceType == .fromBatchCompleted {
+            controlPanelBlurView.contentView.addSubview(returnToCenterButton)
+        }
     }
     
     private func setupLevelControl() {
@@ -342,6 +347,16 @@ class ImageEnhanceViewController: UIViewController {
         shareButton.alpha = 0.6
     }
     
+    // 🆕 设置返回截图中心按钮
+    private func setupReturnToCenterButton() {
+        returnToCenterButton.setTitle("返回截图中心", for: .normal)
+        returnToCenterButton.setTitleColor(.white, for: .normal)
+        returnToCenterButton.backgroundColor = ThemeManager.buttonPrimary
+        returnToCenterButton.layer.cornerRadius = ThemeManager.smallCornerRadius
+        returnToCenterButton.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .medium)
+        returnToCenterButton.addTarget(self, action: #selector(returnToScreenshotCenterTapped), for: .touchUpInside)
+    }
+    
     private func setupConstraints() {
         gradientBackgroundView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -357,6 +372,10 @@ class ImageEnhanceViewController: UIViewController {
         resetButton.translatesAutoresizingMaskIntoConstraints = false
         saveButton.translatesAutoresizingMaskIntoConstraints = false
         shareButton.translatesAutoresizingMaskIntoConstraints = false
+        // 🆕 条件设置返回截图中心按钮的约束
+        if sourceType == .fromBatch || sourceType == .fromBatchCompleted {
+            returnToCenterButton.translatesAutoresizingMaskIntoConstraints = false
+        }
         
         NSLayoutConstraint.activate([
             // 渐变背景
@@ -412,9 +431,8 @@ class ImageEnhanceViewController: UIViewController {
             statusLabel.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 20),
             statusLabel.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -20),
             
-            // 底部按钮（增加安全区域考虑）
+            // 🎨 双行布局 - 第一行：三个功能按钮
             resetButton.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 16),
-            resetButton.bottomAnchor.constraint(lessThanOrEqualTo: controlPanelBlurView.safeAreaLayoutGuide.bottomAnchor, constant: -12),
             resetButton.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 20),
             resetButton.widthAnchor.constraint(equalTo: controlPanelBlurView.widthAnchor, multiplier: 0.25),
             resetButton.heightAnchor.constraint(equalToConstant: 36),
@@ -429,6 +447,21 @@ class ImageEnhanceViewController: UIViewController {
             shareButton.widthAnchor.constraint(equalTo: resetButton.widthAnchor),
             shareButton.heightAnchor.constraint(equalTo: resetButton.heightAnchor)
         ])
+        
+        // 🆕 条件添加返回截图中心按钮约束（第二行）
+        if sourceType == .fromBatch || sourceType == .fromBatchCompleted {
+            NSLayoutConstraint.activate([
+                // 🎨 第二行：返回截图中心按钮 - 居中显示，底部安全区域考虑
+                returnToCenterButton.topAnchor.constraint(equalTo: resetButton.bottomAnchor, constant: 12),
+                returnToCenterButton.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
+                returnToCenterButton.widthAnchor.constraint(equalToConstant: 160),
+                returnToCenterButton.heightAnchor.constraint(equalToConstant: 40),
+                returnToCenterButton.bottomAnchor.constraint(lessThanOrEqualTo: controlPanelBlurView.safeAreaLayoutGuide.bottomAnchor, constant: -12)
+            ])
+        } else {
+            // 如果没有返回截图中心按钮，第一行按钮需要设置底部约束
+            resetButton.bottomAnchor.constraint(lessThanOrEqualTo: controlPanelBlurView.safeAreaLayoutGuide.bottomAnchor, constant: -12).isActive = true
+        }
         
         // 创建控制面板高度约束（稍后在viewDidLayoutSubviews中动态设置）
         controlPanelHeightConstraint = controlPanelBlurView.heightAnchor.constraint(equalToConstant: 280)
@@ -504,6 +537,9 @@ class ImageEnhanceViewController: UIViewController {
     private func handleEnhancementSuccess(_ enhanced: UIImage) {
         enhancedImage = enhanced
         comparisonView.setEnhancedImage(enhanced)
+        
+        // 🎯 关键新增：重置竖线到中线位置，展示标准修复前后对比
+        comparisonView.resetToCenter()
         
         statusLabel.text = "修复完成！可以保存或分享"
         
@@ -610,20 +646,16 @@ class ImageEnhanceViewController: UIViewController {
         prevButton.isEnabled = context.currentIndex > 0
         nextButton.isEnabled = context.currentIndex < context.items.count - 1
         
-        // 如果已经有右侧按钮（返回截图中心），则组合显示
-        if navigationItem.rightBarButtonItem != nil {
-            // 将切换按钮放在左侧
-            let spacer = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
-            navigationItem.leftBarButtonItems = [
-                navigationItem.leftBarButtonItem!,
-                spacer,
-                prevButton,
-                nextButton
-            ]
+        // 🎯 实现对称布局：左箭头在左侧，右箭头在右侧，标题居中
+        // 保留原有的返回按钮，添加左箭头在其右侧
+        if let originalLeftButton = navigationItem.leftBarButtonItem {
+            navigationItem.leftBarButtonItems = [originalLeftButton, prevButton]
         } else {
-            // 将切换按钮放在右侧
-            navigationItem.rightBarButtonItems = [nextButton, prevButton]
+            navigationItem.leftBarButtonItem = prevButton
         }
+        
+        // 右箭头放在右侧
+        navigationItem.rightBarButtonItem = nextButton
     }
     
     // MARK: - Actions
@@ -749,27 +781,20 @@ class ImageEnhanceViewController: UIViewController {
     private func updateNavigationButtonStates() {
         guard let context = batchContext else { return }
         
-        // 查找并更新导航按钮状态
+        // 🎯 更新对称布局的导航按钮状态
+        // 左箭头按钮在左侧按钮组中
         if let leftBarButtonItems = navigationItem.leftBarButtonItems {
-            // 左侧按钮组合模式
             for item in leftBarButtonItems {
                 if item.image == UIImage(systemName: "chevron.left") {
                     item.isEnabled = context.currentIndex > 0
-                } else if item.image == UIImage(systemName: "chevron.right") {
-                    item.isEnabled = context.currentIndex < context.items.count - 1
                 }
             }
         }
         
-        if let rightBarButtonItems = navigationItem.rightBarButtonItems {
-            // 右侧按钮组合模式
-            for item in rightBarButtonItems {
-                if item.image == UIImage(systemName: "chevron.left") {
-                    item.isEnabled = context.currentIndex > 0
-                } else if item.image == UIImage(systemName: "chevron.right") {
-                    item.isEnabled = context.currentIndex < context.items.count - 1
-                }
-            }
+        // 右箭头按钮在右侧
+        if let rightBarButtonItem = navigationItem.rightBarButtonItem,
+           rightBarButtonItem.image == UIImage(systemName: "chevron.right") {
+            rightBarButtonItem.isEnabled = context.currentIndex < context.items.count - 1
         }
     }
     

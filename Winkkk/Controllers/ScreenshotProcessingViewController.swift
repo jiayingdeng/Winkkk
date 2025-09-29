@@ -32,6 +32,7 @@ class ScreenshotProcessingViewController: UIViewController {
     private let previewContainerView = UIView()
     private let collectionView: UICollectionView
     private let collectionFlowLayout = UICollectionViewFlowLayout()
+    private let interactionHintLabel = UILabel()
     
     // 推荐区域 - 已移除，避免功能重复
     // private let recommendationCardView = UIView()
@@ -55,12 +56,9 @@ class ScreenshotProcessingViewController: UIViewController {
         self.screenshots = screenshots
         self.mode = mode
         
-        // 配置集合视图布局
+        // 配置集合视图布局 - 使用代理方法动态计算尺寸
         collectionFlowLayout.scrollDirection = .horizontal
-        collectionFlowLayout.itemSize = CGSize(width: 60, height: 60)
-        collectionFlowLayout.minimumInteritemSpacing = 8
-        collectionFlowLayout.minimumLineSpacing = 8
-        collectionFlowLayout.sectionInset = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
+        // itemSize, spacing 和 insets 通过 UICollectionViewDelegateFlowLayout 动态设置
         
         collectionView = UICollectionView(frame: .zero, collectionViewLayout: collectionFlowLayout)
         
@@ -89,9 +87,22 @@ class ScreenshotProcessingViewController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         
+        print("🔍 Layout Debug: viewDidLayoutSubviews called, view.bounds.width=\(view.bounds.width)")
+        
         // 当视图布局改变时（比如屏幕旋转），更新预览区域高度
         if view.bounds.width > 0 && previewHeightConstraint != nil {
             updatePreviewContainerHeight(animated: false)
+        }
+        
+        // 🔧 修复：强制刷新collection view布局以确保正确的item尺寸
+        DispatchQueue.main.async {
+            // 使用异步调用确保布局计算在所有视图更新完成后执行
+            self.collectionView.collectionViewLayout.invalidateLayout()
+            
+            // 强制重新计算布局
+            if let flowLayout = self.collectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+                flowLayout.invalidateLayout()
+            }
         }
     }
     
@@ -125,6 +136,7 @@ class ScreenshotProcessingViewController: UIViewController {
         // 添加到内容视图
         contentView.addSubview(headerView)
         contentView.addSubview(previewContainerView)
+        contentView.addSubview(interactionHintLabel)
         // contentView.addSubview(recommendationCardView) // 已移除推荐卡片
         contentView.addSubview(optionsTableView)
     }
@@ -132,10 +144,11 @@ class ScreenshotProcessingViewController: UIViewController {
     private func setupHeaderView() {
         headerView.backgroundColor = .clear
         
-        // 标题
+        // 隐藏标题 - 避免与导航栏重复
         titleLabel.font = ThemeManager.titleFont
         titleLabel.textColor = .white
         titleLabel.textAlignment = .center
+        titleLabel.isHidden = true // 隐藏大标题
         headerView.addSubview(titleLabel)
         
         // 数量标签
@@ -160,9 +173,16 @@ class ScreenshotProcessingViewController: UIViewController {
         previewContainerView.layer.cornerRadius = ThemeManager.standardCornerRadius
         previewContainerView.clipsToBounds = true
         
+        // 配置collection view layout为水平滚动
+        collectionFlowLayout.scrollDirection = .horizontal
+        collectionFlowLayout.minimumInteritemSpacing = 8
+        collectionFlowLayout.minimumLineSpacing = 8
+        collectionFlowLayout.sectionInset = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
+        
         // 集合视图
         collectionView.backgroundColor = .clear
         collectionView.showsHorizontalScrollIndicator = false
+        collectionView.showsVerticalScrollIndicator = false
         collectionView.dataSource = self
         collectionView.delegate = self
         
@@ -202,6 +222,7 @@ class ScreenshotProcessingViewController: UIViewController {
         countLabel.translatesAutoresizingMaskIntoConstraints = false
         previewContainerView.translatesAutoresizingMaskIntoConstraints = false
         collectionView.translatesAutoresizingMaskIntoConstraints = false
+        interactionHintLabel.translatesAutoresizingMaskIntoConstraints = false
         // 推荐卡片相关组件已移除
         // recommendationCardView.translatesAutoresizingMaskIntoConstraints = false
         // recommendationBlurView.translatesAutoresizingMaskIntoConstraints = false
@@ -234,7 +255,7 @@ class ScreenshotProcessingViewController: UIViewController {
             headerView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
             headerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             headerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            headerView.heightAnchor.constraint(equalToConstant: 80),
+            headerView.heightAnchor.constraint(equalToConstant: 40),
             
             // 标题
             titleLabel.topAnchor.constraint(equalTo: headerView.topAnchor),
@@ -242,8 +263,8 @@ class ScreenshotProcessingViewController: UIViewController {
             titleLabel.trailingAnchor.constraint(equalTo: headerView.trailingAnchor),
             titleLabel.heightAnchor.constraint(equalToConstant: 40),
             
-            // 数量标签
-            countLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            // 数量标签 - 在头部区域居中显示
+            countLabel.centerYAnchor.constraint(equalTo: headerView.centerYAnchor),
             countLabel.leadingAnchor.constraint(equalTo: headerView.leadingAnchor),
             countLabel.trailingAnchor.constraint(equalTo: headerView.trailingAnchor),
             countLabel.heightAnchor.constraint(equalToConstant: 24),
@@ -259,10 +280,15 @@ class ScreenshotProcessingViewController: UIViewController {
             collectionView.trailingAnchor.constraint(equalTo: previewContainerView.trailingAnchor),
             collectionView.bottomAnchor.constraint(equalTo: previewContainerView.bottomAnchor, constant: -10),
             
+            // 交互提示标签 - 放置在预览区域下方
+            interactionHintLabel.topAnchor.constraint(equalTo: previewContainerView.bottomAnchor, constant: 8),
+            interactionHintLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            interactionHintLabel.heightAnchor.constraint(equalToConstant: 16),
+            
             // 智能推荐卡片 - 已移除所有推荐卡片相关约束
             
-            // 操作选项表格 - 直接连接到预览区域
-            optionsTableView.topAnchor.constraint(equalTo: previewContainerView.bottomAnchor, constant: 20),
+            // 操作选项表格 - 连接到提示标签
+            optionsTableView.topAnchor.constraint(equalTo: interactionHintLabel.bottomAnchor, constant: 16),
             optionsTableView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             optionsTableView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             optionsTableView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
@@ -280,33 +306,69 @@ class ScreenshotProcessingViewController: UIViewController {
             previewHeightConstraint.isActive = false
         }
         
-        // 计算新的高度
-        let containerWidth = view.bounds.width - 32 // 左右各16的边距
+        // 计算新的高度，确保有有效的容器宽度
+        var containerWidth = view.bounds.width - 32 // 左右各16的边距
+        if containerWidth <= 0 {
+            containerWidth = UIScreen.main.bounds.width - 32 // 使用屏幕宽度作为后备
+        }
+        
         let targetHeight = calculatePreviewHeight(containerWidth: containerWidth)
         
         // 创建新的高度约束
         previewHeightConstraint = previewContainerView.heightAnchor.constraint(equalToConstant: targetHeight)
         previewHeightConstraint.isActive = true
         
+        print("🔍 Container Height Update: containerWidth=\(containerWidth), targetHeight=\(targetHeight)")
+        
         // 执行布局更新
         if animated {
             UIView.animate(withDuration: 0.3, delay: 0, options: [.curveEaseInOut], animations: {
                 self.view.layoutIfNeeded()
-            })
+            }) { _ in
+                // 🔧 修复：布局完成后，强制刷新collection view布局
+                DispatchQueue.main.async {
+                    self.collectionView.collectionViewLayout.invalidateLayout()
+                    if let flowLayout = self.collectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+                        flowLayout.invalidateLayout()
+                    }
+                }
+            }
         } else {
             view.layoutIfNeeded()
+            // 🔧 修复：同步刷新collection view布局
+            DispatchQueue.main.async {
+                self.collectionView.collectionViewLayout.invalidateLayout()
+                if let flowLayout = self.collectionView.collectionViewLayout as? UICollectionViewFlowLayout {
+                    flowLayout.invalidateLayout()
+                }
+            }
         }
     }
     
     private func calculatePreviewHeight(containerWidth: CGFloat) -> CGFloat {
         let screenshotCount = screenshots.count
-        let itemSize: CGFloat = 60 // 缩略图尺寸
+        guard screenshotCount > 0 else {
+            return 80 // 默认最小高度
+        }
+        
         let itemSpacing: CGFloat = 8 // 间距
-        let horizontalPadding: CGFloat = 32 // 左右内边距总和
+        let sectionInsets = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
         let verticalPadding: CGFloat = 20 // 上下内边距总和
         
-        // 计算可用宽度
-        let availableWidth = containerWidth - horizontalPadding
+        // 使用与sizeForItemAt相同的逻辑计算item尺寸
+        let availableWidth = containerWidth - sectionInsets.left - sectionInsets.right
+        
+        let itemSize: CGFloat
+        if screenshotCount == 1 {
+            // 单张图片使用较大尺寸
+            itemSize = min(80, availableWidth)
+        } else {
+            // 多张图片时计算合适的大小
+            let totalSpacing = CGFloat(screenshotCount - 1) * itemSpacing
+            let availableWidthForItems = availableWidth - totalSpacing
+            let calculatedWidth = availableWidthForItems / CGFloat(screenshotCount)
+            itemSize = max(50, min(60, calculatedWidth))
+        }
         
         // 计算单行可显示的最大数量
         let maxItemsPerRow = max(1, Int((availableWidth + itemSpacing) / (itemSize + itemSpacing)))
@@ -323,11 +385,15 @@ class ScreenshotProcessingViewController: UIViewController {
         let minHeight: CGFloat = 80
         let maxHeight: CGFloat = 200 // 防止预览区域过高
         
-        return max(minHeight, min(maxHeight, totalHeight))
+        let finalHeight = max(minHeight, min(maxHeight, totalHeight))
+        
+        print("🔍 Height Debug: containerWidth=\(containerWidth), itemCount=\(screenshotCount), itemSize=\(itemSize), finalHeight=\(finalHeight)")
+        
+        return finalHeight
     }
     
     private func configureNavigationBar() {
-        title = mode.displayName + "处理"
+        title = "截图处理中心"
         navigationController?.navigationBar.tintColor = .white
         navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: UIColor.white]
         
@@ -341,20 +407,11 @@ class ScreenshotProcessingViewController: UIViewController {
     
     // MARK: - Interaction Hint Setup
     private func setupInteractionHint() {
-        let hintLabel = UILabel()
-        hintLabel.text = "轻点图片查看详情"
-        hintLabel.font = .systemFont(ofSize: 12, weight: .regular)
-        hintLabel.textColor = UIColor.white.withAlphaComponent(0.6)
-        hintLabel.textAlignment = .center
-        hintLabel.translatesAutoresizingMaskIntoConstraints = false
-        
-        previewContainerView.addSubview(hintLabel)
-        
-        NSLayoutConstraint.activate([
-            hintLabel.bottomAnchor.constraint(equalTo: previewContainerView.bottomAnchor, constant: -4),
-            hintLabel.centerXAnchor.constraint(equalTo: previewContainerView.centerXAnchor),
-            hintLabel.heightAnchor.constraint(equalToConstant: 16)
-        ])
+        interactionHintLabel.text = "轻点图片查看详情"
+        interactionHintLabel.font = .systemFont(ofSize: 12, weight: .regular)
+        interactionHintLabel.textColor = UIColor.white.withAlphaComponent(0.6)
+        interactionHintLabel.textAlignment = .center
+        interactionHintLabel.translatesAutoresizingMaskIntoConstraints = false
     }
     
     // MARK: - Processing Options Setup
@@ -461,6 +518,75 @@ extension ScreenshotProcessingViewController: UICollectionViewDelegate {
             viewSheet.sheetPresentationController?.detents = [.medium(), .large()]
         }
         present(viewSheet, animated: true)
+    }
+}
+
+// MARK: - UICollectionViewDelegateFlowLayout
+extension ScreenshotProcessingViewController: UICollectionViewDelegateFlowLayout {
+    
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
+        // 🔧 修复：使用更精确的容器宽度计算
+        var containerWidth: CGFloat
+        
+        // 优先使用实际的容器宽度
+        if previewContainerView.bounds.width > 0 {
+            containerWidth = previewContainerView.bounds.width
+        } else if view.bounds.width > 0 {
+            containerWidth = view.bounds.width - 32 // 左右边距16*2
+        } else {
+            containerWidth = UIScreen.main.bounds.width - 32
+        }
+        
+        let sectionInsets = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
+        let availableWidth = containerWidth - sectionInsets.left - sectionInsets.right
+        
+        // 图片间距
+        let itemSpacing: CGFloat = 8
+        let itemCount = screenshots.count
+        
+        // 如果只有一张图片，使用较大尺寸
+        if itemCount == 1 {
+            let size: CGFloat = min(80, availableWidth)
+            return CGSize(width: size, height: size)
+        }
+        
+        // 🔧 修复：多张图片时使用更精确的计算
+        // 确保所有图片能在一行内显示且不重叠
+        let totalSpacing = CGFloat(max(0, itemCount - 1)) * itemSpacing
+        let availableWidthForItems = max(0, availableWidth - totalSpacing)
+        
+        // 计算理想的item宽度
+        let idealWidth = availableWidthForItems / CGFloat(itemCount)
+        
+        // 设置合理的尺寸范围：最小40pt，最大80pt
+        let finalWidth = max(40, min(80, idealWidth))
+        
+        // 🔧 修复：检查是否会导致总宽度超出容器
+        let totalRequiredWidth = (finalWidth * CGFloat(itemCount)) + totalSpacing
+        let adjustedWidth: CGFloat
+        
+        if totalRequiredWidth > availableWidth {
+            // 如果总宽度超出，重新计算确保适配
+            adjustedWidth = max(35, (availableWidth - totalSpacing) / CGFloat(itemCount))
+        } else {
+            adjustedWidth = finalWidth
+        }
+        
+        print("🔍 Preview Debug: containerWidth=\(containerWidth), itemCount=\(itemCount), availableWidth=\(availableWidth), finalWidth=\(adjustedWidth)")
+        
+        return CGSize(width: adjustedWidth, height: adjustedWidth)
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
+        return 8
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumLineSpacingForSectionAt section: Int) -> CGFloat {
+        return 8
+    }
+    
+    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, insetForSectionAt section: Int) -> UIEdgeInsets {
+        return UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
     }
 }
 
@@ -887,9 +1013,9 @@ class ProcessingOptionCell: UITableViewCell {
         backgroundColor = .clear
         selectionStyle = .none
         
-        // 图标
+        // 图标 - 使用更深的颜色以提高对比度
         iconImageView.contentMode = .scaleAspectFit
-        iconImageView.tintColor = ThemeManager.buttonPrimary
+        iconImageView.tintColor = UIColor(red: 220/255, green: 140/255, blue: 160/255, alpha: 1.0) // 中等深度的玫瑰色，平衡对比度与视觉柔和度
         contentView.addSubview(iconImageView)
         
         // 标题
@@ -952,7 +1078,7 @@ class ProcessingOptionCell: UITableViewCell {
         layer.shadowOpacity = 0
         
         // 设置默认图标和文字颜色
-        iconImageView.tintColor = ThemeManager.buttonPrimary
+        iconImageView.tintColor = UIColor(red: 220/255, green: 140/255, blue: 160/255, alpha: 1.0) // 中等深度的玫瑰色，平衡对比度与视觉柔和度
         titleLabel.font = ThemeManager.buttonFont
         titleLabel.textColor = .white
         descriptionLabel.textColor = UIColor.white.withAlphaComponent(0.7)
