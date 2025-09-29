@@ -51,10 +51,10 @@ class BatchImageEnhanceViewController: UIViewController {
     private let scrollView = UIScrollView()
     private let contentView = UIView()
     
-    // 头部区域
+    // 头部区域 - 移除重复标题，只保留提示信息
     private let headerView = UIView()
-    private let titleLabel = UILabel()
     private let countLabel = UILabel()
+    private let tipsLabel = UILabel()
     
     // 控制面板
     private let controlPanelView = UIView()
@@ -152,8 +152,8 @@ class BatchImageEnhanceViewController: UIViewController {
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         contentView.translatesAutoresizingMaskIntoConstraints = false
         headerView.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
         countLabel.translatesAutoresizingMaskIntoConstraints = false
+        tipsLabel.translatesAutoresizingMaskIntoConstraints = false
         controlPanelView.translatesAutoresizingMaskIntoConstraints = false
         controlPanelBlurView.translatesAutoresizingMaskIntoConstraints = false
         levelSegmentedControl.translatesAutoresizingMaskIntoConstraints = false
@@ -196,23 +196,23 @@ class BatchImageEnhanceViewController: UIViewController {
             contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
             contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
             
-            // 头部区域
-            headerView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
+            // 头部区域 - 调整高度和布局
+            headerView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 16),
             headerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             headerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            headerView.heightAnchor.constraint(equalToConstant: 80),
-            
-            // 标题
-            titleLabel.topAnchor.constraint(equalTo: headerView.topAnchor),
-            titleLabel.leadingAnchor.constraint(equalTo: headerView.leadingAnchor),
-            titleLabel.trailingAnchor.constraint(equalTo: headerView.trailingAnchor),
-            titleLabel.heightAnchor.constraint(equalToConstant: 40),
+            headerView.heightAnchor.constraint(equalToConstant: 60),
             
             // 数量标签
-            countLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            countLabel.topAnchor.constraint(equalTo: headerView.topAnchor),
             countLabel.leadingAnchor.constraint(equalTo: headerView.leadingAnchor),
             countLabel.trailingAnchor.constraint(equalTo: headerView.trailingAnchor),
             countLabel.heightAnchor.constraint(equalToConstant: 24),
+            
+            // 提示标签
+            tipsLabel.topAnchor.constraint(equalTo: countLabel.bottomAnchor, constant: 8),
+            tipsLabel.leadingAnchor.constraint(equalTo: headerView.leadingAnchor),
+            tipsLabel.trailingAnchor.constraint(equalTo: headerView.trailingAnchor),
+            tipsLabel.heightAnchor.constraint(equalToConstant: 20),
             
             // 控制面板
             controlPanelView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 20),
@@ -337,19 +337,20 @@ class BatchImageEnhanceViewController: UIViewController {
     private func setupHeaderView() {
         headerView.backgroundColor = .clear
         
-        // 标题
-        titleLabel.font = ThemeManager.titleFont
-        titleLabel.textColor = .white
-        titleLabel.textAlignment = .center
-        titleLabel.text = "批量画质修复"
-        headerView.addSubview(titleLabel)
-        
-        // 数量标签
-        countLabel.font = ThemeManager.captionFont
-        countLabel.textColor = UIColor.white.withAlphaComponent(0.8)
+        // 数量标签 - 调整为更大字体
+        countLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
+        countLabel.textColor = .white
         countLabel.textAlignment = .center
         countLabel.text = "共 \(enhanceItems.count) 张图片，请选择需要修复的图片"
         headerView.addSubview(countLabel)
+        
+        // 提示标签 - 添加智能提示
+        tipsLabel.font = ThemeManager.captionFont
+        tipsLabel.textColor = UIColor.white.withAlphaComponent(0.7)
+        tipsLabel.textAlignment = .center
+        tipsLabel.text = "💡 想要不同修复强度？点击单个图片进入详细修复"
+        tipsLabel.numberOfLines = 2
+        headerView.addSubview(tipsLabel)
     }
     
     private func setupControlPanel() {
@@ -1189,6 +1190,11 @@ extension BatchImageEnhanceViewController {
         levelSegmentedControl.isHidden = false
         startButton.isHidden = false
         
+        // 重置开始按钮状态为正常可点击状态
+        startButton.setTitle("开始修复", for: .normal)
+        startButton.isEnabled = true
+        startButton.alpha = 1.0
+        
         // 隐藏处理相关按钮
         pauseButton.isHidden = true
         resetButton.isHidden = true
@@ -1206,14 +1212,21 @@ extension BatchImageEnhanceViewController {
         resetButton.isHidden = false
     }
     
-    /// 更新完成状态下的按钮显示
+    /// 更新完成状态下的按钮显示 - 保留部分控制元素
     private func updateButtonsForCompletedState() {
-        // 隐藏所有选择和处理按钮
-        selectModeButton.isHidden = true
-        levelSegmentedControl.isHidden = true
-        startButton.isHidden = true
+        // 隐藏处理相关按钮
         pauseButton.isHidden = true
         resetButton.isHidden = true
+        
+        // 保留选择和等级控制，允许用户重新修复
+        selectModeButton.isHidden = false
+        levelSegmentedControl.isHidden = false
+        startButton.isHidden = false
+        
+        // 更新开始按钮为不可点击的成功状态
+        startButton.setTitle("已成功修复！", for: .normal)
+        startButton.isEnabled = false
+        startButton.alpha = 0.6
         
         // 保存和分享按钮的显示由updateBottomButtonsForCompletion控制
     }
@@ -1286,8 +1299,15 @@ extension BatchImageEnhanceViewController: UICollectionViewDelegate {
         if item.processingState == .completed {
             showDetailView(for: item, at: indexPath.item)
         } else if !isProcessing {
-            // 未完成且非处理状态时，切换选择状态
-            toggleSelection(at: indexPath.item)
+            // 未完成且非处理状态时，进入单独修复
+            // 同时从选择列表中移除该图片（避免重复处理）
+            if selectedIndices.contains(indexPath.item) {
+                selectedIndices.remove(indexPath.item)
+                updateSelectionUI()
+            }
+            
+            // 进入单独修复页面
+            showDetailView(for: item, at: indexPath.item)
         }
         // 处理中的图片不响应点击
         
@@ -1652,9 +1672,14 @@ extension BatchImageEnhanceViewController {
         if selectedCount == 0 {
             statusLabel.text = "选择图片后点击开始修复"
             progressLabel.text = "当前等级：\(levelText)"
+            // 显示智能提示
+            tipsLabel.text = "💡 想要不同修复强度？点击单个图片进入详细修复"
+            tipsLabel.isHidden = false
         } else {
             statusLabel.text = "已选择 \(selectedCount) 张图片"
             progressLabel.text = "当前等级：\(levelText) | 共 \(totalCount) 张"
+            // 选择后隐藏提示，避免界面拥挤
+            tipsLabel.isHidden = true
         }
         
         overallProgressView.progress = 0.0
@@ -1697,6 +1722,9 @@ extension BatchImageEnhanceViewController {
             statusLabel.text = "已完成 \(completedItems)/\(selectedCount) 张图片"
         }
         
+        // 处理中隐藏提示信息，避免干扰
+        tipsLabel.isHidden = true
+        
         progressLabel.text = "\(Int(overallProgressView.progress * 100))%"
     }
     
@@ -1712,6 +1740,10 @@ extension BatchImageEnhanceViewController {
             statusLabel.text = "修复完成，有 \(failedItems) 张失败"
             progressLabel.text = "成功 \(completedItems) 张，失败 \(failedItems) 张"
         }
+        
+        // 完成状态显示不同的提示信息
+        tipsLabel.text = "✨ 点击已完成的图片可查看对比效果或重新修复"
+        tipsLabel.isHidden = false
         
         overallProgressView.progress = 1.0
     }

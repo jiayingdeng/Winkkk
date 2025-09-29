@@ -819,7 +819,7 @@ class VideoGalleryViewController: UIViewController {
                     switch result {
                     case .success:
                         print("✅ 视频成功导出到相册")
-                        self?.showSuccessAlert(message: "视频已成功导出到系统相册")
+                        self?.showVideoExportSuccessAlert()
                     case .failure(let error):
                         print("❌ 视频导出失败: \(error.localizedDescription)")
                         self?.showError(error)
@@ -841,6 +841,39 @@ class VideoGalleryViewController: UIViewController {
     
     private func showSuccessAlert(message: String) {
         showAlert(title: "成功", message: message)
+    }
+    
+    private func showVideoExportSuccessAlert() {
+        let message = """
+        视频已成功保存到系统相册！
+        
+        📍 查找位置：
+        • 打开"照片" App
+        • 查看"最近添加"相册
+        • 或查看"视频"分类
+        
+        💡 如果暂时看不到：
+        • 请稍等几秒钟让系统同步
+        • 可以尝试关闭并重新打开相册
+        • 确保您的设备有足够存储空间
+        """
+        
+        let alert = UIAlertController(title: "✅ 导出成功", message: message, preferredStyle: .alert)
+        
+        // 添加"打开相册"按钮
+        alert.addAction(UIAlertAction(title: "打开相册", style: .default) { _ in
+            if let photosURL = URL(string: "photos-redirect://") {
+                UIApplication.shared.open(photosURL, options: [:]) { success in
+                    if !success {
+                        // 如果photos-redirect://不可用，尝试其他方式
+                        print("无法直接打开相册App")
+                    }
+                }
+            }
+        })
+        
+        alert.addAction(UIAlertAction(title: "知道了", style: .default))
+        present(alert, animated: true)
     }
     
     private func confirmDeleteVideo(_ video: VideoItem) {
@@ -1850,15 +1883,6 @@ extension VideoGalleryViewController: UICollectionViewDelegate {
         present(alert, animated: true)
     }
     
-    private func showVideoExportSuccessAlert() {
-        let alert = UIAlertController(
-            title: "导出成功",
-            message: "视频已成功导出到系统相册",
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "确定", style: .default))
-        present(alert, animated: true)
-    }
     
     private func showVideoExportErrorAlert(_ error: Error) {
         // 使用统一的错误处理方法
@@ -1984,6 +2008,9 @@ extension VideoGalleryViewController: NSFetchedResultsControllerDelegate {
                 return
             }
             
+            // 检查是否有新增的视频（用户导入操作）
+            let previousCount = self.videos.count
+            
             // 🚀 立即过滤掉文件不存在的视频，避免UI闪烁
             let validVideos = fetchedObjects.filter { video in
                 let exists = FileManager.default.fileExists(atPath: video.filePath.path)
@@ -1996,8 +2023,15 @@ extension VideoGalleryViewController: NSFetchedResultsControllerDelegate {
             self.videos = validVideos
             self.applyCurrentFilters()
             
-            // 使用防抖机制，避免频繁更新UI
-            self.scheduleUIUpdate()
+            // 🎯 关键修复：如果是新增视频（导入操作），立即更新UI
+            let currentCount = self.videos.count
+            if currentCount > previousCount {
+                print("📱 VideoGallery: 检测到新增视频，立即更新UI")
+                self.updateUI()
+            } else {
+                // 其他情况（如清理操作）使用防抖机制
+                self.scheduleUIUpdate()
+            }
         }
     }
     

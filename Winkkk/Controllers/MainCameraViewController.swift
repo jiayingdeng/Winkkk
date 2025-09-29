@@ -59,7 +59,27 @@ class MainCameraViewController: UIViewController {
         configureTheme()
         setupNotificationObservers()
         
+        // 🆕 主动预热录制系统
+        preWarmRecordingSystem()
+        
         // 触感反馈管理器已在单例初始化时准备好
+    }
+    
+    // 🆕 预热录制系统，减少首次录制延迟
+    private func preWarmRecordingSystem() {
+        print("🔥 MainCameraViewController: 开始预热录制系统")
+        
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let self = self else { return }
+            
+            // 1. 预检查设备性能并调整录制质量
+            self.optimizeRecordingQualityForDevice()
+            
+            // 2. 延迟预热，避免阻塞UI
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                self.performRecordingSystemPreCheck()
+            }
+        }
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -87,6 +107,64 @@ class MainCameraViewController: UIViewController {
     
     override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation {
         return .fade
+    }
+    
+    // MARK: - Recording System Optimization
+    
+    // 🆕 根据设备性能优化录制质量
+    private func optimizeRecordingQualityForDevice() {
+        let videoManager = VideoManager.shared
+        let diagnostics = videoManager.getPerformanceDiagnostics()
+        
+        print("📊 设备性能诊断:")
+        print("   - 性能等级: \(diagnostics.devicePerformanceLevel.displayName)")
+        print("   - 推荐质量: \(diagnostics.recommendedQuality.displayName)")
+        print("   - 温度状态: \(diagnostics.thermalState.displayName)")
+        print("   - 内存压力: \(diagnostics.currentMemoryStatus.memoryPressure.displayName)")
+        
+        // 🎯 如果当前设置的质量过高，自动降级
+        let currentQuality = videoManager.currentVideoQuality
+        let recommendedQuality = diagnostics.recommendedQuality
+        
+        if currentQuality != recommendedQuality {
+            print("⚡️ 检测到当前质量(\(currentQuality.displayName))高于推荐质量，自动降级到\(recommendedQuality.displayName)")
+            videoManager.currentVideoQuality = recommendedQuality
+            
+            // 🚀 使用新的动态调整功能立即应用质量变更
+            DispatchQueue.main.async { [weak self] in
+                self?.cameraManager.adjustRecordingQuality(to: recommendedQuality)
+            }
+        }
+    }
+    
+    // 🆕 执行录制系统预检查
+    private func performRecordingSystemPreCheck() {
+        print("🔍 MainCameraViewController: 执行录制系统预检查")
+        
+        // 1. 检查相机管理器状态
+        let cameraReady = cameraManager.isReadyForRecording
+        print("   - 相机管理器就绪: \(cameraReady ? "✅" : "❌")")
+        
+        // 2. 检查存储空间
+        let freeSpace = FileManagerHelper.getAvailableSpaceInGB()
+        let hasEnoughSpace = freeSpace > 1.0 // 至少1GB
+        print("   - 可用存储空间: \(String(format: "%.1f", freeSpace))GB \(hasEnoughSpace ? "✅" : "❌")")
+        
+        // 3. 检查性能状态
+        let diagnostics = VideoManager.shared.getPerformanceDiagnostics()
+        let performanceOK = !diagnostics.hasCriticalIssues
+        print("   - 性能状态: \(performanceOK ? "✅" : "⚠️ 有问题")")
+        
+        // 🎯 如果有问题，预先准备解决方案
+        if !hasEnoughSpace {
+            print("⚠️ 存储空间不足，建议用户清理空间")
+        }
+        
+        if !performanceOK && diagnostics.thermalState == .critical {
+            print("🌡️ 设备温度过高，录制质量将自动降级")
+        }
+        
+        print("🏁 录制系统预检查完成")
     }
     
     
@@ -672,21 +750,182 @@ extension MainCameraViewController {
     private func startRecording() {
         guard !isRecording else { return }
         
+        // 🚀 智能录制启动：先执行快速预检查和优化
+        performQuickRecordingCheck { [weak self] canProceed in
+            guard let self = self else { return }
+            
+            if !canProceed {
+                print("❌ 快速预检查未通过，无法开始录制")
+                return
+            }
+            
+            // 🔧 修复：添加录制就绪状态检查
+            guard self.cameraManager.isReadyForRecording else {
+                print("⚠️ 相机管理器尚未准备好录制，尝试智能等待...")
+                
+                // 🆕 智能等待和重试机制
+                self.attemptRecordingWithSmartRetry()
+                return
+            }
+
+            self.cameraManager.startRecording { [weak self] result in
+                DispatchQueue.main.async {
+                    switch result {
+                    case .success:
+                        self?.isRecording = true
+                        self?.startRecordingTimer()
+                        
+                        // 触觉反馈
+                        self?.hapticManager.recordingStart()
+                        
+                    case .failure(let error):
+                        // 🔧 改进：提供更友好的错误处理
+                        print("❌ 录制启动失败: \(error.localizedDescription)")
+                        self?.handleRecordingStartFailure(error: error)
+                    }
+                }
+            }
+        }
+    }
+    
+    // 🆕 快速录制前检查
+    private func performQuickRecordingCheck(completion: @escaping (Bool) -> Void) {
+        // 1. 检查存储空间
+        let freeSpace = FileManagerHelper.getAvailableSpaceInGB()
+        if freeSpace < 0.5 { // 少于500MB
+            showStorageWarningAlert()
+            completion(false)
+            return
+        }
+        
+        // 2. 检查设备性能状态
+        let diagnostics = VideoManager.shared.getPerformanceDiagnostics()
+        if diagnostics.hasCriticalIssues {
+            // 自动降级质量以确保录制成功
+            print("⚡️ 检测到性能问题，自动调整录制质量")
+            let recommendedQuality = diagnostics.recommendedQuality
+            VideoManager.shared.currentVideoQuality = recommendedQuality
+            
+            // 立即应用质量调整
+            cameraManager.adjustRecordingQuality(to: recommendedQuality)
+        }
+        
+        completion(true)
+    }
+    
+    // 🆕 智能等待和重试录制
+    private func attemptRecordingWithSmartRetry() {
+        print("🔄 开始智能重试录制...")
+        
+        // 显示更友好的加载提示
+        let loadingAlert = UIAlertController(
+            title: "准备录制中",
+            message: "正在优化相机设置，请稍候...",
+            preferredStyle: .alert
+        )
+        present(loadingAlert, animated: true)
+        
+        // 给相机更多时间初始化，同时重置状态
+        cameraManager.resetRecordingState()
+        
+        // 延迟重试
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+            guard let self = self else { return }
+            
+            loadingAlert.dismiss(animated: true) {
+                if self.cameraManager.isReadyForRecording {
+                    print("✅ 智能重试成功，开始录制")
+                    self.startRecording()
+                } else {
+                    print("❌ 智能重试失败")
+                    self.showRecordingFailedAlert()
+                }
+            }
+        }
+    }
+    
+    // 🆕 存储空间不足警告
+    private func showStorageWarningAlert() {
+        let alert = UIAlertController(
+            title: "存储空间不足",
+            message: "设备存储空间不足，可能影响录制质量。建议清理空间后再试。",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "继续录制", style: .default) { [weak self] _ in
+            // 降级到最低质量继续录制
+            VideoManager.shared.currentVideoQuality = .low
+            self?.performActualRecording()
+        })
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel) { [weak self] _ in
+            self?.hapticManager.notificationError()
+        })
+        
+        present(alert, animated: true)
+    }
+    
+    // 🆕 录制最终失败的提示
+    private func showRecordingFailedAlert() {
+        let alert = UIAlertController(
+            title: "录制准备失败",
+            message: "相机系统可能需要更多时间初始化。请稍后再试，或重启应用。",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "稍后重试", style: .default) { [weak self] _ in
+            self?.hapticManager.buttonTap()
+        })
+        
+        alert.addAction(UIAlertAction(title: "确定", style: .cancel))
+        
+        present(alert, animated: true)
+        hapticManager.notificationError()
+    }
+    
+    // 🆕 执行实际录制（跳过检查）
+    private func performActualRecording() {
         cameraManager.startRecording { [weak self] result in
             DispatchQueue.main.async {
                 switch result {
                 case .success:
                     self?.isRecording = true
                     self?.startRecordingTimer()
-                    
-                    // 触觉反馈
                     self?.hapticManager.recordingStart()
                     
                 case .failure(let error):
-                    self?.showError(error)
+                    print("❌ 强制录制也失败: \(error.localizedDescription)")
+                    self?.handleRecordingStartFailure(error: error)
                 }
             }
         }
+    }
+    
+    // 🆕 处理录制启动失败的专门方法
+    private func handleRecordingStartFailure(error: Error) {
+        // 检查是否是初始化问题
+        if let cameraError = error as? CameraError,
+           case .outputSetupFailed = cameraError {
+            
+            let alert = UIAlertController(
+                title: "录制启动失败",
+                message: "相机组件还在初始化中，请稍等几秒后重试",
+                preferredStyle: .alert
+            )
+            alert.addAction(UIAlertAction(title: "确定", style: .default))
+            present(alert, animated: true)
+            
+            // 提供重试选项
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+                self?.hapticManager.buttonTap() // 轻微提示用户可以重试
+            }
+        } else {
+            // 其他类型的错误使用原有处理方式
+            showError(error)
+        }
+        
+        // 错误触觉反馈
+        hapticManager.notificationError()
     }
     
     private func stopRecording() {

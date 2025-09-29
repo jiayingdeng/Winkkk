@@ -161,6 +161,50 @@ extension PersistenceController {
         save()
         return videoItem
     }
+
+    /// 在指定上下文中创建新的视频项目 (修复跨上下文问题)
+    func createVideoItem(
+        in context: NSManagedObjectContext,
+        fileName: String,
+        filePath: URL,
+        duration: Double,
+        isFromCamera: Bool,
+        width: Int32,
+        height: Int32,
+        fileSize: Int64,
+        thumbnailPath: URL? = nil,
+        videoSource: String? = nil,
+        exportStatus: String? = nil
+    ) -> VideoItem {
+        let videoItem = VideoItem(context: context)
+        
+        videoItem.id = UUID()
+        videoItem.fileName = fileName
+        videoItem.filePath = filePath
+        videoItem.duration = duration
+        videoItem.createdDate = Date()
+        videoItem.isFromCamera = isFromCamera
+        videoItem.width = width
+        videoItem.height = height
+        videoItem.fileSize = fileSize
+        videoItem.thumbnailPath = thumbnailPath
+        
+        // 设置新字段的默认值
+        videoItem.videoSource = videoSource ?? (isFromCamera ? VideoSourceType.appRecorded.rawValue : VideoSourceType.systemImported.rawValue)
+        videoItem.exportStatus = exportStatus ?? (isFromCamera ? ExportStatusType.pending.rawValue : ExportStatusType.exported.rawValue)
+        
+        // 在指定上下文中保存
+        if context.hasChanges {
+            do {
+                try context.save()
+                print("✅ PersistenceController: VideoItem已在指定上下文中保存")
+            } catch {
+                print("❌ PersistenceController: 保存VideoItem失败: \(error)")
+            }
+        }
+        
+        return videoItem
+    }
     
     /// 创建新的截图项目
     func createScreenshotItem(

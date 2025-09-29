@@ -8,6 +8,7 @@
 
 import AVFoundation
 import UIKit
+import Foundation
 
 // MARK: - CameraManagerDelegate Protocol
 protocol CameraManagerDelegate: AnyObject {
@@ -37,6 +38,14 @@ class CameraManager: NSObject {
     // 录制状态
     private var isRecording = false
     private var recordingCompletion: ((Result<URL, Error>) -> Void)?
+    
+    // 🆕 录制就绪状态
+    private var _isReadyForRecording = false
+    var isReadyForRecording: Bool {
+        return _isReadyForRecording && 
+               captureSession.isRunning && 
+               movieFileOutput != nil
+    }
     
     // 设备性能配置
     private let devicePerformance = DeviceInfo.performanceLevel
@@ -101,11 +110,65 @@ class CameraManager: NSObject {
             if !self.captureSession.isRunning {
                 self.captureSession.startRunning()
                 
+                // 🆕 快速启动录制准备
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                    self?.performFastRecordingPreparation()
+                }
+                
                 DispatchQueue.main.async {
                     self.delegate?.cameraManagerDidStartSession()
                 }
             }
         }
+    }
+    
+    // 🆕 快速录制准备
+    private func performFastRecordingPreparation() {
+        print("⚡️ CameraManager: 开始快速录制准备")
+        
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self = self else { return }
+            
+            // 1. 确保movieFileOutput完全准备就绪
+            if let movieOutput = self.movieFileOutput {
+                // 检查输出连接状态
+                let videoConnection = movieOutput.connection(with: .video)
+                let audioConnection = movieOutput.connection(with: .audio)
+                
+                print("   - 视频连接状态: \(videoConnection?.isActive == true ? "✅" : "❌")")
+                print("   - 音频连接状态: \(audioConnection?.isActive == true ? "✅" : "❌")")
+                
+                // 2. 预热录制系统
+                if let videoDevice = self.videoDeviceInput?.device {
+                    // 检查设备状态
+                    print("   - 当前设备: \(videoDevice.localizedName)")
+                    print("   - 设备就绪: \(videoDevice.isConnected ? "✅" : "❌")")
+                }
+                
+                // 3. 加速标记录制就绪状态（如果所有条件都满足）
+                DispatchQueue.main.async {
+                    if !self._isReadyForRecording && 
+                       self.captureSession.isRunning &&
+                       videoConnection?.isActive == true {
+                        
+                        // 减少延迟，更快地标记为就绪
+                        self._isReadyForRecording = true
+                        print("🚀 CameraManager: 快速录制准备完成！")
+                    } else if !self._isReadyForRecording {
+                        // 如果还没就绪，给一点额外时间
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                            guard let self = self else { return }
+                            if self.captureSession.isRunning && movieOutput.connections.count > 0 {
+                                self._isReadyForRecording = true
+                                print("🎬 CameraManager: 延迟录制准备完成")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        sessionQueue.async(execute: workItem)
     }
     
     func stopSession() {
@@ -151,6 +214,12 @@ class CameraManager: NSObject {
         }
         
         isSessionConfigured = true
+        
+        // 🆕 延迟标记录制就绪状态，确保所有组件完全初始化
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?._isReadyForRecording = true
+            print("✅ CameraManager: 录制系统已就绪")
+        }
     }
     
     private func configureSessionPreset() {
@@ -351,8 +420,67 @@ class CameraManager: NSObject {
     }
     
     private func handleConfigurationError(_ error: CameraError) {
+        // 🔧 配置失败时重置录制就绪状态
+        _isReadyForRecording = false
+        
         DispatchQueue.main.async { [weak self] in
             self?.delegate?.cameraManager(self!, didFailWithError: error)
+        }
+    }
+    
+    // 🆕 重置录制状态的方法（用于重新初始化）
+    func resetRecordingState() {
+        _isReadyForRecording = false
+        print("🔄 CameraManager: 录制状态已重置")
+        
+        // 重新检查并准备录制系统
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.performFastRecordingPreparation()
+        }
+    }
+    
+    // 🆕 动态调整录制质量（用于性能优化）
+    func adjustRecordingQuality(to quality: VideoQuality) {
+        print("🎚️ CameraManager: 动态调整录制质量到 \(quality.displayName)")
+        
+        sessionQueue.async { [weak self] in
+            guard let self = self else { return }
+            
+            // 暂时标记为未就绪，防止在调整过程中开始录制
+            self._isReadyForRecording = false
+            
+            // 重新配置会话预设以适应新的质量设置
+            self.captureSession.beginConfiguration()
+            
+            // 根据新质量调整会话预设
+            let newPreset = self.getSessionPresetForQuality(quality)
+            if self.captureSession.canSetSessionPreset(newPreset) {
+                self.captureSession.sessionPreset = newPreset
+                print("✅ 会话预设已调整为: \(newPreset.rawValue)")
+            }
+            
+            self.captureSession.commitConfiguration()
+            
+            // 快速重新准备录制
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                self?.performFastRecordingPreparation()
+            }
+        }
+    }
+    
+    // 🆕 根据VideoQuality获取对应的会话预设
+    private func getSessionPresetForQuality(_ quality: VideoQuality) -> AVCaptureSession.Preset {
+        switch quality {
+        case .high:
+            if DeviceInfo.performanceLevel == .ultra {
+                return .hd4K3840x2160
+            } else {
+                return .hd1920x1080
+            }
+        case .medium:
+            return .hd1280x720
+        case .low:
+            return .medium
         }
     }
 }

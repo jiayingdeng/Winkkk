@@ -608,5 +608,17 @@ struct FileManagerHelper {
         
         return size
     }
+    
+    /// 获取可用存储空间(GB)
+    static func getAvailableSpaceInGB() -> Double {
+        guard let attributes = try? FileManager.default.attributesOfFileSystem(forPath: NSHomeDirectory()),
+              let freeSpace = attributes[.systemFreeSize] as? Int64 else {
+            return 0.0
+        }
+        
+        // 转换为GB (1GB = 1024^3 bytes)
+        let gbSpace = Double(freeSpace) / (1024.0 * 1024.0 * 1024.0)
+        return gbSpace
+    }
 }
 

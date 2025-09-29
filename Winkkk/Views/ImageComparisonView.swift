@@ -470,6 +470,22 @@ extension ImageComparisonView {
         }
     }
     
+    /// 重置到显示完整原图（用于清除修复后图片时）
+    func resetToOriginalImage() {
+        enhancedImage = nil
+        enhancedImageView.image = nil
+        
+        UIView.animate(withDuration: 0.5, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5, animations: {
+            self.enhancedImageView.alpha = 0.0
+            self.enhancedLabel.alpha = 0.0
+            self.instructionLabel.alpha = 0.0
+            self.dividerPosition = 1.0  // 显示完整原图
+        }) { _ in
+            // 动画完成后更新阴影
+            self.updateSliderHandleShadow()
+        }
+    }
+    
     /// 显示完整的原始图像
     func showOriginalImage() {
         UIView.animate(withDuration: 0.3) {

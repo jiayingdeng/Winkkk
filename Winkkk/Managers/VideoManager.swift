@@ -151,6 +151,7 @@ class VideoManager: NSObject {
                 for video in allVideos {
                     if !self.fileManager.fileExists(atPath: video.filePath.path) {
                         print("🗑️ 删除孤儿记录: \(video.fileName)")
+                        // ✅ 这里的video对象已经是从backgroundContext获取的，所以是安全的
                         self.backgroundContext.delete(video)
                         deletedCount += 1
                     }
@@ -217,8 +218,9 @@ class VideoManager: NSObject {
                     return
                 }
                 
-                // 创建数据库记录
+                // 创建数据库记录 (使用后台上下文，修复跨上下文问题)
                 let videoItem = self.persistenceController.createVideoItem(
+                    in: self.backgroundContext,
                     fileName: fileName,
                     filePath: destinationURL,
                     duration: videoInfo.duration,
@@ -264,8 +266,9 @@ class VideoManager: NSObject {
                 // 获取视频信息
                 let videoInfo = try self.extractVideoInfo(from: destinationURL)
                 
-                // 创建数据库记录
+                // 创建数据库记录 (使用后台上下文，修复跨上下文问题)
                 let videoItem = self.persistenceController.createVideoItem(
+                    in: self.backgroundContext,
                     fileName: fileName,
                     filePath: destinationURL,
                     duration: videoInfo.duration,
@@ -296,30 +299,56 @@ class VideoManager: NSObject {
     
     // MARK: - Video Deletion
     func deleteVideo(_ videoItem: VideoItem, completion: @escaping (Result<Void, Error>) -> Void) {
+        // 🔧 修复Core Data上下文错误 - 获取objectID以在后台context中重新获取对象
+        let objectID = videoItem.objectID
+        let filePath = videoItem.filePath
+        let thumbnailPath = videoItem.thumbnailPath
+        let fileName = videoItem.fileName
+        
+        print("🗑️ 开始删除视频: \(fileName)")
+        print("   - Object ID: \(objectID)")
+        print("   - 来源Context: \(videoItem.managedObjectContext == PersistenceController.shared.container.viewContext ? "主Context" : "其他Context")")
+        
         backgroundContext.perform { [weak self] in
             guard let self = self else { return }
             
             do {
+                // 🎯 关键修复：在backgroundContext中重新获取VideoItem对象
+                guard let videoItemInBackgroundContext = try? self.backgroundContext.existingObject(with: objectID) as? VideoItem else {
+                    print("⚠️ 无法在后台Context中找到VideoItem对象，可能已被删除")
+                    DispatchQueue.main.async {
+                        completion(.success(())) // 对象已不存在，视为删除成功
+                    }
+                    return
+                }
+                
+                print("✅ 在后台Context中成功获取VideoItem对象")
+                
                 // 删除视频文件
-                if self.fileManager.fileExists(atPath: videoItem.filePath.path) {
-                    try self.fileManager.removeItem(at: videoItem.filePath)
+                if self.fileManager.fileExists(atPath: filePath.path) {
+                    try self.fileManager.removeItem(at: filePath)
+                    print("✅ 视频文件删除成功: \(filePath.path)")
                 }
                 
                 // 删除缩略图文件
-                if let thumbnailPath = videoItem.thumbnailPath,
+                if let thumbnailPath = thumbnailPath,
                    self.fileManager.fileExists(atPath: thumbnailPath.path) {
                     try self.fileManager.removeItem(at: thumbnailPath)
+                    print("✅ 缩略图文件删除成功: \(thumbnailPath.path)")
                 }
                 
-                // 删除数据库记录
-                self.backgroundContext.delete(videoItem)
+                // 🎯 现在安全删除数据库记录 - 使用正确的Context对象
+                self.backgroundContext.delete(videoItemInBackgroundContext)
                 try self.backgroundContext.save()
+                
+                print("✅ 视频删除完成: \(fileName)")
                 
                 DispatchQueue.main.async {
                     completion(.success(()))
                 }
                 
             } catch {
+                print("❌ 视频删除失败: \(fileName) - \(error.localizedDescription)")
                 DispatchQueue.main.async {
                     completion(.failure(error))
                 }
@@ -466,6 +495,7 @@ class VideoManager: NSObject {
                     if !self.fileManager.fileExists(atPath: videoItem.filePath.path) {
                         deletedVideoCount += 1
                         deletedVideoSize += videoItem.fileSize
+                        // ✅ 这里的videoItem对象已经是从backgroundContext获取的，所以是安全的
                         self.backgroundContext.delete(videoItem)
                     }
                 }
@@ -585,11 +615,25 @@ class VideoManager: NSObject {
         try validateVideoForExport(at: videoURL)
         
         return try await withCheckedThrowingContinuation { continuation in
+            var changeRequest: PHAssetChangeRequest?
+            
             PHPhotoLibrary.shared().performChanges({
-                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: videoURL)
+                changeRequest = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: videoURL)
+                
+                // 添加详细日志用于诊断
+                print("📤 正在执行视频导出操作")
+                print("   - 文件路径: \(videoURL.path)")
+                print("   - 文件大小: \(ByteCountFormatter.string(fromByteCount: Int64(videoURL.fileSize), countStyle: .file))")
+                print("   - 视频格式: \(videoURL.pathExtension.uppercased())")
+                
             }) { success, error in
                 if success {
+                    // 添加更详细的成功反馈
                     print("✅ 视频导出成功: \(video.fileName)")
+                    print("💡 提示：新导出的视频可能需要几秒钟时间在相册中显示")
+                    print("   - 请查看相册的「最近添加」或「视频」分类")
+                    print("   - 如果仍未显示，请稍等片刻或重启相册App")
+                    
                     continuation.resume()
                 } else {
                     // 根据具体错误类型返回更准确的错误信息
@@ -688,17 +732,31 @@ class VideoManager: NSObject {
         if #available(iOS 14.0, *) {
             let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
             
+            // 添加详细的权限状态日志
+            print("📋 检查相册权限状态:")
             switch status {
-            case .authorized, .limited:
+            case .authorized:
+                print("   - 状态: 已授权 (完全访问)")
                 return
-            case .denied, .restricted:
+            case .limited:
+                print("   - 状态: 已授权 (有限访问)")
+                print("   - 说明: 可以保存到相册，但可能不会立即在所有位置显示")
+                return
+            case .denied:
+                print("   - 状态: 已拒绝")
+                throw VideoManagerError.exportPermissionDenied
+            case .restricted:
+                print("   - 状态: 受限制")
                 throw VideoManagerError.exportPermissionDenied
             case .notDetermined:
+                print("   - 状态: 未确定，正在请求权限...")
                 let newStatus = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+                print("   - 用户选择: \(newStatus == .authorized ? "已授权" : newStatus == .limited ? "有限访问" : "拒绝")")
                 if newStatus != .authorized && newStatus != .limited {
                     throw VideoManagerError.exportPermissionDenied
                 }
             @unknown default:
+                print("   - 状态: 未知状态")
                 throw VideoManagerError.exportPermissionDenied
             }
         } else {
