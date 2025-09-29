@@ -554,7 +554,7 @@ class TimelineView: UIView {
         if duration > 0 {
             let actualVideoWidth = getActualVideoWidth()
             timeToPixelRatio = Double(actualVideoWidth) / duration
-            print("🎯 [简化] 内容更新: duration=\(duration.formattedTimeString()), videoWidth=\(Int(actualVideoWidth))px, 比例=\(String(format: "%.1f", timeToPixelRatio))px/s")
+            // 内容更新调试日志已优化
         }
     }
     
@@ -586,8 +586,7 @@ class TimelineView: UIView {
         let captureTime = coordinateToTime(absoluteX)
         let clampedTime = max(0, min(duration, captureTime))  // 限制在有效范围内
         
-        print("🔍 DEBUG-P4: getCurrentCaptureTime - timelineCenter=\(timelineCenter), contentOffset.x=\(scrollView.contentOffset.x)")
-        print("🔍 DEBUG-P4: getCurrentCaptureTime - absoluteX=\(absoluteX), captureTime=\(captureTime), clampedTime=\(clampedTime)")
+        // 调试日志已移除以提升性能
         
         // 🎯 帧级别精度：在高缩放时对齐到帧边界
         if currentTimeResolution == .frames && zoomScale >= 4.0 {
@@ -625,7 +624,7 @@ class TimelineView: UIView {
         let validMin = minScrollOffset  // 允许负偏移，确保视频开头能到达中心竖线
         let validMax = max(validMin, maxScrollOffset)
         
-        print("🎯 [简化] 滚动边界: 0秒@\(Int(timeZeroCoordinate))px, \(duration.formattedTimeString())@\(Int(timeDurationCoordinate))px, 中心@\(Int(centerX))px")
+        // 滚动边界调试日志已优化
         
         return (min: validMin, max: validMax)
     }
@@ -643,7 +642,7 @@ class TimelineView: UIView {
         let scrollRange = getValidScrollRange()
         let clampedOffset = max(scrollRange.min, min(scrollRange.max, scrollOffsetX))
         
-        print("🎯 [粉色轴] 滚动到\(time.formattedTimeString()): 目标@\(Int(targetX))px, 中心@\(Int(centerX))px, 偏移\(Int(clampedOffset))")
+        // 滚动定位调试日志已优化
         
         scrollView.setContentOffset(CGPoint(x: clampedOffset, y: 0), animated: true)
         
@@ -767,89 +766,105 @@ class TimelineView: UIView {
     }
     
     // MARK: - Time Scale Generation
+    private var lastVisibleRange: (start: CGFloat, end: CGFloat) = (0, 0)
+    private var lastScaleUpdateTime: TimeInterval = 0
+    private let scaleUpdateThreshold: TimeInterval = 0.1 // 最小更新间隔
+    
     private func generateTimeScale() {
-        // 🎯 第1步：清空旧的刻度图层
-        timeScaleView.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
+        // 🎯 性能优化：限制更新频率
+        let currentMediaTime = CACurrentMediaTime()
+        if currentMediaTime - lastScaleUpdateTime < scaleUpdateThreshold {
+            return
+        }
+        lastScaleUpdateTime = currentMediaTime
         
         guard duration > 0, bounds.width > 0 else { return }
         
-        // 🎯 第2步：确定需要绘制的可见时间范围
+        // 🎯 确定需要绘制的可见时间范围
         let visibleStartOffset = scrollView.contentOffset.x
         let visibleEndOffset = visibleStartOffset + scrollView.bounds.width
+        
+        // 🎯 性能优化：只有可见范围明显变化时才重新绘制
+        let rangeDiff = abs(visibleStartOffset - lastVisibleRange.start) + abs(visibleEndOffset - lastVisibleRange.end)
+        if rangeDiff < bounds.width * 0.1 {
+            return  // 变化幅度小于10%，跳过更新
+        }
+        lastVisibleRange = (visibleStartOffset, visibleEndOffset)
+        
+        // 清空旧的刻度图层
+        timeScaleView.layer.sublayers?.forEach { $0.removeFromSuperlayer() }
         
         // 🎯 修复：正确计算可见时间范围，确保不会因为padding产生负时间
         let startTime = max(0, coordinateToTime(visibleStartOffset))
         let endTime = min(duration, coordinateToTime(visibleEndOffset))
         
-        // 🎯 第3步：获取刻度间隔
+        // 🎯 获取刻度间隔
         let interval = getCurrentTimeInterval()
         
         var tickCount = 0
         
-        // 🎯 **核心修复：关键时间点优先绘制机制**
-        // 步骤A：强制绘制0秒刻度（如果在可见范围内）
+        // 🎯 关键时间点优先绘制 - 修复：不裁剪坐标位置
         let zeroAbsoluteX = timeToCoordinate(0)
         let zeroRelativeX = zeroAbsoluteX - scrollView.contentOffset.x
-        if zeroRelativeX >= 0 && zeroRelativeX <= timeScaleView.bounds.width {
+        if zeroRelativeX >= -10 && zeroRelativeX <= timeScaleView.bounds.width + 10 {
+            // ✅ 修复：使用真实坐标位置，不进行裁剪
             drawTickMark(at: zeroRelativeX, for: 0, interval: interval)
             tickCount += 1
-            print("🎯 [强制] 起点刻度: 00:00@\(Int(zeroAbsoluteX))px")
         }
         
-        // 步骤B：强制绘制结尾秒刻度（如果在可见范围内）
+        // 强制绘制结尾刻度 - 修复：不裁剪坐标位置
         let endAbsoluteX = timeToCoordinate(duration)
         let endRelativeX = endAbsoluteX - scrollView.contentOffset.x
-        if endRelativeX >= 0 && endRelativeX <= timeScaleView.bounds.width {
+        if endRelativeX >= -10 && endRelativeX <= timeScaleView.bounds.width + 10 {
+            // ✅ 修复：使用真实坐标位置，不进行裁剪
             drawTickMark(at: endRelativeX, for: duration, interval: interval)
             tickCount += 1
-            print("🎯 [强制] 终点刻度: \(duration.formattedTimeString())@\(Int(endAbsoluteX))px")
         }
         
-        // 🎯 第4步：绘制中间的间隔刻度
-        // 修复：从最接近startTime但不小于0的间隔点开始
-        var currentTime = max(0, floor(startTime / interval) * interval)
+        // 🎯 绘制中间的间隔刻度
+        var tickTime = max(0, floor(startTime / interval) * interval)
         
-        // 使用精度容差避免浮点数比较问题
         let epsilon = 0.001
-        while currentTime <= endTime + epsilon && currentTime <= duration + epsilon {
-            // 跳过已经绘制的关键时间点，避免重复绘制
-            let isZeroTick = abs(currentTime - 0) < epsilon
-            let isEndTick = abs(currentTime - duration) < epsilon
+        while tickTime <= endTime + epsilon && tickTime <= duration + epsilon {
+            let isZeroTick = abs(tickTime - 0) < epsilon
+            let isEndTick = abs(tickTime - duration) < epsilon
             
             if !isZeroTick && !isEndTick {
-                // 将时间转换为contentView中的绝对X坐标
-                let absoluteX = timeToCoordinate(currentTime)
-                
-                // 转换为相对于timeScaleView的本地X坐标
+                let absoluteX = timeToCoordinate(tickTime)
                 let relativeX = absoluteX - scrollView.contentOffset.x
                 
-                // 只绘制在timeScaleView范围内的刻度
-                if relativeX >= 0 && relativeX <= timeScaleView.bounds.width {
-                    drawTickMark(at: relativeX, for: currentTime, interval: interval)
+                // 扩展绘制范围，减少边界闪烁
+                if relativeX >= -10 && relativeX <= timeScaleView.bounds.width + 10 {
+                    // ✅ 修复：使用真实坐标位置，不进行裁剪
+                    drawTickMark(at: relativeX, for: tickTime, interval: interval)
                     tickCount += 1
                 }
             }
             
-            currentTime += interval
+            tickTime += interval
         }
         
-        print("🎯 [修复] 刻度更新: \(tickCount)个刻度, 时间范围\(startTime.formattedTimeString())-\(endTime.formattedTimeString())")
+        // 刻度生成完成，已优化坐标计算逻辑
     }
     
     /// 绘制单个刻度线和文字
     private func drawTickMark(at x: CGFloat, for time: Double, interval: Double) {
         let isMainTick = shouldDrawTimeLabel(for: time, interval: interval)
         
-        // 绘制刻度线
-        let tickLayer = CALayer()
-        tickLayer.backgroundColor = UIColor.white.withAlphaComponent(0.6).cgColor
-        tickLayer.frame = CGRect(
-            x: x - 0.5,
-            y: timeScaleView.bounds.height - (isMainTick ? 12 : 8),
-            width: 1,
-            height: isMainTick ? 12 : 8
-        )
-        timeScaleView.layer.addSublayer(tickLayer)
+        // ✅ 修复：只在刻度线可见范围内绘制
+        let tickX = x - 0.5
+        if tickX >= -1 && tickX <= timeScaleView.bounds.width + 1 {
+            // 绘制刻度线
+            let tickLayer = CALayer()
+            tickLayer.backgroundColor = UIColor.white.withAlphaComponent(0.6).cgColor
+            tickLayer.frame = CGRect(
+                x: tickX,
+                y: timeScaleView.bounds.height - (isMainTick ? 12 : 8),
+                width: 1,
+                height: isMainTick ? 12 : 8
+            )
+            timeScaleView.layer.addSublayer(tickLayer)
+        }
         
         // 只在主刻度位置绘制时间文字
         if isMainTick {
@@ -866,20 +881,21 @@ class TimelineView: UIView {
                 .font: UIFont.systemFont(ofSize: 11, weight: .medium)
             ]) ?? CGSize(width: 40, height: 12)
             
-            // 🎯 添加边界检查，防止文字溢出屏幕边界
+            // ✅ 修复：文字位置只有在完全可见时才绘制，否则跳过
             let halfTextWidth = textSize.width / 2
-            let minX = halfTextWidth  // 左边界
-            let maxX = timeScaleView.bounds.width - halfTextWidth  // 右边界
-            let clampedX = max(minX, min(maxX, x))  // 限制在有效范围内
+            let textLeftEdge = x - halfTextWidth
+            let textRightEdge = x + halfTextWidth
             
-            textLayer.frame = CGRect(
-                x: clampedX - halfTextWidth,
-                y: 2,
-                width: textSize.width,
-                height: textSize.height
-            )
-            
-            timeScaleView.layer.addSublayer(textLayer)
+            // 只有文字完全在可见范围内才绘制
+            if textLeftEdge >= 0 && textRightEdge <= timeScaleView.bounds.width {
+                textLayer.frame = CGRect(
+                    x: textLeftEdge,
+                    y: 2,
+                    width: textSize.width,
+                    height: textSize.height
+                )
+                timeScaleView.layer.addSublayer(textLayer)
+            }
         }
     }
     
@@ -1606,5 +1622,20 @@ extension TimelineView {
             return .adjustable
         }
         set { }
+    }
+    
+    // MARK: - External Updates
+    /// 处理边界变化，重新计算布局和内容尺寸
+    func handleBoundsChange() {
+        // ✅ 修复：当TimelineView宽度发生变化时，重新计算所有依赖于bounds的值
+        DispatchQueue.main.async { [weak self] in
+            self?.updateContentSize()
+            self?.generateTimeScale()
+            
+            // 如果是Live Photo模式，更新范围位置
+            if self?.isLivePhotoMode == true {
+                self?.updateLivePhotoRangePosition()
+            }
+        }
     }
 }

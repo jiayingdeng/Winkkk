@@ -544,37 +544,62 @@ extension ScreenshotProcessingViewController: UICollectionViewDelegateFlowLayout
         let itemSpacing: CGFloat = 8
         let itemCount = screenshots.count
         
-        // 如果只有一张图片，使用较大尺寸
-        if itemCount == 1 {
-            let size: CGFloat = min(80, availableWidth)
-            return CGSize(width: size, height: size)
-        }
+        // 🎯 获取当前截图的长宽比例信息
+        let screenshot = screenshots[indexPath.item]
+        let imageWidth = CGFloat(screenshot.width)
+        let imageHeight = CGFloat(screenshot.height)
         
-        // 🔧 修复：多张图片时使用更精确的计算
-        // 确保所有图片能在一行内显示且不重叠
-        let totalSpacing = CGFloat(max(0, itemCount - 1)) * itemSpacing
-        let availableWidthForItems = max(0, availableWidth - totalSpacing)
+        // 计算长宽比例，防止除零错误
+        let aspectRatio = imageHeight > 0 ? imageWidth / imageHeight : 1.0
         
-        // 计算理想的item宽度
-        let idealWidth = availableWidthForItems / CGFloat(itemCount)
+        // 定义基准高度和尺寸范围
+        let baseHeight: CGFloat = itemCount == 1 ? 80 : 60
+        let minWidth: CGFloat = 40
+        let maxWidth: CGFloat = itemCount == 1 ? 120 : 100
+        let minHeight: CGFloat = 40
+        let maxHeight: CGFloat = 80
         
-        // 设置合理的尺寸范围：最小40pt，最大80pt
-        let finalWidth = max(40, min(80, idealWidth))
+        // 🎯 根据长宽比例计算动态尺寸
+        var dynamicWidth: CGFloat
+        var dynamicHeight: CGFloat
         
-        // 🔧 修复：检查是否会导致总宽度超出容器
-        let totalRequiredWidth = (finalWidth * CGFloat(itemCount)) + totalSpacing
-        let adjustedWidth: CGFloat
-        
-        if totalRequiredWidth > availableWidth {
-            // 如果总宽度超出，重新计算确保适配
-            adjustedWidth = max(35, (availableWidth - totalSpacing) / CGFloat(itemCount))
+        if aspectRatio > 1.5 {
+            // 横向长图 (宽度 > 1.5倍高度)
+            dynamicWidth = min(maxWidth, baseHeight * aspectRatio)
+            dynamicHeight = dynamicWidth / aspectRatio
+        } else if aspectRatio < 0.7 {
+            // 竖向长图 (高度 > 1.4倍宽度)  
+            dynamicHeight = min(maxHeight, baseHeight)
+            dynamicWidth = dynamicHeight * aspectRatio
         } else {
-            adjustedWidth = finalWidth
+            // 接近正方形的图片
+            let size = min(baseHeight, maxWidth)
+            dynamicWidth = size
+            dynamicHeight = size
         }
         
-        print("🔍 Preview Debug: containerWidth=\(containerWidth), itemCount=\(itemCount), availableWidth=\(availableWidth), finalWidth=\(adjustedWidth)")
+        // 限制最小尺寸
+        dynamicWidth = max(minWidth, dynamicWidth)
+        dynamicHeight = max(minHeight, dynamicHeight)
         
-        return CGSize(width: adjustedWidth, height: adjustedWidth)
+        // 🔧 多张图片时需要考虑总宽度限制
+        if itemCount > 1 {
+            let totalSpacing = CGFloat(max(0, itemCount - 1)) * itemSpacing
+            let maxAllowedWidth = (availableWidth - totalSpacing) / CGFloat(itemCount)
+            
+            if dynamicWidth > maxAllowedWidth {
+                // 如果宽度超出限制，按比例缩小
+                let scale = maxAllowedWidth / dynamicWidth
+                dynamicWidth = maxAllowedWidth
+                dynamicHeight = max(minHeight, dynamicHeight * scale)
+            }
+        }
+        
+        let finalSize = CGSize(width: dynamicWidth, height: dynamicHeight)
+        
+        print("🔍 Dynamic Preview Debug: screenshot[\(indexPath.item)] ratio=\(String(format: "%.2f", aspectRatio)), size=\(Int(finalSize.width))×\(Int(finalSize.height))")
+        
+        return finalSize
     }
     
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, minimumInteritemSpacingForSectionAt section: Int) -> CGFloat {
@@ -1107,12 +1132,15 @@ class ProcessingThumbnailCell: UICollectionViewCell {
     private func setupUI() {
         backgroundColor = .clear
         
-        // 图片视图
-        imageView.contentMode = .scaleAspectFill
+        // 图片视图 - 🎯 修改为scaleAspectFit以完整显示图片内容
+        imageView.contentMode = .scaleAspectFit
         imageView.clipsToBounds = true
         imageView.layer.cornerRadius = 8
         imageView.layer.borderWidth = 1
         imageView.layer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
+        
+        // 🎯 为了美观，给图片视图添加背景色
+        imageView.backgroundColor = UIColor.black.withAlphaComponent(0.8)
         
         // 添加轻微阴影效果
         imageView.layer.shadowColor = UIColor.black.cgColor

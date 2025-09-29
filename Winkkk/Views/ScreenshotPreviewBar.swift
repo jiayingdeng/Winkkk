@@ -125,11 +125,11 @@ class ScreenshotPreviewBar: UIView {
         scrollView.alwaysBounceHorizontal = true
         scrollView.decelerationRate = .fast
         
-        // 配置堆叠视图
+        // 配置堆叠视图 - 🎯 修改为支持不同尺寸的缩略图
         stackView.axis = .horizontal
         stackView.spacing = 8
         stackView.alignment = .center
-        stackView.distribution = .fillEqually
+        stackView.distribution = .fill  // 改为fill以支持不同宽度的子视图
         
         scrollView.addSubview(stackView)
         
@@ -289,6 +289,44 @@ class ScreenshotPreviewBar: UIView {
     
     private func createScreenshotThumbnailView(for screenshot: ScreenshotItem, at index: Int) -> ScreenshotThumbnailView {
         let thumbnailView = ScreenshotThumbnailView()
+        
+        // 🎯 根据截图长宽比例动态设置缩略图尺寸
+        let imageWidth = CGFloat(screenshot.width)
+        let imageHeight = CGFloat(screenshot.height)
+        let aspectRatio = imageHeight > 0 ? imageWidth / imageHeight : 1.0
+        
+        // 计算动态尺寸
+        let baseHeight: CGFloat = 60
+        let minWidth: CGFloat = 40
+        let maxWidth: CGFloat = 90
+        let minHeight: CGFloat = 40
+        let maxHeight: CGFloat = 60
+        
+        var dynamicWidth: CGFloat
+        var dynamicHeight: CGFloat
+        
+        if aspectRatio > 1.5 {
+            // 横向长图
+            dynamicWidth = min(maxWidth, baseHeight * aspectRatio)
+            dynamicHeight = dynamicWidth / aspectRatio
+        } else if aspectRatio < 0.7 {
+            // 竖向长图
+            dynamicHeight = min(maxHeight, baseHeight)
+            dynamicWidth = dynamicHeight * aspectRatio
+        } else {
+            // 接近正方形
+            dynamicWidth = baseHeight
+            dynamicHeight = baseHeight
+        }
+        
+        // 应用尺寸限制
+        dynamicWidth = max(minWidth, min(maxWidth, dynamicWidth))
+        dynamicHeight = max(minHeight, min(maxHeight, dynamicHeight))
+        
+        // 🎯 设置动态尺寸约束
+        thumbnailView.widthAnchor.constraint(equalToConstant: dynamicWidth).isActive = true
+        thumbnailView.heightAnchor.constraint(equalToConstant: dynamicHeight).isActive = true
+        
         thumbnailView.configure(with: screenshot)
         
         thumbnailView.onDeleteTap = { [weak self] in
@@ -300,7 +338,6 @@ class ScreenshotPreviewBar: UIView {
             // 🆕 弹出Sheet预览
             self.presentScreenshotDetailSheet(for: screenshot, at: index)
         }
-        
         
         return thumbnailView
     }

@@ -118,7 +118,7 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
         
         stackView.axis = .horizontal
         stackView.spacing = 0
-        stackView.distribution = .equalSpacing
+        stackView.distribution = .fillEqually  // 🔧 修复：确保每个图片视图宽度相等
         
         scrollView.addSubview(stackView)
         
@@ -305,7 +305,10 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
             stackView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
             stackView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
             stackView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
-            stackView.heightAnchor.constraint(equalTo: scrollView.heightAnchor)
+            stackView.heightAnchor.constraint(equalTo: scrollView.heightAnchor),
+            
+            // 🔧 关键修复：设置stackView的宽度以启用水平滚动
+            stackView.widthAnchor.constraint(equalToConstant: UIScreen.main.bounds.width * CGFloat(screenshots.count))
         ])
     }
     

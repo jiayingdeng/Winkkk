@@ -1398,22 +1398,27 @@ class VideoPlayerViewController: UIViewController {
         let controlAreaHeight = safeAreaHeight * 0.213  // 21.3%
         let bottomAreaHeight = safeAreaHeight * 0.254  // 25.4%
         
-        print("📱 VideoPlayerViewController 三分屏响应式布局:")
-        print("   安全区域高度: \(safeAreaHeight)")
-        print("   视频区域高度: \(videoAreaHeight) (53.3%)")
-        print("   控制区域高度: \(controlAreaHeight) (21.3%)")
-        print("   底部区域高度: \(bottomAreaHeight) (25.4%)")
+        // 三分屏响应式布局日志已优化
     }
     
     // 🎯 动态更新时间轴宽度 (实现15%溢出)
     private func updateTimelineWidth() {
         let screenWidth = view.bounds.width
         let overflowWidth = screenWidth + (screenWidth * 0.15)  // 15%溢出
-        timelineWidthConstraint?.constant = overflowWidth
         
-        print("🎯 时间轴溢出更新:")
-        print("   屏幕宽度: \(screenWidth)")
-        print("   溢出宽度: \(overflowWidth) (+\(screenWidth * 0.15)px)")
+        // ✅ 修复：确保约束更新和布局刷新
+        if timelineWidthConstraint?.constant != overflowWidth {
+            timelineWidthConstraint?.constant = overflowWidth
+            
+            // 强制立即布局更新，确保TimelineView获得正确宽度
+            timelineView.setNeedsUpdateConstraints()
+            UIView.performWithoutAnimation {
+                timelineView.layoutIfNeeded()
+            }
+            
+            // 通知TimelineView尺寸已更新，触发内部重新计算
+            timelineView.handleBoundsChange()
+        }
     }
     
     // MARK: - KVO
@@ -1422,7 +1427,7 @@ class VideoPlayerViewController: UIViewController {
             DispatchQueue.main.async { [weak self] in
                 // 🎯 编辑器模式：不再同步AVPlayer的播放状态
                 // 流动状态由用户手动控制，不跟随AVPlayer状态
-                print("📱 AVPlayer状态变化，但编辑器模式独立控制流动状态")
+                // AVPlayer状态变化日志已优化
             }
         }
     }

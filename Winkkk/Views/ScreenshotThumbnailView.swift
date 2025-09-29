@@ -48,16 +48,9 @@ class ScreenshotThumbnailView: UIView {
     private func setupUI() {
         backgroundColor = .clear
         
-        // 设置固定尺寸 - 使用高优先级约束以避免冲突
+        // 🎯 移除固定尺寸约束，改为支持动态尺寸
+        // 不再设置固定的宽高约束，让父视图决定尺寸
         translatesAutoresizingMaskIntoConstraints = false
-        let widthConstraint = widthAnchor.constraint(equalToConstant: 60)
-        let heightConstraint = heightAnchor.constraint(equalToConstant: 60)
-        widthConstraint.priority = UILayoutPriority(999)
-        heightConstraint.priority = UILayoutPriority(999)
-        NSLayoutConstraint.activate([
-            widthConstraint,
-            heightConstraint
-        ])
         
         // 图片视图
         setupImageView()
@@ -92,15 +85,16 @@ class ScreenshotThumbnailView: UIView {
     }
     
     private func setupImageView() {
-        imageView.contentMode = .scaleAspectFill
+        // 🎯 修改为scaleAspectFit以完整显示图片内容，不裁剪
+        imageView.contentMode = .scaleAspectFit
         imageView.clipsToBounds = true
         imageView.backgroundColor = UIColor.black.withAlphaComponent(0.5)
         imageView.layer.cornerRadius = 8
         imageView.layer.borderWidth = 2
         imageView.layer.borderColor = UIColor.white.cgColor
         
-        // 确保高质量图像渲染
-        imageView.layer.contentsGravity = .resizeAspectFill
+        // 确保高质量图像渲染，适配新的显示模式
+        imageView.layer.contentsGravity = .resizeAspect
         imageView.layer.magnificationFilter = .linear
         imageView.layer.minificationFilter = .trilinear
     }

@@ -17,12 +17,47 @@ class CollageViewController: UIViewController {
     private var selectedImageIndex: Int? // 当前选中的图片索引
     private var selectedAspectRatio: AspectRatio = .square1_1
     private var selectedLayoutTemplate: CollageLayoutTemplate = GridLayoutTemplate()
-    private let availableTemplates: [CollageLayoutTemplate] = [
+    private let allTemplates: [CollageLayoutTemplate] = [
         GridLayoutTemplate(),
         HorizontalLayoutTemplate(),
-        VerticalLayoutTemplate(),
-        MosaicLayoutTemplate()
+        VerticalLayoutTemplate()
     ]
+    
+    // 根据当前图片数量和比例获取可用模板
+    private var availableTemplates: [CollageLayoutTemplate] {
+        let imageCount = imageItems.count
+        return allTemplates.filter { template in
+            // 奇数图片时不显示网格布局
+            if template is GridLayoutTemplate && imageCount % 2 != 0 {
+                return false
+            }
+            
+            // 根据比例过滤布局模板
+            if !isTemplateCompatibleWithAspectRatio(template, aspectRatio: selectedAspectRatio) {
+                return false
+            }
+            
+            return template.isSupported(for: imageCount)
+        }
+    }
+    
+    // 检查模板是否与比例兼容
+    private func isTemplateCompatibleWithAspectRatio(_ template: CollageLayoutTemplate, aspectRatio: AspectRatio) -> Bool {
+        switch aspectRatio {
+        case .portrait3_4:
+            // 竖屏比例：适合竖向布局和网格布局
+            return template is VerticalLayoutTemplate || template is GridLayoutTemplate
+        case .landscape4_3, .widescreen16_9:
+            // 横屏比例：适合横向布局和网格布局
+            return template is HorizontalLayoutTemplate || template is GridLayoutTemplate
+        case .square1_1:
+            // 正方形：所有布局都适合
+            return true
+        case .full:
+            // 全屏：所有布局都适合
+            return true
+        }
+    }
     
     // MARK: - UI Components
     private let gradientBackgroundView = GradientBackgroundView()
@@ -122,6 +157,10 @@ class CollageViewController: UIViewController {
         setupUI()
         setupConstraints()
         configureNavigationBar()
+        
+        // 确保选择的模板可用
+        validateSelectedTemplate()
+        
         updatePreview()
         
         // 进入拼图页面的触感反馈
@@ -155,11 +194,11 @@ class CollageViewController: UIViewController {
         // 预览区域
         setupPreviewArea()
         
-        // 布局选择区域
-        setupLayoutSection()
-        
         // 比例选择区域
         setupAspectRatioSection()
+        
+        // 布局选择区域
+        setupLayoutSection()
         
         // 图片编辑区域
         setupEditingSection()
@@ -170,8 +209,8 @@ class CollageViewController: UIViewController {
         // 添加到内容视图
         contentView.addSubview(headerView)
         contentView.addSubview(previewContainerView)
-        contentView.addSubview(layoutSectionView)
         contentView.addSubview(aspectRatioSectionView)
+        contentView.addSubview(layoutSectionView)
         contentView.addSubview(editingSectionView)
         contentView.addSubview(bottomButtonsView)
     }
@@ -511,25 +550,8 @@ class CollageViewController: UIViewController {
             previewPlaceholder.leadingAnchor.constraint(equalTo: previewContainerView.leadingAnchor, constant: 16),
             previewPlaceholder.trailingAnchor.constraint(equalTo: previewContainerView.trailingAnchor, constant: -16),
             
-            // 布局选择区域 - 优化高度
-            layoutSectionView.topAnchor.constraint(equalTo: previewContainerView.bottomAnchor, constant: 16),
-            layoutSectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
-            layoutSectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            layoutSectionView.heightAnchor.constraint(greaterThanOrEqualToConstant: 150),
-            
-            layoutTitleLabel.topAnchor.constraint(equalTo: layoutSectionView.topAnchor, constant: 16),
-            layoutTitleLabel.leadingAnchor.constraint(equalTo: layoutSectionView.leadingAnchor, constant: 16),
-            layoutTitleLabel.trailingAnchor.constraint(equalTo: layoutSectionView.trailingAnchor, constant: -16),
-            layoutTitleLabel.heightAnchor.constraint(equalToConstant: 24),
-            
-            templateCollectionView.topAnchor.constraint(equalTo: layoutTitleLabel.bottomAnchor, constant: 12),
-            templateCollectionView.leadingAnchor.constraint(equalTo: layoutSectionView.leadingAnchor, constant: 16),
-            templateCollectionView.trailingAnchor.constraint(equalTo: layoutSectionView.trailingAnchor, constant: -16),
-            templateCollectionView.heightAnchor.constraint(equalToConstant: 80),
-            templateCollectionView.bottomAnchor.constraint(lessThanOrEqualTo: layoutSectionView.bottomAnchor, constant: -16),
-            
             // 比例选择区域 - 优化高度
-            aspectRatioSectionView.topAnchor.constraint(equalTo: layoutSectionView.bottomAnchor, constant: 16),
+            aspectRatioSectionView.topAnchor.constraint(equalTo: previewContainerView.bottomAnchor, constant: 16),
             aspectRatioSectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             aspectRatioSectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             aspectRatioSectionView.heightAnchor.constraint(greaterThanOrEqualToConstant: 90),
@@ -545,8 +567,25 @@ class CollageViewController: UIViewController {
             aspectRatioCollectionView.heightAnchor.constraint(equalToConstant: 50),
             aspectRatioCollectionView.bottomAnchor.constraint(lessThanOrEqualTo: aspectRatioSectionView.bottomAnchor, constant: -8),
             
+            // 布局选择区域 - 优化高度
+            layoutSectionView.topAnchor.constraint(equalTo: aspectRatioSectionView.bottomAnchor, constant: 16),
+            layoutSectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            layoutSectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
+            layoutSectionView.heightAnchor.constraint(greaterThanOrEqualToConstant: 150),
+            
+            layoutTitleLabel.topAnchor.constraint(equalTo: layoutSectionView.topAnchor, constant: 16),
+            layoutTitleLabel.leadingAnchor.constraint(equalTo: layoutSectionView.leadingAnchor, constant: 16),
+            layoutTitleLabel.trailingAnchor.constraint(equalTo: layoutSectionView.trailingAnchor, constant: -16),
+            layoutTitleLabel.heightAnchor.constraint(equalToConstant: 24),
+            
+            templateCollectionView.topAnchor.constraint(equalTo: layoutTitleLabel.bottomAnchor, constant: 12),
+            templateCollectionView.leadingAnchor.constraint(equalTo: layoutSectionView.leadingAnchor, constant: 16),
+            templateCollectionView.trailingAnchor.constraint(equalTo: layoutSectionView.trailingAnchor, constant: -16),
+            templateCollectionView.heightAnchor.constraint(equalToConstant: 80),
+            templateCollectionView.bottomAnchor.constraint(lessThanOrEqualTo: layoutSectionView.bottomAnchor, constant: -16),
+            
             // 图片编辑区域 - 优化高度
-            editingSectionView.topAnchor.constraint(equalTo: aspectRatioSectionView.bottomAnchor, constant: 16),
+            editingSectionView.topAnchor.constraint(equalTo: layoutSectionView.bottomAnchor, constant: 16),
             editingSectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             editingSectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             editingSectionView.heightAnchor.constraint(greaterThanOrEqualToConstant: 140),
@@ -888,6 +927,20 @@ class CollageViewController: UIViewController {
     }
     
     // MARK: - Helper Methods
+    
+    private func validateSelectedTemplate() {
+        // 检查当前选择的模板是否在可用模板中
+        let currentTemplateType = type(of: selectedLayoutTemplate)
+        let isCurrentTemplateAvailable = availableTemplates.contains { template in
+            type(of: template) == currentTemplateType
+        }
+        
+        // 如果当前模板不可用，选择第一个可用的模板
+        if !isCurrentTemplateAvailable && !availableTemplates.isEmpty {
+            selectedLayoutTemplate = availableTemplates[0]
+        }
+    }
+    
     private func updatePreview() {
         // 自动生成预览拼图
         DispatchQueue.global(qos: .userInitiated).async {
@@ -1216,54 +1269,6 @@ class VerticalLayoutTemplate: CollageLayoutTemplate {
     }
 }
 
-class MosaicLayoutTemplate: CollageLayoutTemplate {
-    let templateName = "马赛克布局"
-    let templateIcon = "⊞"
-    
-    func calculateFrames(for imageCount: Int, in bounds: CGRect) -> [CGRect] {
-        var frames: [CGRect] = []
-        let spacing: CGFloat = 4
-        
-        switch imageCount {
-        case 2:
-            // 一大一小，大图占左侧2/3
-            let mainWidth = bounds.width * 2/3 - spacing
-            let sideWidth = bounds.width * 1/3 - spacing * 2
-            frames.append(CGRect(x: spacing, y: spacing, width: mainWidth, height: bounds.height - spacing * 2))
-            frames.append(CGRect(x: mainWidth + spacing * 2, y: spacing, width: sideWidth, height: bounds.height - spacing * 2))
-            
-        case 3:
-            // 大图占左侧，右侧两个小图上下排列
-            let mainWidth = bounds.width * 2/3 - spacing
-            let sideWidth = bounds.width * 1/3 - spacing * 2
-            let sideHeight = (bounds.height - spacing * 3) / 2
-            
-            frames.append(CGRect(x: spacing, y: spacing, width: mainWidth, height: bounds.height - spacing * 2))
-            frames.append(CGRect(x: mainWidth + spacing * 2, y: spacing, width: sideWidth, height: sideHeight))
-            frames.append(CGRect(x: mainWidth + spacing * 2, y: sideHeight + spacing * 2, width: sideWidth, height: sideHeight))
-            
-        case 4:
-            // 2x2网格，但第一张图占据左上角双倍大小
-            let halfWidth = (bounds.width - spacing * 3) / 2
-            let halfHeight = (bounds.height - spacing * 3) / 2
-            
-            frames.append(CGRect(x: spacing, y: spacing, width: halfWidth, height: halfHeight))
-            frames.append(CGRect(x: halfWidth + spacing * 2, y: spacing, width: halfWidth, height: halfHeight))
-            frames.append(CGRect(x: spacing, y: halfHeight + spacing * 2, width: halfWidth, height: halfHeight))
-            frames.append(CGRect(x: halfWidth + spacing * 2, y: halfHeight + spacing * 2, width: halfWidth, height: halfHeight))
-            
-        default:
-            // 回退到网格布局
-            return GridLayoutTemplate().calculateFrames(for: imageCount, in: bounds)
-        }
-        
-        return frames
-    }
-    
-    func isSupported(for imageCount: Int) -> Bool {
-        return imageCount >= 2 && imageCount <= 4
-    }
-}
 
 // MARK: - CollageImageItem Data Model
 class CollageImageItem {
@@ -1627,12 +1632,6 @@ extension CollageViewController: UICollectionViewDataSource, UICollectionViewDel
         if collectionView == templateCollectionView {
             let template = availableTemplates[indexPath.item]
             
-            // 检查模板是否支持当前图片数量
-            guard template.isSupported(for: imageItems.count) else {
-                HapticFeedbackManager.shared.notificationWarning()
-                return
-            }
-            
             // 检查是否真的改变了模板
             if type(of: template) != type(of: selectedLayoutTemplate) {
                 selectedLayoutTemplate = template
@@ -1666,6 +1665,13 @@ extension CollageViewController: UICollectionViewDataSource, UICollectionViewDel
             if previousAspectRatio != selectedAspectRatio {
                 HapticFeedbackManager.shared.buttonTap()
                 collectionView.reloadData()
+                
+                // 验证当前选择的模板是否仍然可用
+                validateSelectedTemplate()
+                
+                // 刷新模板集合视图（因为可用模板可能已经改变）
+                templateCollectionView.reloadData()
+                
                 // 更新预览框高度
                 updatePreviewContainerHeight(animated: true)
                 // 更新预览内容
