@@ -468,108 +468,6 @@ class VideoThumbnailCell: UICollectionViewCell {
     // 这个方法已经被上面的新实现替换，这里保留是为了避免重复
 }
 
-// MARK: - AddVideoCell
-class AddVideoCell: UICollectionViewCell {
-    
-    static let identifier = "AddVideoCell"
-    
-    // MARK: - UI Components
-    private let iconView: UIImageView = {
-        let imageView = UIImageView(image: UIImage(systemName: "plus.circle.fill"))
-        imageView.tintColor = ThemeManager.buttonPrimary
-        imageView.contentMode = .scaleAspectFit
-        return imageView
-    }()
-    
-    private let titleLabel: UILabel = {
-        let label = UILabel()
-        label.text = "添加视频"
-        label.font = ThemeManager.subheadlineFont
-        label.textColor = ThemeManager.primaryText
-        label.textAlignment = .center
-        label.numberOfLines = 2
-        return label
-    }()
-    
-    private let dashedBorderView = UIView()
-    
-    // MARK: - Initialization
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        setupUI()
-        setupConstraints()
-    }
-    
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        setupUI()
-        setupConstraints()
-    }
-    
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        
-        contentView.layer.cornerRadius = ThemeManager.standardCornerRadius
-        setupDashedBorder()
-    }
-    
-    // MARK: - UI Setup
-    private func setupUI() {
-        contentView.backgroundColor = ThemeManager.cardBackground.withAlphaComponent(0.5)
-        
-        contentView.addSubview(dashedBorderView)
-        contentView.addSubview(iconView)
-        contentView.addSubview(titleLabel)
-    }
-    
-    private func setupConstraints() {
-        dashedBorderView.translatesAutoresizingMaskIntoConstraints = false
-        iconView.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        
-        NSLayoutConstraint.activate([
-            // 虚线边框
-            dashedBorderView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            dashedBorderView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            dashedBorderView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            dashedBorderView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
-            
-            // 图标
-            iconView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            iconView.centerYAnchor.constraint(equalTo: contentView.centerYAnchor, constant: -15),
-            iconView.widthAnchor.constraint(equalToConstant: 40),
-            iconView.heightAnchor.constraint(equalToConstant: 40),
-            
-            // 标题
-            titleLabel.topAnchor.constraint(equalTo: iconView.bottomAnchor, constant: 8),
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 8),
-            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
-        ])
-    }
-    
-    private func setupDashedBorder() {
-        // 移除旧的虚线边框
-        dashedBorderView.layer.sublayers?.removeAll()
-        
-        let shapeLayer = CAShapeLayer()
-        shapeLayer.strokeColor = ThemeManager.buttonPrimary.withAlphaComponent(0.7).cgColor
-        shapeLayer.lineWidth = 2
-        shapeLayer.lineDashPattern = [8, 4]
-        shapeLayer.fillColor = UIColor.clear.cgColor
-        
-        let path = UIBezierPath(roundedRect: dashedBorderView.bounds, 
-                               cornerRadius: ThemeManager.standardCornerRadius)
-        shapeLayer.path = path.cgPath
-        
-        dashedBorderView.layer.addSublayer(shapeLayer)
-    }
-    
-    func configure() {
-        // 配置添加按钮外观
-        iconView.tintColor = ThemeManager.buttonPrimary
-        titleLabel.textColor = ThemeManager.primaryText
-    }
-}
 
 // MARK: - EmptyStateView
 class EmptyStateView: UIView {
@@ -593,7 +491,7 @@ class EmptyStateView: UIView {
     
     private let messageLabel: UILabel = {
         let label = UILabel()
-        label.text = "在应用内拍摄或导入视频\n完成后可导出到系统相册分享"
+        label.text = "点击正上方 ➕ 按钮添加视频\n在应用内拍摄或从相册导入"
         label.font = ThemeManager.bodyFont
         label.textColor = ThemeManager.secondaryText
         label.textAlignment = .center

@@ -92,53 +92,6 @@ class SettingsViewController: UIViewController {
                 ]
             ),
             
-            // 画质修复设置
-            SettingsSection(
-                title: "画质修复",
-                items: [
-                    SettingsItem(
-                        type: .selection,
-                        title: "默认修复强度",
-                        subtitle: "中度修复",
-                        icon: "wand.and.stars",
-                        action: { [weak self] in self?.showEnhanceSettings() }
-                    ),
-                    SettingsItem(
-                        type: .toggle,
-                        title: "自动画质修复",
-                        subtitle: "截图后自动应用修复",
-                        icon: "autostartstop",
-                        isOn: UserDefaults.standard.bool(forKey: "AutoEnhanceEnabled"),
-                        switchAction: { isOn in
-                            UserDefaults.standard.set(isOn, forKey: "AutoEnhanceEnabled")
-                        }
-                    )
-                ]
-            ),
-            
-            // 分享设置
-            SettingsSection(
-                title: "分享设置",
-                items: [
-                    SettingsItem(
-                        type: .toggle,
-                        title: "默认添加水印",
-                        subtitle: "分享时自动添加应用水印",
-                        icon: "drop.fill",
-                        isOn: UserDefaults.standard.bool(forKey: "DefaultWatermarkEnabled"),
-                        switchAction: { isOn in
-                            UserDefaults.standard.set(isOn, forKey: "DefaultWatermarkEnabled")
-                        }
-                    ),
-                    SettingsItem(
-                        type: .selection,
-                        title: "水印样式",
-                        subtitle: "默认样式",
-                        icon: "paintbrush.fill",
-                        action: { [weak self] in self?.showWatermarkSettings() }
-                    )
-                ]
-            ),
             
             // 存储管理
             SettingsSection(
@@ -334,49 +287,6 @@ class SettingsViewController: UIViewController {
         present(alert, animated: true)
     }
     
-    private func showEnhanceSettings() {
-        let alert = UIAlertController(title: "默认修复强度", message: "选择图片画质修复的默认强度", preferredStyle: .actionSheet)
-        
-        let levels = ["轻度修复", "中度修复", "重度修复"]
-        
-        for (index, level) in levels.enumerated() {
-            alert.addAction(UIAlertAction(title: level, style: .default) { [weak self] _ in
-                UserDefaults.standard.set(index + 1, forKey: "DefaultEnhanceLevel")
-                self?.updateEnhanceSubtitle(level)
-            })
-        }
-        
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        
-        if let popover = alert.popoverPresentationController {
-            popover.sourceView = view
-            popover.sourceRect = view.bounds
-        }
-        
-        present(alert, animated: true)
-    }
-    
-    private func showWatermarkSettings() {
-        let alert = UIAlertController(title: "水印样式", message: "选择默认的水印样式", preferredStyle: .actionSheet)
-        
-        let styles = ["默认样式", "简约样式", "优雅样式"]
-        
-        for (index, style) in styles.enumerated() {
-            alert.addAction(UIAlertAction(title: style, style: .default) { [weak self] _ in
-                UserDefaults.standard.set(index, forKey: "DefaultWatermarkStyle")
-                self?.updateWatermarkSubtitle(style)
-            })
-        }
-        
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        
-        if let popover = alert.popoverPresentationController {
-            popover.sourceView = view
-            popover.sourceRect = view.bounds
-        }
-        
-        present(alert, animated: true)
-    }
     
     private func showStorageDetails() {
         let storageVC = StorageDetailViewController()
@@ -530,13 +440,6 @@ class SettingsViewController: UIViewController {
         updateSubtitle(sectionTitle: "视频设置", itemTitle: "录制时长限制", newSubtitle: duration)
     }
     
-    private func updateEnhanceSubtitle(_ level: String) {
-        updateSubtitle(sectionTitle: "画质修复", itemTitle: "默认修复强度", newSubtitle: level)
-    }
-    
-    private func updateWatermarkSubtitle(_ style: String) {
-        updateSubtitle(sectionTitle: "分享设置", itemTitle: "水印样式", newSubtitle: style)
-    }
     
     private func updateSubtitle(sectionTitle: String, itemTitle: String, newSubtitle: String) {
         if let section = sections.first(where: { $0.title == sectionTitle }),

@@ -39,7 +39,6 @@ class VideoGalleryViewController: UIViewController {
         
         // 注册cell
         cv.register(VideoThumbnailCell.self, forCellWithReuseIdentifier: VideoThumbnailCell.identifier)
-        cv.register(AddVideoCell.self, forCellWithReuseIdentifier: AddVideoCell.identifier)
         
         return cv
     }()
@@ -302,6 +301,27 @@ class VideoGalleryViewController: UIViewController {
     private let videoManager = VideoManager.shared
     private var fetchedResultsController: NSFetchedResultsController<VideoItem>!
     private var videos: [VideoItem] = []
+    
+    // 删除状态管理
+    private var isDeletionInProgress = false
+    
+    // 安全访问VideoItem的辅助方法
+    private func safeVideoItem(at index: Int) -> VideoItem? {
+        guard index >= 0 && index < videos.count else {
+            print("⚠️ VideoGallery: 访问越界，index: \(index), videos.count: \(videos.count)")
+            return nil
+        }
+        
+        let video = videos[index]
+        
+        // 检查VideoItem是否已被删除
+        guard !video.isDeleted else {
+            print("⚠️ VideoGallery: 尝试访问已删除的VideoItem: \(video.fileName)")
+            return nil
+        }
+        
+        return video
+    }
     
     // 防抖机制
     private var updateTimer: Timer?
@@ -748,10 +768,9 @@ class VideoGalleryViewController: UIViewController {
         
         let location = gesture.location(in: collectionView)
         guard let indexPath = collectionView.indexPathForItem(at: location),
-              indexPath.item > 0, // 不处理添加按钮
               !isSelectionMode else { return }
         
-        let video = videos[indexPath.item - 1]
+        guard let video = safeVideoItem(at: indexPath.item) else { return }
         showVideoDetailPopup(for: video)
     }
     
@@ -896,6 +915,10 @@ class VideoGalleryViewController: UIViewController {
     
     @objc private func deleteButtonTapped() {
         guard !selectedVideoItems.isEmpty else { return }
+        guard !isDeletionInProgress else {
+            showAlert(title: "请稍等", message: "正在执行删除操作，请稍后再试")
+            return
+        }
         
         showDeleteConfirmation(
             title: "删除视频",
@@ -983,7 +1006,12 @@ class VideoGalleryViewController: UIViewController {
     }
     
     private func deleteVideo(at indexPath: IndexPath) {
-        let video = videos[indexPath.item]
+        guard !isDeletionInProgress else {
+            showAlert(title: "请稍等", message: "正在执行删除操作，请稍后再试")
+            return
+        }
+        
+        guard let video = safeVideoItem(at: indexPath.item) else { return }
         
         let alert = UIAlertController(
             title: "删除视频",
@@ -1001,8 +1029,12 @@ class VideoGalleryViewController: UIViewController {
     }
     
     private func performDeleteVideo(_ video: VideoItem) {
+        isDeletionInProgress = true
+        
         videoManager.deleteVideo(video) { [weak self] result in
             DispatchQueue.main.async {
+                self?.isDeletionInProgress = false
+                
                 switch result {
                 case .success:
                     // 数据会通过NSFetchedResultsController自动更新
@@ -1164,22 +1196,120 @@ class VideoGalleryViewController: UIViewController {
     
     private func performBatchDelete() {
         let selectedVideos = Array(selectedVideoItems)
+        guard !selectedVideos.isEmpty else { return }
         
-        for video in selectedVideos {
-            videoManager.deleteVideo(video) { [weak self] result in
-                DispatchQueue.main.async {
-                    switch result {
-                    case .success:
-                        // Core Data会自动更新UI
-                        break
-                    case .failure(let error):
-                        self?.showError(error)
+        // 防止重复操作
+        guard !isDeletionInProgress else {
+            print("⚠️ 删除操作正在进行中，忽略重复请求")
+            return
+        }
+        
+        isDeletionInProgress = true
+        
+        // 显示进度提示
+        let progressAlert = UIAlertController(
+            title: "删除进行中",
+            message: "正在删除视频 (0/\(selectedVideos.count))",
+            preferredStyle: .alert
+        )
+        present(progressAlert, animated: true)
+        
+        // 串行删除，避免并发冲突
+        performSerialDeletion(videos: selectedVideos, progressAlert: progressAlert)
+    }
+    
+    private func performSerialDeletion(videos: [VideoItem], progressAlert: UIAlertController) {
+        var remainingVideos = videos
+        var completedCount = 0
+        var failedCount = 0
+        var failedVideos: [String] = []
+        
+        func deleteNextVideo() {
+            guard !remainingVideos.isEmpty else {
+                // 所有删除完成
+                DispatchQueue.main.async { [weak self] in
+                    progressAlert.dismiss(animated: true) {
+                        self?.showBatchDeleteResult(completed: completedCount, failed: failedCount, failedVideos: failedVideos)
+                        self?.completeDeletion()
                     }
                 }
+                return
+            }
+            
+            let video = remainingVideos.removeFirst()
+            completedCount += 1
+            
+            // 更新进度
+            DispatchQueue.main.async {
+                progressAlert.message = "正在删除视频 (\(completedCount)/\(videos.count))\n\(video.fileName)"
+            }
+            
+            videoManager.deleteVideo(video) { [weak self] result in
+                switch result {
+                case .success:
+                    print("✅ 删除成功: \(video.fileName)")
+                case .failure(let error):
+                    print("❌ 删除失败: \(video.fileName) - \(error.localizedDescription)")
+                    failedCount += 1
+                    failedVideos.append(video.fileName)
+                }
+                
+                // 继续删除下一个视频
+                deleteNextVideo()
             }
         }
         
+        // 开始串行删除
+        deleteNextVideo()
+    }
+    
+    private func showBatchDeleteResult(completed: Int, failed: Int, failedVideos: [String]) {
+        let totalCount = completed
+        
+        if failed == 0 {
+            showAlert(title: "删除完成", message: "成功删除 \(totalCount) 个视频")
+        } else {
+            var message = "删除完成：成功 \(completed - failed) 个，失败 \(failed) 个"
+            if !failedVideos.isEmpty {
+                message += "\n\n失败的视频：\n" + failedVideos.joined(separator: "\n")
+            }
+            showAlert(title: "删除结果", message: message)
+        }
+    }
+    
+    private func completeDeletion() {
+        isDeletionInProgress = false
         exitSelectionMode()
+        
+        // 验证删除操作的完整性
+        validateDeletionIntegrity()
+    }
+    
+    // 删除操作完整性验证
+    private func validateDeletionIntegrity() {
+        #if DEBUG
+        print("🔍 VideoGallery: 验证删除操作完整性")
+        
+        // 检查是否有悬空的选中项
+        let invalidSelections = selectedVideoItems.filter { video in
+            video.isDeleted || !videos.contains(video)
+        }
+        
+        if !invalidSelections.isEmpty {
+            print("⚠️ VideoGallery: 发现 \(invalidSelections.count) 个无效的选中项")
+            selectedVideoItems = selectedVideoItems.filter { !invalidSelections.contains($0) }
+        }
+        
+        // 检查UI状态一致性
+        let actualVideoCount = videos.filter { !$0.isDeleted }.count
+        let displayVideoCount = getDisplayVideos().count
+        
+        if actualVideoCount != displayVideoCount {
+            print("⚠️ VideoGallery: UI状态不一致，实际视频数: \(actualVideoCount), 显示视频数: \(displayVideoCount)")
+        }
+        
+        print("✅ VideoGallery: 删除操作完整性验证完成")
+        #endif
     }
     
     // MARK: - First Time Guidance
@@ -1606,33 +1736,35 @@ extension VideoGalleryViewController: UICollectionViewDataSourcePrefetching {
 extension VideoGalleryViewController: UICollectionViewDataSource {
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return getDisplayVideos().count + 1 // +1 for add video cell
+        return getDisplayVideos().count
     }
     
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        if indexPath.item == 0 {
-            // 添加视频按钮
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: AddVideoCell.identifier, for: indexPath) as! AddVideoCell
-            cell.configure()
-            
-            // 在选择模式下隐藏添加按钮
-            cell.alpha = isSelectionMode ? 0.3 : 1.0
-            cell.isUserInteractionEnabled = !isSelectionMode
-            
-            return cell
-        } else {
-            // 视频缩略图
-            let cell = collectionView.dequeueReusableCell(withReuseIdentifier: VideoThumbnailCell.identifier, for: indexPath) as! VideoThumbnailCell
-            let video = getDisplayVideos()[indexPath.item - 1]
-            cell.configure(with: video)
-            
-            // 在选择模式下设置选择状态
-            if isSelectionMode {
-                cell.setSelected(selectedVideoItems.contains(video))
-            }
-            
-            return cell
+        // 视频缩略图
+        let cell = collectionView.dequeueReusableCell(withReuseIdentifier: VideoThumbnailCell.identifier, for: indexPath) as! VideoThumbnailCell
+        
+        let displayVideos = getDisplayVideos()
+        guard indexPath.item >= 0 && indexPath.item < displayVideos.count else {
+            print("⚠️ VideoGallery: cellForItemAt 访问越界，indexPath.item: \(indexPath.item), displayVideos.count: \(displayVideos.count)")
+            return cell // 返回空配置的cell
         }
+        
+        let video = displayVideos[indexPath.item]
+        
+        // 检查VideoItem是否已被删除
+        guard !video.isDeleted else {
+            print("⚠️ VideoGallery: cellForItemAt 尝试配置已删除的VideoItem: \(video.fileName)")
+            return cell // 返回空配置的cell
+        }
+        
+        cell.configure(with: video)
+            
+        // 在选择模式下设置选择状态
+        if isSelectionMode {
+            cell.setSelected(selectedVideoItems.contains(video))
+        }
+        
+        return cell
     }
 }
 
@@ -1642,50 +1774,41 @@ extension VideoGalleryViewController: UICollectionViewDelegate {
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
         collectionView.deselectItem(at: indexPath, animated: true)
         
-        if indexPath.item == 0 {
-            // 添加视频按钮
-            if !isSelectionMode {
-                importButtonTapped()
+        // 选择视频
+        let video = getDisplayVideos()[indexPath.item]
+        
+        if isSelectionMode {
+            // 选择模式下处理多选
+            let wasSelected = selectedVideoItems.contains(video)
+            if wasSelected {
+                selectedVideoItems.remove(video)
+                // 取消选择的轻微触觉反馈
+                let feedbackGenerator = UIImpactFeedbackGenerator(style: .light)
+                feedbackGenerator.impactOccurred()
+            } else {
+                selectedVideoItems.insert(video)
+                // 选择的中等强度触觉反馈
+                let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
+                feedbackGenerator.impactOccurred()
+            }
+            updateSelectionUI()
+            
+            // 更新对应的cell
+            if let cell = collectionView.cellForItem(at: indexPath) as? VideoThumbnailCell {
+                cell.setSelected(selectedVideoItems.contains(video))
             }
         } else {
-            // 选择视频
-            let video = getDisplayVideos()[indexPath.item - 1]
-            
-            if isSelectionMode {
-                // 选择模式下处理多选
-                let wasSelected = selectedVideoItems.contains(video)
-                if wasSelected {
-                    selectedVideoItems.remove(video)
-                    // 取消选择的轻微触觉反馈
-                    let feedbackGenerator = UIImpactFeedbackGenerator(style: .light)
-                    feedbackGenerator.impactOccurred()
-                } else {
-                    selectedVideoItems.insert(video)
-                    // 选择的中等强度触觉反馈
-                    let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
-                    feedbackGenerator.impactOccurred()
-                }
-                updateSelectionUI()
-                
-                // 更新对应的cell
-                if let cell = collectionView.cellForItem(at: indexPath) as? VideoThumbnailCell {
-                    cell.setSelected(selectedVideoItems.contains(video))
-                }
+            // 正常模式下的视频选择
+            if let delegate = delegate {
+                delegate.videoGalleryViewController(self, didSelectVideo: video)
             } else {
-                // 正常模式下的视频选择
-                if let delegate = delegate {
-                    delegate.videoGalleryViewController(self, didSelectVideo: video)
-                } else {
-                    openVideoEditor(with: video)
-                }
+                openVideoEditor(with: video)
             }
         }
     }
     
     func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
-        guard indexPath.item > 0 else { return nil }
-        
-        let video = videos[indexPath.item - 1]
+        guard let video = safeVideoItem(at: indexPath.item) else { return nil }
         
         return UIContextMenuConfiguration(identifier: nil, previewProvider: nil) { _ in
             let editAction = UIAction(title: "编辑", image: UIImage(systemName: "pencil")) { [weak self] _ in
@@ -1881,9 +2004,48 @@ extension VideoGalleryViewController: NSFetchedResultsControllerDelegate {
     func controller(_ controller: NSFetchedResultsController<NSFetchRequestResult>, didFailWithError error: Error) {
         print("❌ VideoGallery: NSFetchedResultsController错误: \(error)")
         
-        // 错误恢复：重新设置fetchedResultsController
+        // 错误恢复：重新设置fetchedResultsController，带重试机制
         DispatchQueue.main.async { [weak self] in
-            self?.setupFetchedResultsController()
+            self?.recoverFromFetchedResultsControllerError(error: error)
+        }
+    }
+    
+    private func recoverFromFetchedResultsControllerError(error: Error, retryCount: Int = 0) {
+        let maxRetries = 3
+        
+        guard retryCount < maxRetries else {
+            print("❌ VideoGallery: 达到最大重试次数，显示错误提示")
+            showAlert(title: "数据同步错误", message: "视频列表同步失败，请重启应用")
+            return
+        }
+        
+        print("🔄 VideoGallery: 尝试恢复NSFetchedResultsController (第\(retryCount + 1)次)")
+        
+        // 延迟重试，避免立即重试
+        let delay = TimeInterval(retryCount + 1) * 0.5
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            do {
+                // 重新设置fetchedResultsController
+                self?.setupFetchedResultsController()
+                
+                // 验证恢复是否成功
+                if let strongSelf = self,
+                   let controller = strongSelf.fetchedResultsController {
+                    try controller.performFetch()
+                    print("✅ VideoGallery: NSFetchedResultsController恢复成功")
+                    
+                    // 刷新UI
+                    strongSelf.collectionView.reloadData()
+                    strongSelf.updateEmptyStateVisibility()
+                } else {
+                    throw NSError(domain: "VideoGallery", code: -1, userInfo: [NSLocalizedDescriptionKey: "Controller setup failed"])
+                }
+                
+            } catch {
+                print("❌ VideoGallery: 恢复失败: \(error)")
+                // 递归重试
+                self?.recoverFromFetchedResultsControllerError(error: error, retryCount: retryCount + 1)
+            }
         }
     }
 }

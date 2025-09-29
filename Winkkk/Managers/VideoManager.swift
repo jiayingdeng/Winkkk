@@ -533,7 +533,7 @@ class VideoManager: NSObject {
                 PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: videoURL)
             }) { success, error in
                 if success {
-                    print("✅ 视频导出成功: \(video.title)")
+                    print("✅ 视频导出成功: \(video.fileName)")
                     continuation.resume()
                 } else {
                     // 根据具体错误类型返回更准确的错误信息
