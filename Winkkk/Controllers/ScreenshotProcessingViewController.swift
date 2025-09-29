@@ -170,6 +170,9 @@ class ScreenshotProcessingViewController: UIViewController {
         collectionView.register(ProcessingThumbnailCell.self, forCellWithReuseIdentifier: "ThumbnailCell")
         
         previewContainerView.addSubview(collectionView)
+        
+        // 添加交互提示
+        setupInteractionHint()
     }
     
     // 推荐卡片设置方法已移除 - 避免功能重复，简化界面
@@ -336,6 +339,24 @@ class ScreenshotProcessingViewController: UIViewController {
         )
     }
     
+    // MARK: - Interaction Hint Setup
+    private func setupInteractionHint() {
+        let hintLabel = UILabel()
+        hintLabel.text = "轻点图片查看详情"
+        hintLabel.font = .systemFont(ofSize: 12, weight: .regular)
+        hintLabel.textColor = UIColor.white.withAlphaComponent(0.6)
+        hintLabel.textAlignment = .center
+        hintLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        previewContainerView.addSubview(hintLabel)
+        
+        NSLayoutConstraint.activate([
+            hintLabel.bottomAnchor.constraint(equalTo: previewContainerView.bottomAnchor, constant: -4),
+            hintLabel.centerXAnchor.constraint(equalTo: previewContainerView.centerXAnchor),
+            hintLabel.heightAnchor.constraint(equalToConstant: 16)
+        ])
+    }
+    
     // MARK: - Processing Options Setup
     private func setupProcessingOptions() {
         switch mode {
@@ -360,8 +381,8 @@ class ScreenshotProcessingViewController: UIViewController {
                     action: { [weak self] in self?.showCollageCreation() }
                 ),
                 ProcessingOption(
-                    title: "📤 批量分享",
-                    description: "一键分享所有图片",
+                    title: "📤 分享",
+                    description: "分享图片到其他应用",
                     icon: "square.and.arrow.up",
                     action: { [weak self] in self?.showBatchShare() }
                 )
@@ -966,6 +987,14 @@ class ProcessingThumbnailCell: UICollectionViewCell {
         imageView.layer.cornerRadius = 8
         imageView.layer.borderWidth = 1
         imageView.layer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
+        
+        // 添加轻微阴影效果
+        imageView.layer.shadowColor = UIColor.black.cgColor
+        imageView.layer.shadowOffset = CGSize(width: 0, height: 2)
+        imageView.layer.shadowOpacity = 0.15
+        imageView.layer.shadowRadius = 4
+        imageView.layer.masksToBounds = false
+        
         contentView.addSubview(imageView)
         
         // 覆盖层（可用于选择状态等）

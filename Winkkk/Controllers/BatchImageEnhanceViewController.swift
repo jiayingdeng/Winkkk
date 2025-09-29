@@ -29,6 +29,13 @@ class BatchEnhanceItem {
     }
 }
 
+// MARK: - Page State Enum
+enum PageState {
+    case selecting    // 选择阶段
+    case processing   // 处理阶段  
+    case completed    // 完成阶段
+}
+
 // MARK: - BatchImageEnhanceViewController
 class BatchImageEnhanceViewController: UIViewController {
     
@@ -37,6 +44,7 @@ class BatchImageEnhanceViewController: UIViewController {
     private var enhanceItems: [BatchEnhanceItem] = []
     private var currentLevel: EnhanceLevel = .medium
     private var isProcessing = false
+    private var pageState: PageState = .selecting
     
     // MARK: - UI Components
     private let gradientBackgroundView = GradientBackgroundView()
@@ -69,10 +77,18 @@ class BatchImageEnhanceViewController: UIViewController {
     // 底部操作按钮
     private let bottomActionView = UIView()
     private let bottomBlurView = BlurEffectView(style: .regular, intensity: 0.9)
+    
+    // 第一行按钮
+    private let firstRowStackView = UIStackView()
     private let saveAllButton = UIButton()
     private let shareAllButton = UIButton()
+    private let createCollageButton = UIButton()
+    
+    // 第二行按钮
+    private let secondRowStackView = UIStackView()
     private let selectModeButton = UIButton()
-    private let createCollageButton = UIButton() // 新增拼图创建按钮
+    private let reselectButton = UIButton() // 新增重新选择按钮
+    private let returnToCenterButton = UIButton() // 新增返回截图中心按钮
     
     // MARK: - Dependencies
     private let imageEnhancer = ImageEnhancer()
@@ -124,6 +140,9 @@ class BatchImageEnhanceViewController: UIViewController {
         // 初始化选择状态UI
         updateSelectionUI()
         
+        // 初始化状态信息显示
+        updateInitialStateInfo()
+        
         // 进入批量修复的触感反馈
         HapticFeedbackManager.shared.lightImpact()
     }
@@ -148,10 +167,14 @@ class BatchImageEnhanceViewController: UIViewController {
         collectionView.translatesAutoresizingMaskIntoConstraints = false
         bottomActionView.translatesAutoresizingMaskIntoConstraints = false
         bottomBlurView.translatesAutoresizingMaskIntoConstraints = false
+        firstRowStackView.translatesAutoresizingMaskIntoConstraints = false
+        secondRowStackView.translatesAutoresizingMaskIntoConstraints = false
         saveAllButton.translatesAutoresizingMaskIntoConstraints = false
         shareAllButton.translatesAutoresizingMaskIntoConstraints = false
         selectModeButton.translatesAutoresizingMaskIntoConstraints = false
         createCollageButton.translatesAutoresizingMaskIntoConstraints = false
+        reselectButton.translatesAutoresizingMaskIntoConstraints = false
+        returnToCenterButton.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
             // 渐变背景
@@ -263,7 +286,7 @@ class BatchImageEnhanceViewController: UIViewController {
             bottomActionView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             bottomActionView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             bottomActionView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-            bottomActionView.heightAnchor.constraint(equalToConstant: 80),
+            bottomActionView.heightAnchor.constraint(equalToConstant: 120),
             
             // 底部模糊背景
             bottomBlurView.topAnchor.constraint(equalTo: bottomActionView.topAnchor),
@@ -271,30 +294,17 @@ class BatchImageEnhanceViewController: UIViewController {
             bottomBlurView.trailingAnchor.constraint(equalTo: bottomActionView.trailingAnchor),
             bottomBlurView.bottomAnchor.constraint(equalTo: bottomActionView.bottomAnchor),
             
-            // 保存全部按钮
-            saveAllButton.leadingAnchor.constraint(equalTo: bottomActionView.leadingAnchor, constant: 12),
-            saveAllButton.centerYAnchor.constraint(equalTo: bottomActionView.centerYAnchor),
-            saveAllButton.widthAnchor.constraint(equalToConstant: 70),
-            saveAllButton.heightAnchor.constraint(equalToConstant: 44),
+            // 第一行按钮容器
+            firstRowStackView.topAnchor.constraint(equalTo: bottomActionView.topAnchor, constant: 12),
+            firstRowStackView.leadingAnchor.constraint(equalTo: bottomActionView.leadingAnchor, constant: 16),
+            firstRowStackView.trailingAnchor.constraint(equalTo: bottomActionView.trailingAnchor, constant: -16),
+            firstRowStackView.heightAnchor.constraint(equalToConstant: 44),
             
-            // 拼图创建按钮
-            createCollageButton.leadingAnchor.constraint(equalTo: saveAllButton.trailingAnchor, constant: 6),
-            createCollageButton.centerYAnchor.constraint(equalTo: bottomActionView.centerYAnchor),
-            createCollageButton.widthAnchor.constraint(equalToConstant: 70),
-            createCollageButton.heightAnchor.constraint(equalToConstant: 44),
-            
-            // 分享全部按钮
-            shareAllButton.leadingAnchor.constraint(equalTo: createCollageButton.trailingAnchor, constant: 6),
-            shareAllButton.centerYAnchor.constraint(equalTo: bottomActionView.centerYAnchor),
-            shareAllButton.widthAnchor.constraint(equalToConstant: 70),
-            shareAllButton.heightAnchor.constraint(equalToConstant: 44),
-            
-            // 选择模式按钮 - 固定宽度确保文字显示完整
-            selectModeButton.leadingAnchor.constraint(equalTo: shareAllButton.trailingAnchor, constant: 6),
-            selectModeButton.trailingAnchor.constraint(equalTo: bottomActionView.trailingAnchor, constant: -12),
-            selectModeButton.centerYAnchor.constraint(equalTo: bottomActionView.centerYAnchor),
-            selectModeButton.heightAnchor.constraint(equalToConstant: 44),
-            selectModeButton.widthAnchor.constraint(greaterThanOrEqualToConstant: 70) // 确保最小宽度
+            // 第二行按钮容器
+            secondRowStackView.topAnchor.constraint(equalTo: firstRowStackView.bottomAnchor, constant: 8),
+            secondRowStackView.leadingAnchor.constraint(equalTo: bottomActionView.leadingAnchor, constant: 16),
+            secondRowStackView.trailingAnchor.constraint(equalTo: bottomActionView.trailingAnchor, constant: -16),
+            secondRowStackView.heightAnchor.constraint(equalToConstant: 44)
         ])
     }
     
@@ -394,7 +404,8 @@ class BatchImageEnhanceViewController: UIViewController {
     private func setupProgressView() {
         progressContainerView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
         progressContainerView.layer.cornerRadius = ThemeManager.standardCornerRadius
-        progressContainerView.isHidden = true
+        // 状态容器始终显示，提供持续的状态反馈
+        progressContainerView.isHidden = false
         
         // 总体进度条
         overallProgressView.progressTintColor = ThemeManager.buttonPrimary
@@ -416,6 +427,9 @@ class BatchImageEnhanceViewController: UIViewController {
         statusLabel.textAlignment = .center
         statusLabel.text = "准备就绪"
         progressContainerView.addSubview(statusLabel)
+        
+        // 设置初始状态信息
+        updateInitialStateInfo()
     }
     
     private func setupCollectionView() {
@@ -434,8 +448,20 @@ class BatchImageEnhanceViewController: UIViewController {
         // 模糊背景
         bottomActionView.addSubview(bottomBlurView)
         
+        // 配置第一行StackView
+        firstRowStackView.axis = .horizontal
+        firstRowStackView.distribution = .fillEqually
+        firstRowStackView.spacing = 12
+        bottomActionView.addSubview(firstRowStackView)
+        
+        // 配置第二行StackView
+        secondRowStackView.axis = .horizontal
+        secondRowStackView.distribution = .fillEqually
+        secondRowStackView.spacing = 12
+        bottomActionView.addSubview(secondRowStackView)
+        
         // 保存全部按钮
-        saveAllButton.setTitle("保存", for: .normal) // 缩短文字
+        saveAllButton.setTitle("保存已完成", for: .normal)
         saveAllButton.backgroundColor = ThemeManager.buttonPrimary
         saveAllButton.setTitleColor(.white, for: .normal)
         saveAllButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
@@ -445,10 +471,10 @@ class BatchImageEnhanceViewController: UIViewController {
         saveAllButton.addTarget(self, action: #selector(saveAllButtonTapped), for: .touchUpInside)
         saveAllButton.isEnabled = false
         saveAllButton.alpha = 0.6
-        bottomActionView.addSubview(saveAllButton)
+        firstRowStackView.addArrangedSubview(saveAllButton)
         
         // 分享全部按钮
-        shareAllButton.setTitle("分享", for: .normal) // 缩短文字
+        shareAllButton.setTitle("分享已完成", for: .normal)
         shareAllButton.backgroundColor = ThemeManager.buttonSecondary
         shareAllButton.setTitleColor(.white, for: .normal)
         shareAllButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
@@ -458,10 +484,10 @@ class BatchImageEnhanceViewController: UIViewController {
         shareAllButton.addTarget(self, action: #selector(shareAllButtonTapped), for: .touchUpInside)
         shareAllButton.isEnabled = false
         shareAllButton.alpha = 0.6
-        bottomActionView.addSubview(shareAllButton)
+        firstRowStackView.addArrangedSubview(shareAllButton)
         
         // 拼图创建按钮
-        createCollageButton.setTitle("拼图", for: .normal) // 去掉emoji，缩短文字
+        createCollageButton.setTitle("拼图创建", for: .normal)
         createCollageButton.backgroundColor = UIColor.systemTeal.withAlphaComponent(0.8)
         createCollageButton.setTitleColor(.white, for: .normal)
         createCollageButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
@@ -471,21 +497,45 @@ class BatchImageEnhanceViewController: UIViewController {
         createCollageButton.addTarget(self, action: #selector(createCollageButtonTapped), for: .touchUpInside)
         createCollageButton.isEnabled = false
         createCollageButton.alpha = 0.6
-        bottomActionView.addSubview(createCollageButton)
+        firstRowStackView.addArrangedSubview(createCollageButton)
         
-        // 选择模式按钮（改为全选/反选按钮）
+        // 选择模式按钮（全选/反选）
         selectModeButton.setTitle("全选", for: .normal)
         selectModeButton.setTitle("反选", for: .selected)
         selectModeButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
         selectModeButton.setTitleColor(.white, for: .normal)
-        selectModeButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium) // 优化字体大小
-        selectModeButton.titleLabel?.adjustsFontSizeToFitWidth = true // 自动调整字体大小
-        selectModeButton.titleLabel?.minimumScaleFactor = 0.8 // 最小缩放到80%
+        selectModeButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        selectModeButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        selectModeButton.titleLabel?.minimumScaleFactor = 0.8
         selectModeButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         selectModeButton.addTarget(self, action: #selector(selectModeButtonTapped), for: .touchUpInside)
-        selectModeButton.isEnabled = true  // 默认启用
+        selectModeButton.isEnabled = true
         selectModeButton.alpha = 1.0
-        bottomActionView.addSubview(selectModeButton)
+        secondRowStackView.addArrangedSubview(selectModeButton)
+        
+        // 重新选择按钮
+        reselectButton.setTitle("重新选择", for: .normal)
+        reselectButton.backgroundColor = UIColor.systemOrange.withAlphaComponent(0.8)
+        reselectButton.setTitleColor(.white, for: .normal)
+        reselectButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        reselectButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        reselectButton.titleLabel?.minimumScaleFactor = 0.8
+        reselectButton.layer.cornerRadius = ThemeManager.standardCornerRadius
+        reselectButton.addTarget(self, action: #selector(reselectButtonTapped), for: .touchUpInside)
+        reselectButton.isHidden = true // 初始隐藏
+        secondRowStackView.addArrangedSubview(reselectButton)
+        
+        // 返回截图中心按钮
+        returnToCenterButton.setTitle("返回截图中心", for: .normal)
+        returnToCenterButton.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.8)
+        returnToCenterButton.setTitleColor(.white, for: .normal)
+        returnToCenterButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        returnToCenterButton.titleLabel?.adjustsFontSizeToFitWidth = true
+        returnToCenterButton.titleLabel?.minimumScaleFactor = 0.8
+        returnToCenterButton.layer.cornerRadius = ThemeManager.standardCornerRadius
+        returnToCenterButton.addTarget(self, action: #selector(returnToCenterButtonTapped), for: .touchUpInside)
+        returnToCenterButton.isHidden = true // 初始隐藏
+        secondRowStackView.addArrangedSubview(returnToCenterButton)
     }
     
     private func configureNavigationBar() {
@@ -567,6 +617,16 @@ extension BatchImageEnhanceViewController {
     @objc private func selectModeButtonTapped() {
         HapticFeedbackManager.shared.buttonTap()
         toggleSelectAll()
+    }
+    
+    @objc private func reselectButtonTapped() {
+        HapticFeedbackManager.shared.buttonTap()
+        showReselectConfirmation()
+    }
+    
+    @objc private func returnToCenterButtonTapped() {
+        HapticFeedbackManager.shared.buttonTap()
+        performReturn()
     }
     
     private func toggleSelectAll() {
@@ -731,6 +791,7 @@ extension BatchImageEnhanceViewController {
                     
                     self.collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
                     self.updateOverallProgress()
+                    self.updatePageState()
                     
                     self.processingGroup.leave()
                 }
@@ -786,7 +847,13 @@ extension BatchImageEnhanceViewController {
         let progress = totalSelectedItems > 0 ? Float(processedItems) / Float(totalSelectedItems) : 0
         
         overallProgressView.progress = progress
-        progressLabel.text = "\(Int(progress * 100))%"
+        
+        // 根据当前状态更新信息显示
+        if pageState == .processing {
+            updateProcessingStateInfo()
+        } else if pageState == .completed {
+            updateCompletedStateInfo()
+        }
     }
     
     private func updateProcessingState() {
@@ -851,6 +918,9 @@ extension BatchImageEnhanceViewController {
         // 更新计数和按钮
         updateCountLabel()
         updateStartButtonText()
+        
+        // 更新状态信息显示
+        updateSelectionStateInfo()
     }
     
     // 移除原来的toggleSelectMode方法，已被toggleSelectAll替代
@@ -948,7 +1018,9 @@ extension BatchImageEnhanceViewController {
         // 简化处理，实际应该用批量保存API
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             progressAlert.dismiss(animated: true) {
-                self.showAlert(title: "保存完成", message: "已保存\(totalCount)张图片到相册")
+                let message = totalCount == 1 ? "已保存1张修复后的图片到相册" : "已保存\(totalCount)张修复后的图片到相册"
+                self.showAlert(title: "保存成功", message: message)
+                HapticFeedbackManager.shared.notificationSuccess()
             }
         }
     }
@@ -971,6 +1043,21 @@ extension BatchImageEnhanceViewController {
         alert.addAction(UIAlertAction(title: "取消", style: .cancel))
         alert.addAction(UIAlertAction(title: "重置", style: .destructive) { _ in
             self.resetAllItems()
+        })
+        
+        present(alert, animated: true)
+    }
+    
+    private func showReselectConfirmation() {
+        let alert = UIAlertController(
+            title: "重新选择确认",
+            message: "这将清除所有修复结果，返回选择状态，确定要重新选择吗？",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        alert.addAction(UIAlertAction(title: "重新选择", style: .destructive) { _ in
+            self.resetToSelectingState()
         })
         
         present(alert, animated: true)
@@ -1019,6 +1106,116 @@ extension BatchImageEnhanceViewController {
         
         // 更新选择UI
         updateSelectionUI()
+    }
+    
+    private func resetToSelectingState() {
+        // 停止所有处理
+        // imageEnhancer.cancelAllEnhancements() // 如果需要的话可以添加取消方法
+        
+        // 重置所有项目状态
+        for item in enhanceItems {
+            item.processingState = .pending
+            item.progress = 0.0
+            item.error = nil
+            item.enhancedImage = nil
+        }
+        
+        completedCount = 0
+        failedCount = 0
+        
+        // 重置为默认未选择状态
+        selectedIndices = Set<Int>()
+        
+        // 重置页面状态为选择状态
+        pageState = .selecting
+        
+        // 状态显示和UI更新将由状态管理系统处理
+        updatePageState()
+        updateSelectionUI()
+        collectionView.reloadData()
+    }
+    
+    private func updatePageState() {
+        let hasCompleted = enhanceItems.contains { $0.processingState == .completed }
+        let hasProcessing = enhanceItems.contains { $0.processingState == .processing }
+        
+        // 更新页面状态
+        let newState: PageState
+        if hasProcessing {
+            newState = .processing
+        } else if hasCompleted {
+            newState = .completed
+        } else {
+            newState = .selecting
+        }
+        
+        // 只在状态真正改变时更新
+        if pageState != newState {
+            pageState = newState
+            updateStateInfoForCurrentState()
+        }
+        
+        // 根据状态显示/隐藏按钮
+        if hasCompleted && !hasProcessing {
+            // 有完成的项目且没有正在处理的项目，显示重新选择和返回按钮
+            reselectButton.isHidden = false
+            returnToCenterButton.isHidden = false
+        } else {
+            // 否则隐藏这些按钮
+            reselectButton.isHidden = true
+            returnToCenterButton.isHidden = true
+        }
+    }
+    
+    /// 根据当前页面状态更新状态信息显示
+    private func updateStateInfoForCurrentState() {
+        switch pageState {
+        case .selecting:
+            updateInitialStateInfo()
+            updateButtonsForSelectingState()
+        case .processing:
+            updateProcessingStateInfo()
+            updateButtonsForProcessingState()
+        case .completed:
+            updateCompletedStateInfo()
+            updateButtonsForCompletedState()
+        }
+    }
+    
+    /// 更新选择状态下的按钮显示
+    private func updateButtonsForSelectingState() {
+        // 显示选择相关按钮
+        selectModeButton.isHidden = false
+        levelSegmentedControl.isHidden = false
+        startButton.isHidden = false
+        
+        // 隐藏处理相关按钮
+        pauseButton.isHidden = true
+        resetButton.isHidden = true
+    }
+    
+    /// 更新处理状态下的按钮显示
+    private func updateButtonsForProcessingState() {
+        // 隐藏选择相关按钮
+        selectModeButton.isHidden = true
+        levelSegmentedControl.isHidden = true
+        startButton.isHidden = true
+        
+        // 显示处理相关按钮
+        pauseButton.isHidden = false
+        resetButton.isHidden = false
+    }
+    
+    /// 更新完成状态下的按钮显示
+    private func updateButtonsForCompletedState() {
+        // 隐藏所有选择和处理按钮
+        selectModeButton.isHidden = true
+        levelSegmentedControl.isHidden = true
+        startButton.isHidden = true
+        pauseButton.isHidden = true
+        resetButton.isHidden = true
+        
+        // 保存和分享按钮的显示由updateBottomButtonsForCompletion控制
     }
     
     private func showAlert(title: String, message: String) {
@@ -1440,5 +1637,82 @@ class BatchEnhanceCell: UICollectionViewCell {
         progressView.progress = 0
         // 重用时隐藏分割线
         dividerView.isHidden = true
+    }
+}
+
+// MARK: - State Information Management
+extension BatchImageEnhanceViewController {
+    
+    /// 更新初始状态信息显示
+    private func updateInitialStateInfo() {
+        let selectedCount = selectedIndices.count
+        let totalCount = enhanceItems.count
+        let levelText = getLevelText(currentLevel)
+        
+        if selectedCount == 0 {
+            statusLabel.text = "选择图片后点击开始修复"
+            progressLabel.text = "当前等级：\(levelText)"
+        } else {
+            statusLabel.text = "已选择 \(selectedCount) 张图片"
+            progressLabel.text = "当前等级：\(levelText) | 共 \(totalCount) 张"
+        }
+        
+        overallProgressView.progress = 0.0
+    }
+    
+    /// 更新选择状态变化时的信息
+    func updateSelectionStateInfo() {
+        guard pageState == .selecting else { return }
+        updateInitialStateInfo()
+    }
+    
+    /// 获取等级文本描述
+    private func getLevelText(_ level: EnhanceLevel) -> String {
+        switch level {
+        case .light:
+            return "轻度"
+        case .medium:
+            return "中度"
+        case .heavy:
+            return "重度"
+        }
+    }
+    
+    /// 更新处理过程中的状态信息
+    private func updateProcessingStateInfo() {
+        let selectedCount = selectedIndices.count
+        let completedItems = enhanceItems.enumerated().filter { index, item in
+            selectedIndices.contains(index) && item.processingState == .completed
+        }.count
+        
+        let processingItems = enhanceItems.enumerated().filter { index, item in
+            selectedIndices.contains(index) && item.processingState == .processing
+        }.count
+        
+        if processingItems > 0 {
+            statusLabel.text = "正在修复第 \(completedItems + 1) 张图片..."
+        } else if completedItems == selectedCount {
+            statusLabel.text = "修复完成！共处理 \(completedItems) 张图片"
+        } else {
+            statusLabel.text = "已完成 \(completedItems)/\(selectedCount) 张图片"
+        }
+        
+        progressLabel.text = "\(Int(overallProgressView.progress * 100))%"
+    }
+    
+    /// 更新完成状态的信息
+    private func updateCompletedStateInfo() {
+        let completedItems = enhanceItems.filter { $0.processingState == .completed }.count
+        let failedItems = enhanceItems.filter { $0.processingState == .failed }.count
+        
+        if failedItems == 0 {
+            statusLabel.text = "🎉 全部修复完成！"
+            progressLabel.text = "成功处理 \(completedItems) 张图片"
+        } else {
+            statusLabel.text = "修复完成，有 \(failedItems) 张失败"
+            progressLabel.text = "成功 \(completedItems) 张，失败 \(failedItems) 张"
+        }
+        
+        overallProgressView.progress = 1.0
     }
 }
