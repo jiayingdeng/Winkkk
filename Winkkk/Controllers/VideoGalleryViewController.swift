@@ -786,24 +786,24 @@ class VideoGalleryViewController: UIViewController {
     
     
     private func exportVideoToPhotoLibrary(_ video: VideoItem) {
-        // 检查权限
-        PHPhotoLibrary.requestAuthorization { [weak self] status in
+        print("🔄 开始导出视频到相册: \(video.fileName)")
+        
+        // 显示导出进度指示器
+        let loadingAlert = UIAlertController(title: "导出中", message: "正在导出视频到相册...", preferredStyle: .alert)
+        present(loadingAlert, animated: true)
+        
+        // 使用 VideoManager 统一的导出方法
+        videoManager.exportToPhotoLibrary(video: video) { [weak self] result in
             DispatchQueue.main.async {
-                guard status == .authorized else {
-                    self?.showPermissionAlert()
-                    return
-                }
-                
-                // 保存到相册
-                PHPhotoLibrary.shared().performChanges({
-                    PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: video.filePath)
-                }) { [weak self] success, error in
-                    DispatchQueue.main.async {
-                        if success {
-                            self?.showSuccessAlert(message: "视频已成功导出到系统相册")
-                        } else {
-                            self?.showError(error ?? NSError(domain: "ExportError", code: -1, userInfo: [NSLocalizedDescriptionKey: "导出失败"]))
-                        }
+                // 关闭进度指示器
+                loadingAlert.dismiss(animated: true) {
+                    switch result {
+                    case .success:
+                        print("✅ 视频成功导出到相册")
+                        self?.showSuccessAlert(message: "视频已成功导出到系统相册")
+                    case .failure(let error):
+                        print("❌ 视频导出失败: \(error.localizedDescription)")
+                        self?.showError(error)
                     }
                 }
             }
@@ -1276,7 +1276,52 @@ class VideoGalleryViewController: UIViewController {
     }
     
     private func showError(_ error: Error) {
-        showAlert(title: "错误", message: error.localizedDescription)
+        var title = "错误"
+        var message = error.localizedDescription
+        var actions: [UIAlertAction] = []
+        
+        // 如果是VideoManagerError，显示更详细的错误信息
+        if let videoError = error as? VideoManagerError {
+            switch videoError {
+            case .exportPermissionDenied, .permissionDenied:
+                title = "需要权限"
+                if let failureReason = videoError.failureReason {
+                    message = "\(message)\n\n\(failureReason)"
+                }
+                if let suggestion = videoError.recoverySuggestion {
+                    message = "\(message)\n\n建议：\(suggestion)"
+                }
+                
+                // 添加设置按钮
+                let settingsAction = UIAlertAction(title: "去设置", style: .default) { _ in
+                    if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(settingsURL)
+                    }
+                }
+                actions.append(settingsAction)
+                actions.append(UIAlertAction(title: "取消", style: .cancel))
+                
+            case .insufficientStorage:
+                title = "存储空间不足"
+                if let suggestion = videoError.recoverySuggestion {
+                    message = "\(message)\n\n建议：\(suggestion)"
+                }
+                
+            default:
+                if let failureReason = videoError.failureReason {
+                    message = "\(message)\n\n原因：\(failureReason)"
+                }
+                if let suggestion = videoError.recoverySuggestion {
+                    message = "\(message)\n\n建议：\(suggestion)"
+                }
+            }
+        }
+        
+        if actions.isEmpty {
+            actions.append(UIAlertAction(title: "确定", style: .default))
+        }
+        
+        showAlert(title: title, message: message, actions: actions)
     }
 }
 
@@ -1648,7 +1693,7 @@ extension VideoGalleryViewController: UICollectionViewDelegate {
             }
             
             let exportAction = UIAction(title: "导出到系统相册", image: UIImage(systemName: "square.and.arrow.up")) { [weak self] _ in
-                self?.exportVideoToSystemLibrary(video)
+                self?.exportVideoToPhotoLibrary(video)
             }
             
             let deleteAction = UIAction(title: "删除", image: UIImage(systemName: "trash"), attributes: .destructive) { [weak self] _ in
@@ -1664,30 +1709,6 @@ extension VideoGalleryViewController: UICollectionViewDelegate {
         TimeSequenceModeManager.shared.handleVideoSelection(video.filePath, from: self)
     }
     
-    private func exportVideoToSystemLibrary(_ video: VideoItem) {
-        print("🔄 开始单个视频导出到系统相册: \(video.fileName)")
-        
-        // 显示导出进度指示器
-        let loadingAlert = UIAlertController(title: "导出中", message: "正在导出视频到系统相册...", preferredStyle: .alert)
-        present(loadingAlert, animated: true)
-        
-        // 使用 VideoManager 统一的导出方法
-        videoManager.exportToPhotoLibrary(video: video) { [weak self] result in
-            DispatchQueue.main.async {
-                // 关闭进度指示器
-                loadingAlert.dismiss(animated: true) {
-                    switch result {
-                    case .success:
-                        print("✅ 单个视频成功导出到系统相册")
-                        self?.showVideoExportSuccessAlert()
-                    case .failure(let error):
-                        print("❌ 单个视频导出失败: \(error.localizedDescription)")
-                        self?.showVideoExportErrorAlert(error)
-                    }
-                }
-            }
-        }
-    }
     
     private func showVideoExportPermissionDeniedAlert() {
         let alert = UIAlertController(
@@ -1717,13 +1738,8 @@ extension VideoGalleryViewController: UICollectionViewDelegate {
     }
     
     private func showVideoExportErrorAlert(_ error: Error) {
-        let alert = UIAlertController(
-            title: "导出失败",
-            message: "无法导出视频到系统相册: \(error.localizedDescription)",
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "确定", style: .default))
-        present(alert, animated: true)
+        // 使用统一的错误处理方法
+        showError(error)
     }
     
 }

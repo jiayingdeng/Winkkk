@@ -498,38 +498,108 @@ class VideoManager: NSObject {
             return
         }
         
-        // 使用 async/await 检查权限
+        // 使用现代的 PHPhotoLibrary API
         Task {
             do {
                 try await checkPhotoLibraryPermission()
                 
-                // 权限获得，执行导出
-                DispatchQueue.main.async {
-                    UISaveVideoAtPathToSavedPhotosAlbum(video.filePath.path, self, #selector(self.videoExportCompleted(_:didFinishSavingWithError:contextInfo:)), Unmanaged.passRetained(CompletionWrapper(completion: completion, videoItem: video)).toOpaque())
+                // 权限获得，使用现代API执行导出
+                try await performVideoExport(video: video)
+                
+                // 导出成功，更新状态
+                await MainActor.run {
+                    self.updateVideoExportStatus(video, to: .exported)
+                    completion(.success(()))
                 }
+                
             } catch {
-                DispatchQueue.main.async {
+                await MainActor.run {
+                    print("❌ 视频导出失败: \(error.localizedDescription)")
                     completion(.failure(error))
                 }
             }
         }
     }
     
-    @objc private func videoExportCompleted(_ videoPath: String, didFinishSavingWithError error: Error?, contextInfo: UnsafeRawPointer) {
-        let wrapper = Unmanaged<CompletionWrapper>.fromOpaque(contextInfo).takeRetainedValue()
+    // 使用现代PHPhotoLibrary API执行导出
+    private func performVideoExport(video: VideoItem) async throws {
+        let videoURL = video.filePath
         
-        DispatchQueue.main.async {
-            if let error = error {
-                wrapper.completion(.failure(error))
-            } else {
-                // 导出成功，更新视频的导出状态
-                if let videoItem = wrapper.videoItem {
-                    self.updateVideoExportStatus(videoItem, to: .exported)
+        // 验证文件格式兼容性
+        try validateVideoForExport(at: videoURL)
+        
+        return try await withCheckedThrowingContinuation { continuation in
+            PHPhotoLibrary.shared().performChanges({
+                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: videoURL)
+            }) { success, error in
+                if success {
+                    print("✅ 视频导出成功: \(video.title)")
+                    continuation.resume()
+                } else {
+                    // 根据具体错误类型返回更准确的错误信息
+                    let exportError: Error
+                    if let phError = error as? PHPhotosError {
+                        switch phError.code {
+                        case .accessRestricted, .accessUserDenied:
+                            exportError = VideoManagerError.exportPermissionDenied
+                        case .networkAccessRequired:
+                            exportError = VideoManagerError.networkError
+                        case .libraryVolumeOffline, .libraryInFileProviderSyncRoot:
+                            exportError = VideoManagerError.insufficientStorage
+                        default:
+                            exportError = VideoManagerError.exportFailed
+                        }
+                    } else if let nsError = error as? NSError {
+                        switch nsError.code {
+                        case NSFileReadNoSuchFileError:
+                            exportError = VideoManagerError.fileNotFound
+                        case NSFileWriteFileExistsError, NSFileWriteVolumeReadOnlyError:
+                            exportError = VideoManagerError.insufficientStorage
+                        default:
+                            exportError = VideoManagerError.exportFailed
+                        }
+                    } else {
+                        exportError = error ?? VideoManagerError.exportFailed
+                    }
+                    
+                    print("❌ 视频导出失败: \(exportError.localizedDescription)")
+                    continuation.resume(throwing: exportError)
                 }
-                wrapper.completion(.success(()))
             }
         }
     }
+    
+    // 验证视频文件是否适合导出
+    private func validateVideoForExport(at url: URL) throws {
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw VideoManagerError.fileNotFound
+        }
+        
+        // 检查文件扩展名
+        let supportedExtensions = ["mov", "mp4", "m4v", "3gp"]
+        let fileExtension = url.pathExtension.lowercased()
+        
+        guard supportedExtensions.contains(fileExtension) else {
+            print("❌ 不支持的视频格式: \(fileExtension)")
+            throw VideoManagerError.exportUnsupportedFormat
+        }
+        
+        // 检查文件大小（避免过大的文件导致导出失败）
+        do {
+            let fileAttributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            if let fileSize = fileAttributes[.size] as? Int64 {
+                let maxFileSize: Int64 = 2 * 1024 * 1024 * 1024 // 2GB
+                if fileSize > maxFileSize {
+                    print("❌ 视频文件过大: \(fileSize) bytes")
+                    throw VideoManagerError.insufficientStorage
+                }
+            }
+        } catch {
+            print("❌ 无法获取文件信息: \(error)")
+            throw VideoManagerError.invalidVideoFile
+        }
+    }
+    
     
     // MARK: - Export Status Management
     func updateVideoExportStatus(_ videoItem: VideoItem, to status: ExportStatusType) {
@@ -558,34 +628,49 @@ class VideoManager: NSObject {
     
     // MARK: - Permission Management
     private func checkPhotoLibraryPermission() async throws {
-        let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
-        
-        switch status {
-        case .authorized, .limited:
-            return
-        case .denied, .restricted:
-            throw VideoManagerError.permissionDenied
-        case .notDetermined:
-            let newStatus = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
-            if newStatus != .authorized && newStatus != .limited {
-                throw VideoManagerError.permissionDenied
+        // iOS 14.0+ 支持 .addOnly 权限类型
+        if #available(iOS 14.0, *) {
+            let status = PHPhotoLibrary.authorizationStatus(for: .addOnly)
+            
+            switch status {
+            case .authorized, .limited:
+                return
+            case .denied, .restricted:
+                throw VideoManagerError.exportPermissionDenied
+            case .notDetermined:
+                let newStatus = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+                if newStatus != .authorized && newStatus != .limited {
+                    throw VideoManagerError.exportPermissionDenied
+                }
+            @unknown default:
+                throw VideoManagerError.exportPermissionDenied
             }
-        @unknown default:
-            throw VideoManagerError.permissionDenied
+        } else {
+            // iOS 13.x 及以下版本的兼容性处理
+            let status = PHPhotoLibrary.authorizationStatus()
+            
+            switch status {
+            case .authorized:
+                return
+            case .denied, .restricted:
+                throw VideoManagerError.exportPermissionDenied
+            case .notDetermined:
+                return try await withCheckedThrowingContinuation { continuation in
+                    PHPhotoLibrary.requestAuthorization { newStatus in
+                        if newStatus == .authorized {
+                            continuation.resume()
+                        } else {
+                            continuation.resume(throwing: VideoManagerError.exportPermissionDenied)
+                        }
+                    }
+                }
+            @unknown default:
+                throw VideoManagerError.exportPermissionDenied
+            }
         }
     }
 }
 
-// MARK: - Helper Classes
-private class CompletionWrapper {
-    let completion: (Result<Void, Error>) -> Void
-    let videoItem: VideoItem?
-    
-    init(completion: @escaping (Result<Void, Error>) -> Void, videoItem: VideoItem? = nil) {
-        self.completion = completion
-        self.videoItem = videoItem
-    }
-}
 
 // MARK: - Data Structures
 struct VideoInfo {
@@ -606,6 +691,9 @@ enum VideoManagerError: LocalizedError {
     case insufficientStorage
     case networkError
     case permissionDenied
+    case exportFailed
+    case exportPermissionDenied
+    case exportUnsupportedFormat
     
     var errorDescription: String? {
         switch self {
@@ -625,6 +713,60 @@ enum VideoManagerError: LocalizedError {
             return "网络错误"
         case .permissionDenied:
             return "权限被拒绝"
+        case .exportFailed:
+            return "视频导出失败"
+        case .exportPermissionDenied:
+            return "相册访问权限被拒绝，请在设置中允许访问相册"
+        case .exportUnsupportedFormat:
+            return "不支持的视频格式"
+        }
+    }
+    
+    var failureReason: String? {
+        switch self {
+        case .invalidVideoFile:
+            return "视频文件格式不正确或已损坏"
+        case .fileNotFound:
+            return "视频文件可能已被删除或移动"
+        case .fileCopyFailed:
+            return "无法复制视频文件，可能是存储空间不足"
+        case .thumbnailGenerationFailed:
+            return "无法从视频生成缩略图"
+        case .thumbnailSaveFailed:
+            return "缩略图保存到磁盘时发生错误"
+        case .insufficientStorage:
+            return "设备存储空间不足，请清理后重试"
+        case .networkError:
+            return "网络连接异常，请检查网络设置"
+        case .permissionDenied:
+            return "应用没有必要的访问权限"
+        case .exportFailed:
+            return "导出过程中发生未知错误"
+        case .exportPermissionDenied:
+            return "需要相册访问权限才能保存视频"
+        case .exportUnsupportedFormat:
+            return "当前视频格式不支持导出到相册"
+        }
+    }
+    
+    var recoverySuggestion: String? {
+        switch self {
+        case .invalidVideoFile:
+            return "请选择其他视频文件"
+        case .fileNotFound:
+            return "请重新选择视频文件"
+        case .fileCopyFailed, .insufficientStorage:
+            return "请清理设备存储空间后重试"
+        case .thumbnailGenerationFailed, .thumbnailSaveFailed:
+            return "请重启应用后重试"
+        case .networkError:
+            return "请检查网络连接后重试"
+        case .permissionDenied, .exportPermissionDenied:
+            return "请在设置-隐私-照片中允许应用访问相册"
+        case .exportFailed:
+            return "请重试，如问题持续请重启应用"
+        case .exportUnsupportedFormat:
+            return "请使用其他视频编辑工具转换格式"
         }
     }
 }
