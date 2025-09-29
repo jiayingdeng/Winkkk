@@ -578,15 +578,15 @@ class TimelineView: UIView {
     
     /// 🎯 Wink风格：获取当前竖线位置对应的截取时间
     func getCurrentCaptureTime() -> Double {
-        // 🎯 计算竖线在内容视图中的绝对位置 - 现在基于屏幕中心
-        let centerX = screenWidth / 2  // 🎯 修复：竖线现在固定在屏幕中心，与约束一致
-        let absoluteX = centerX + scrollView.contentOffset.x  // 相对于内容视图的绝对位置
+        // 🎯 修复：竖线约束到屏幕中心，但需要计算相对于TimelineView的位置
+        let timelineCenter = bounds.width / 2  // TimelineView自身的中心
+        let absoluteX = timelineCenter + scrollView.contentOffset.x  // 相对于内容视图的绝对位置
         
         // 🎯 使用更新后的坐标转换方法（已考虑padding）
         let captureTime = coordinateToTime(absoluteX)
         let clampedTime = max(0, min(duration, captureTime))  // 限制在有效范围内
         
-        print("🔍 DEBUG-P4: getCurrentCaptureTime - centerX=\(centerX), contentOffset.x=\(scrollView.contentOffset.x)")
+        print("🔍 DEBUG-P4: getCurrentCaptureTime - timelineCenter=\(timelineCenter), contentOffset.x=\(scrollView.contentOffset.x)")
         print("🔍 DEBUG-P4: getCurrentCaptureTime - absoluteX=\(absoluteX), captureTime=\(captureTime), clampedTime=\(clampedTime)")
         
         // 🎯 帧级别精度：在高缩放时对齐到帧边界
@@ -611,7 +611,7 @@ class TimelineView: UIView {
             return (min: 0, max: 0)
         }
         
-        let centerX = screenWidth / 2  // 🎯 修复：基于屏幕宽度计算中心位置
+        let centerX = bounds.width / 2  // 🎯 修复：基于TimelineView宽度计算中心位置
         
         // 让视频开头（时间0）能够到达中心竖线的滚动位置
         let timeZeroCoordinate = timeToCoordinate(0)
@@ -634,7 +634,7 @@ class TimelineView: UIView {
     func scrollToCaptureTime(_ time: Double) {
         // 🎯 使用更新后的坐标转换（已考虑padding）
         let targetX = timeToCoordinate(time)
-        let centerX = screenWidth / 2  // 🎯 修复：基于屏幕宽度计算中心位置
+        let centerX = bounds.width / 2  // 🎯 修复：基于TimelineView宽度计算中心位置
         
         // 计算需要的滚动偏移，让目标时间点移动到中心竖线位置
         let scrollOffsetX = targetX - centerX
@@ -781,40 +781,59 @@ class TimelineView: UIView {
         let startTime = max(0, coordinateToTime(visibleStartOffset))
         let endTime = min(duration, coordinateToTime(visibleEndOffset))
         
-        // 🎯 第3步：获取刻度间隔并计算起始时间
+        // 🎯 第3步：获取刻度间隔
         let interval = getCurrentTimeInterval()
         
-        // 🎯 修复：确保从0秒开始绘制时间刻度，即使不在可见范围内
-        // 这样能确保0秒、结尾秒等关键时间点总是正确对齐
-        var currentTime = floor(startTime / interval) * interval
-        if currentTime < 0 {
-            currentTime = 0  // 不绘制负时间刻度
+        var tickCount = 0
+        
+        // 🎯 **核心修复：关键时间点优先绘制机制**
+        // 步骤A：强制绘制0秒刻度（如果在可见范围内）
+        let zeroAbsoluteX = timeToCoordinate(0)
+        let zeroRelativeX = zeroAbsoluteX - scrollView.contentOffset.x
+        if zeroRelativeX >= 0 && zeroRelativeX <= timeScaleView.bounds.width {
+            drawTickMark(at: zeroRelativeX, for: 0, interval: interval)
+            tickCount += 1
+            print("🎯 [强制] 起点刻度: 00:00@\(Int(zeroAbsoluteX))px")
         }
         
-        // 🎯 第4步：循环绘制每个刻度
-        var tickCount = 0
-        while currentTime <= endTime && currentTime <= duration {
-            // 将时间转换为contentView中的绝对X坐标
-            let absoluteX = timeToCoordinate(currentTime)
+        // 步骤B：强制绘制结尾秒刻度（如果在可见范围内）
+        let endAbsoluteX = timeToCoordinate(duration)
+        let endRelativeX = endAbsoluteX - scrollView.contentOffset.x
+        if endRelativeX >= 0 && endRelativeX <= timeScaleView.bounds.width {
+            drawTickMark(at: endRelativeX, for: duration, interval: interval)
+            tickCount += 1
+            print("🎯 [强制] 终点刻度: \(duration.formattedTimeString())@\(Int(endAbsoluteX))px")
+        }
+        
+        // 🎯 第4步：绘制中间的间隔刻度
+        // 修复：从最接近startTime但不小于0的间隔点开始
+        var currentTime = max(0, floor(startTime / interval) * interval)
+        
+        // 使用精度容差避免浮点数比较问题
+        let epsilon = 0.001
+        while currentTime <= endTime + epsilon && currentTime <= duration + epsilon {
+            // 跳过已经绘制的关键时间点，避免重复绘制
+            let isZeroTick = abs(currentTime - 0) < epsilon
+            let isEndTick = abs(currentTime - duration) < epsilon
             
-            // 转换为相对于timeScaleView的本地X坐标
-            let relativeX = absoluteX - scrollView.contentOffset.x
-            
-            // 只绘制在timeScaleView范围内的刻度
-            if relativeX >= 0 && relativeX <= timeScaleView.bounds.width {
-                drawTickMark(at: relativeX, for: currentTime, interval: interval)
-                tickCount += 1
+            if !isZeroTick && !isEndTick {
+                // 将时间转换为contentView中的绝对X坐标
+                let absoluteX = timeToCoordinate(currentTime)
                 
-                // 🔍 关键刻度调试
-                if currentTime == 0 || abs(currentTime - duration) < 0.1 {
-                    print("🎯 [关键] \(currentTime == 0 ? "起点" : "终点")刻度: \(currentTime.formattedTimeString())@\(Int(absoluteX))px")
+                // 转换为相对于timeScaleView的本地X坐标
+                let relativeX = absoluteX - scrollView.contentOffset.x
+                
+                // 只绘制在timeScaleView范围内的刻度
+                if relativeX >= 0 && relativeX <= timeScaleView.bounds.width {
+                    drawTickMark(at: relativeX, for: currentTime, interval: interval)
+                    tickCount += 1
                 }
             }
             
             currentTime += interval
         }
         
-        print("🎯 [简化] 刻度更新: \(tickCount)个刻度, 时间范围\(startTime.formattedTimeString())-\(endTime.formattedTimeString())")
+        print("🎯 [修复] 刻度更新: \(tickCount)个刻度, 时间范围\(startTime.formattedTimeString())-\(endTime.formattedTimeString())")
     }
     
     /// 绘制单个刻度线和文字
