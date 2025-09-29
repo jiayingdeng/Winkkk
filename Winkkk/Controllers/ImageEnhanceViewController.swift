@@ -25,7 +25,8 @@ enum PhotoLibraryError: Error {
 enum EnhanceSourceType {
     case fromScreenshots    // 来自截图
     case fromCollage       // 来自拼图
-    case fromBatch         // 来自批量修复
+    case fromBatch         // 来自批量修复（未修复状态）
+    case fromBatchCompleted // 来自批量修复（已修复状态）
     
     var displayName: String {
         switch self {
@@ -35,8 +36,18 @@ enum EnhanceSourceType {
             return "拼图修复"
         case .fromBatch:
             return "批量修复"
+        case .fromBatchCompleted:
+            return "批量修复结果"
         }
     }
+}
+
+// MARK: - 批量上下文信息
+struct BatchContext {
+    let items: [BatchEnhanceItem]
+    let currentIndex: Int
+    let enhanceLevel: EnhanceLevel
+    let onItemUpdated: ((Int, UIImage) -> Void)?
 }
 
 class ImageEnhanceViewController: UIViewController {
@@ -48,6 +59,11 @@ class ImageEnhanceViewController: UIViewController {
     private var currentLevel: EnhanceLevel = .medium
     var sourceType: EnhanceSourceType = .fromScreenshots // 修复来源类型
     var onEnhancementComplete: ((UIImage) -> Void)? // 完成回调
+    
+    // 批量模式相关属性
+    private var batchContext: BatchContext?
+    private var skipAutoEnhance: Bool = false
+    private var currentBatchIndex: Int = 0
     
     // MARK: - UI Components
     private let gradientBackgroundView = GradientBackgroundView()
@@ -89,6 +105,23 @@ class ImageEnhanceViewController: UIViewController {
         super.init(nibName: nil, bundle: nil)
     }
     
+    // 扩展初始化方法 - 支持批量修复模式
+    init(image: UIImage, 
+         timestamp: Double, 
+         enhanceLevel: EnhanceLevel = .medium,
+         skipAutoEnhance: Bool = false,
+         batchContext: BatchContext? = nil) {
+        self.originalImage = image
+        self.timestamp = timestamp
+        self.currentLevel = enhanceLevel
+        self.skipAutoEnhance = skipAutoEnhance
+        self.batchContext = batchContext
+        if let context = batchContext {
+            self.currentBatchIndex = context.currentIndex
+        }
+        super.init(nibName: nil, bundle: nil)
+    }
+    
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
@@ -122,8 +155,12 @@ class ImageEnhanceViewController: UIViewController {
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        // 首次显示时自动应用中度修复
-        enhanceImageWithCurrentLevel()
+        
+        // 根据skipAutoEnhance参数决定是否自动修复
+        if !skipAutoEnhance {
+            // 首次显示时自动应用修复
+            enhanceImageWithCurrentLevel()
+        }
     }
     
     override func viewDidLayoutSubviews() {
@@ -174,16 +211,39 @@ class ImageEnhanceViewController: UIViewController {
     }
     
     private func setupNavigationBar() {
-        title = "画质修复"
+        // 根据来源类型设置标题
+        if let batchContext = batchContext {
+            let currentPosition = batchContext.currentIndex + 1
+            let totalCount = batchContext.items.count
+            title = "第\(currentPosition)张/共\(totalCount)张"
+        } else {
+            title = sourceType.displayName
+        }
+        
         navigationController?.navigationBar.tintColor = .white
         navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: UIColor.white]
         
         navigationItem.leftBarButtonItem = UIBarButtonItem(
-            title: "取消",
+            title: "返回",
             style: .plain,
             target: self,
             action: #selector(cancelButtonTapped)
         )
+        
+        // 添加返回截图中心的快捷按钮（需求5）
+        if sourceType == .fromBatch || sourceType == .fromBatchCompleted {
+            navigationItem.rightBarButtonItem = UIBarButtonItem(
+                title: "截图中心",
+                style: .plain,
+                target: self,
+                action: #selector(returnToScreenshotCenterTapped)
+            )
+        }
+        
+        // 如果是批量模式，可以考虑添加左右切换按钮（Phase 2实现）
+        if batchContext != nil {
+            setupBatchNavigationButtons()
+        }
     }
     
     private func setupControlPanel() {
@@ -241,7 +301,14 @@ class ImageEnhanceViewController: UIViewController {
         statusLabel.textColor = .white
         statusLabel.font = ThemeManager.captionFont
         statusLabel.textAlignment = .center
-        statusLabel.text = "选择修复强度并点击应用修复"
+        statusLabel.numberOfLines = 2  // 允许多行显示
+        
+        // 根据来源类型设置初始状态文字
+        if sourceType == .fromBatchCompleted {
+            statusLabel.text = "批量修复已完成\n如需调整效果，可重新选择修复强度"
+        } else {
+            statusLabel.text = "选择修复强度并点击应用修复"
+        }
     }
     
     private func setupBottomButtons() {
@@ -369,9 +436,19 @@ class ImageEnhanceViewController: UIViewController {
     }
     
     private func configureInitialState() {
-        currentLevel = .medium
-        levelSegmentedControl.selectedSegmentIndex = 1
+        // 如果没有通过初始化设置等级，则使用默认中度
+        if currentLevel == .medium && batchContext == nil {
+            currentLevel = .medium
+        }
+        
+        // 设置分段控制器的选中状态
+        levelSegmentedControl.selectedSegmentIndex = currentLevel.rawValue - 1
         updateStatusLabel()
+        
+        // 如果是批量修复完成状态，更新状态提示
+        if sourceType == .fromBatchCompleted {
+            updateBatchCompletedStatus()
+        }
     }
     
     // MARK: - Image Enhancement
@@ -491,13 +568,209 @@ class ImageEnhanceViewController: UIViewController {
     
     private func updateStatusLabel() {
         if !isProcessing {
-            statusLabel.text = "\(currentLevel.displayName) - \(currentLevel.description)"
+            if sourceType == .fromBatchCompleted {
+                statusLabel.text = "批量修复已完成 - \(currentLevel.displayName)效果"
+            } else {
+                statusLabel.text = "\(currentLevel.displayName) - \(currentLevel.description)"
+            }
+        }
+    }
+    
+    private func updateBatchCompletedStatus() {
+        statusLabel.text = "批量修复已完成 - \(currentLevel.displayName)效果\n如需调整效果，可重新选择修复强度"
+        
+        // 更新导航栏副标题（如果需要）
+        if let batchContext = batchContext {
+            let currentPosition = batchContext.currentIndex + 1
+            let totalCount = batchContext.items.count
+            title = "第\(currentPosition)张/共\(totalCount)张 - 已修复"
+        }
+    }
+    
+    // MARK: - Batch Navigation Support
+    private func setupBatchNavigationButtons() {
+        guard let context = batchContext else { return }
+        
+        // 创建左右切换按钮
+        let prevButton = UIBarButtonItem(
+            image: UIImage(systemName: "chevron.left"),
+            style: .plain,
+            target: self,
+            action: #selector(previousImageTapped)
+        )
+        
+        let nextButton = UIBarButtonItem(
+            image: UIImage(systemName: "chevron.right"),
+            style: .plain,
+            target: self,
+            action: #selector(nextImageTapped)
+        )
+        
+        // 根据当前位置启用/禁用按钮
+        prevButton.isEnabled = context.currentIndex > 0
+        nextButton.isEnabled = context.currentIndex < context.items.count - 1
+        
+        // 如果已经有右侧按钮（返回截图中心），则组合显示
+        if navigationItem.rightBarButtonItem != nil {
+            // 将切换按钮放在左侧
+            let spacer = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
+            navigationItem.leftBarButtonItems = [
+                navigationItem.leftBarButtonItem!,
+                spacer,
+                prevButton,
+                nextButton
+            ]
+        } else {
+            // 将切换按钮放在右侧
+            navigationItem.rightBarButtonItems = [nextButton, prevButton]
         }
     }
     
     // MARK: - Actions
     @objc private func cancelButtonTapped() {
         navigationController?.popViewController(animated: true)
+    }
+    
+    @objc private func returnToScreenshotCenterTapped() {
+        HapticFeedbackManager.shared.buttonTap()
+        
+        // 查找导航栈中的ScreenshotProcessingViewController
+        guard let navigationController = navigationController else { return }
+        
+        let screenshotProcessingVC = navigationController.viewControllers.first { viewController in
+            return viewController is ScreenshotProcessingViewController
+        }
+        
+        if let targetVC = screenshotProcessingVC {
+            // 如果找到截图中心，直接返回到那里
+            navigationController.popToViewController(targetVC, animated: true)
+        } else {
+            // 如果没有找到，返回到上一级（批量修复页面）
+            navigationController.popViewController(animated: true)
+        }
+    }
+    
+    @objc private func previousImageTapped() {
+        guard let context = batchContext, context.currentIndex > 0 else { return }
+        switchToImageAtIndex(context.currentIndex - 1)
+    }
+    
+    @objc private func nextImageTapped() {
+        guard let context = batchContext, context.currentIndex < context.items.count - 1 else { return }
+        switchToImageAtIndex(context.currentIndex + 1)
+    }
+    
+    // MARK: - Batch Navigation Implementation
+    private func switchToImageAtIndex(_ newIndex: Int) {
+        guard let context = batchContext,
+              newIndex >= 0,
+              newIndex < context.items.count else { return }
+        
+        HapticFeedbackManager.shared.selectionChanged()
+        
+        let newItem = context.items[newIndex]
+        
+        // 保存当前图片的修复结果（如果有的话）
+        if let currentEnhanced = enhancedImage {
+            context.onItemUpdated?(currentBatchIndex, currentEnhanced)
+        }
+        
+        // 更新当前索引
+        currentBatchIndex = newIndex
+        
+        // 更新批量上下文（创建新的上下文对象）
+        batchContext = BatchContext(
+            items: context.items,
+            currentIndex: newIndex,
+            enhanceLevel: context.enhanceLevel,
+            onItemUpdated: context.onItemUpdated
+        )
+        
+        // 更新UI内容
+        updateContentForCurrentImage(newItem)
+        
+        // 更新导航栏
+        updateNavigationForCurrentIndex()
+        
+        // 更新导航按钮状态
+        updateNavigationButtonStates()
+    }
+    
+    private func updateContentForCurrentImage(_ item: BatchEnhanceItem) {
+        // 更新对比视图的原图
+        comparisonView.setOriginalImage(item.originalImage)
+        
+        // 根据图片状态设置修复结果和来源类型
+        if item.processingState == .completed, let enhancedImage = item.enhancedImage {
+            // 已修复的图片
+            sourceType = .fromBatchCompleted
+            self.enhancedImage = enhancedImage
+            comparisonView.setEnhancedImage(enhancedImage)
+            
+            // 启用保存和分享按钮
+            saveButton.isEnabled = true
+            saveButton.alpha = 1.0
+            shareButton.isEnabled = true
+            shareButton.alpha = 1.0
+            
+        } else {
+            // 未修复的图片
+            sourceType = .fromBatch
+            enhancedImage = nil
+            comparisonView.resetToOriginalImage()
+            
+            // 禁用保存和分享按钮
+            saveButton.isEnabled = false
+            saveButton.alpha = 0.6
+            shareButton.isEnabled = false
+            shareButton.alpha = 0.6
+        }
+        
+        // 更新状态标签
+        updateStatusLabel()
+        if sourceType == .fromBatchCompleted {
+            updateBatchCompletedStatus()
+        }
+    }
+    
+    private func updateNavigationForCurrentIndex() {
+        guard let context = batchContext else { return }
+        
+        let currentPosition = context.currentIndex + 1
+        let totalCount = context.items.count
+        
+        if sourceType == .fromBatchCompleted {
+            title = "第\(currentPosition)张/共\(totalCount)张 - 已修复"
+        } else {
+            title = "第\(currentPosition)张/共\(totalCount)张"
+        }
+    }
+    
+    private func updateNavigationButtonStates() {
+        guard let context = batchContext else { return }
+        
+        // 查找并更新导航按钮状态
+        if let leftBarButtonItems = navigationItem.leftBarButtonItems {
+            // 左侧按钮组合模式
+            for item in leftBarButtonItems {
+                if item.image == UIImage(systemName: "chevron.left") {
+                    item.isEnabled = context.currentIndex > 0
+                } else if item.image == UIImage(systemName: "chevron.right") {
+                    item.isEnabled = context.currentIndex < context.items.count - 1
+                }
+            }
+        }
+        
+        if let rightBarButtonItems = navigationItem.rightBarButtonItems {
+            // 右侧按钮组合模式
+            for item in rightBarButtonItems {
+                if item.image == UIImage(systemName: "chevron.left") {
+                    item.isEnabled = context.currentIndex > 0
+                } else if item.image == UIImage(systemName: "chevron.right") {
+                    item.isEnabled = context.currentIndex < context.items.count - 1
+                }
+            }
+        }
     }
     
     @objc private func resetButtonTapped() {

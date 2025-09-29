@@ -1239,22 +1239,54 @@ extension BatchImageEnhanceViewController {
     
     /// 显示单图详细查看页面
     private func showDetailView(for item: BatchEnhanceItem, at index: Int) {
-        guard let enhancedImage = item.enhancedImage else { return }
-        
-        let imageEnhanceVC = ImageEnhanceViewController(
-            image: item.originalImage,
-            timestamp: Date().timeIntervalSince1970
+        // 创建批量上下文
+        let batchContext = BatchContext(
+            items: enhanceItems,
+            currentIndex: index,
+            enhanceLevel: currentLevel,
+            onItemUpdated: { [weak self] updatedIndex, newEnhancedImage in
+                self?.enhanceItems[updatedIndex].enhancedImage = newEnhancedImage
+                self?.enhanceItems[updatedIndex].processingState = .completed
+                self?.collectionView.reloadItems(at: [IndexPath(item: updatedIndex, section: 0)])
+            }
         )
         
-        // 设置来源类型
-        imageEnhanceVC.sourceType = .fromBatch
+        let imageEnhanceVC: ImageEnhanceViewController
         
-        // 预设已修复的图片
-        imageEnhanceVC.setEnhancedImage(enhancedImage)
+        if item.processingState == .completed, let enhancedImage = item.enhancedImage {
+            // 已修复的图片：使用扩展初始化，跳过自动修复
+            imageEnhanceVC = ImageEnhanceViewController(
+                image: item.originalImage,
+                timestamp: Date().timeIntervalSince1970,
+                enhanceLevel: currentLevel,  // 传递当前批量修复使用的等级
+                skipAutoEnhance: true,      // 跳过自动修复
+                batchContext: batchContext   // 传递批量上下文
+            )
+            
+            // 设置来源类型为已完成的批量修复
+            imageEnhanceVC.sourceType = .fromBatchCompleted
+            
+            // 预设已修复的图片
+            imageEnhanceVC.setEnhancedImage(enhancedImage)
+            
+        } else {
+            // 未修复的图片：使用扩展初始化，保持当前等级但允许自动修复
+            imageEnhanceVC = ImageEnhanceViewController(
+                image: item.originalImage,
+                timestamp: Date().timeIntervalSince1970,
+                enhanceLevel: currentLevel,  // 传递当前批量修复使用的等级
+                skipAutoEnhance: false,     // 允许自动修复
+                batchContext: batchContext   // 传递批量上下文
+            )
+            
+            // 设置来源类型为批量修复
+            imageEnhanceVC.sourceType = .fromBatch
+        }
         
         // 设置完成回调（用户在详细页面重新修复后）
         imageEnhanceVC.onEnhancementComplete = { [weak self] newEnhancedImage in
             self?.enhanceItems[index].enhancedImage = newEnhancedImage
+            self?.enhanceItems[index].processingState = .completed
             self?.collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
         }
         
