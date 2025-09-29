@@ -130,6 +130,8 @@ class ScreenshotEngine {
         let maxSize: CGSize
         
         switch devicePerformance {
+        case .ultra:
+            maxSize = CGSize(width: 8192, height: 8192) // 支持8K截图
         case .high:
             maxSize = CGSize(width: 6144, height: 6144) // 支持6K截图
         case .medium:

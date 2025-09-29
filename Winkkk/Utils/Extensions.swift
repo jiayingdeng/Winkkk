@@ -296,32 +296,123 @@ extension UIImage {
 // MARK: - 设备信息
 struct DeviceInfo {
     
-    /// 获取设备性能等级
+    /// 获取设备性能等级（增强版本，包含更精确的设备检测）
     static var performanceLevel: PerformanceLevel {
+        // 优先使用精确的设备型号检测
+        if let deviceModel = getDeviceModel() {
+            if let levelFromModel = PerformanceLevel.fromDeviceModel(deviceModel) {
+                print("📱 设备型号检测: \(deviceModel) -> \(levelFromModel)")
+                return levelFromModel
+            }
+        }
+        
+        // 回退到处理器和内存检测
         let processorInfo = ProcessInfo.processInfo
         let activeProcessorCount = processorInfo.activeProcessorCount
         let physicalMemory = processorInfo.physicalMemory
         
-        // 根据处理器核心数和内存判断性能等级
-        if activeProcessorCount >= 6 && physicalMemory >= 6_000_000_000 { // 6GB+
+        if activeProcessorCount >= 6 && physicalMemory >= 6_000_000_000 {
             return .high
-        } else if activeProcessorCount >= 4 && physicalMemory >= 3_000_000_000 { // 3GB+
+        } else if activeProcessorCount >= 4 && physicalMemory >= 3_000_000_000 {
             return .medium
         } else {
             return .low
         }
     }
     
+    /// 获取当前设备的实时性能状态
+    static func getCurrentPerformanceStatus() -> PerformanceStatus {
+        let memoryInfo = getMemoryInfo()
+        let thermalState = ProcessInfo.processInfo.thermalState
+        let batteryLevel = UIDevice.current.batteryLevel
+        let isLowPowerMode = ProcessInfo.processInfo.isLowPowerModeEnabled
+        
+        return PerformanceStatus(
+            memoryInfo: memoryInfo,
+            thermalState: thermalState,
+            batteryLevel: batteryLevel,
+            isLowPowerMode: isLowPowerMode
+        )
+    }
+    
+    /// 检查是否可以安全进行高性能录制
+    static func canPerformHighQualityRecording() -> (canPerform: Bool, reason: String?) {
+        let status = getCurrentPerformanceStatus()
+        
+        // 检查内存是否充足
+        if status.memoryInfo.availableMemory < 500_000_000 { // 小于500MB
+            return (false, "可用内存不足，建议关闭其他应用")
+        }
+        
+        // 检查设备温度
+        if status.thermalState == .critical || status.thermalState == .serious {
+            return (false, "设备温度过高，需要等待降温")
+        }
+        
+        // 检查电量
+        if status.batteryLevel > 0 && status.batteryLevel < 0.15 { // 低于15%
+            return (false, "电量过低，建议连接电源")
+        }
+        
+        // 检查低电量模式
+        if status.isLowPowerMode {
+            return (false, "低电量模式已开启，将自动降低录制质量")
+        }
+        
+        return (true, nil)
+    }
+    
+    private static func getDeviceModel() -> String? {
+        var systemInfo = utsname()
+        uname(&systemInfo)
+        let machineMirror = Mirror(reflecting: systemInfo.machine)
+        let identifier = machineMirror.children.reduce("") { identifier, element in
+            guard let value = element.value as? Int8, value != 0 else { return identifier }
+            return identifier + String(UnicodeScalar(UInt8(value)))
+        }
+        return identifier.isEmpty ? nil : identifier
+    }
+    
+    private static func getMemoryInfo() -> MemoryInfo {
+        let host = mach_host_self()
+        var hostInfo = vm_statistics64()
+        var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.stride / MemoryLayout<natural_t>.stride)
+        
+        let result = withUnsafeMutablePointer(to: &hostInfo) {
+            $0.withMemoryRebound(to: integer_t.self, capacity: Int(count)) {
+                host_statistics64(host, HOST_VM_INFO64, $0, &count)
+            }
+        }
+        
+        if result == KERN_SUCCESS {
+            let totalMemory = ProcessInfo.processInfo.physicalMemory
+            let pageSize = UInt64(vm_kernel_page_size)
+            let freeMemory = UInt64(hostInfo.free_count) * pageSize
+            let usedMemory = totalMemory - freeMemory
+            let availableMemory = freeMemory
+            
+            return MemoryInfo(
+                totalMemory: totalMemory,
+                usedMemory: usedMemory,
+                availableMemory: availableMemory
+            )
+        }
+        
+        return MemoryInfo(totalMemory: 0, usedMemory: 0, availableMemory: 0)
+    }
+    
     enum PerformanceLevel {
         case low
         case medium
         case high
+        case ultra // 新增超高性能级别
         
         var maxVideoResolution: String {
             switch self {
             case .low: return AVCaptureSession.Preset.hd1280x720.rawValue
             case .medium: return AVCaptureSession.Preset.hd1920x1080.rawValue
             case .high: return AVCaptureSession.Preset.hd4K3840x2160.rawValue
+            case .ultra: return AVCaptureSession.Preset.hd4K3840x2160.rawValue
             }
         }
         
@@ -330,6 +421,106 @@ struct DeviceInfo {
             case .low: return 1
             case .medium: return 2
             case .high: return 3
+            case .ultra: return 4
+            }
+        }
+        
+        var displayName: String {
+            switch self {
+            case .low: return "低性能"
+            case .medium: return "中等性能"
+            case .high: return "高性能"
+            case .ultra: return "超高性能"
+            }
+        }
+        
+        /// 根据设备型号返回性能等级
+        static func fromDeviceModel(_ model: String) -> PerformanceLevel? {
+            // iPhone 15系列及以上 - Ultra级别
+            if model.hasPrefix("iPhone16") || // iPhone 16系列
+               model.hasPrefix("iPhone15,4") || model.hasPrefix("iPhone15,5") { // iPhone 15 Pro系列
+                return .ultra
+            }
+            
+            // iPhone 13-14系列，M1/M2 iPad - High级别  
+            if model.hasPrefix("iPhone14") || model.hasPrefix("iPhone15,2") || model.hasPrefix("iPhone15,3") || // iPhone 14/15系列
+               model.hasPrefix("iPad13") || model.hasPrefix("iPad14") { // M1/M2 iPad
+                return .high
+            }
+            
+            // iPhone 11-12系列，A12-A14设备 - Medium级别
+            if model.hasPrefix("iPhone11") || model.hasPrefix("iPhone12") || model.hasPrefix("iPhone13") ||
+               model.hasPrefix("iPad11") || model.hasPrefix("iPad12") {
+                return .medium
+            }
+            
+            // 更老的设备 - Low级别
+            if model.hasPrefix("iPhone8") || model.hasPrefix("iPhone9") || model.hasPrefix("iPhone10") ||
+               model.hasPrefix("iPad6") || model.hasPrefix("iPad7") || model.hasPrefix("iPad8") {
+                return .low
+            }
+            
+            return nil
+        }
+    }
+    
+    struct PerformanceStatus {
+        let memoryInfo: MemoryInfo
+        let thermalState: ProcessInfo.ThermalState
+        let batteryLevel: Float
+        let isLowPowerMode: Bool
+        
+        var canPerformHighQualityRecording: Bool {
+            return memoryInfo.availableMemory > 500_000_000 && // 500MB可用内存
+                   thermalState != .critical &&
+                   thermalState != .serious &&
+                   !isLowPowerMode &&
+                   (batteryLevel <= 0 || batteryLevel > 0.15) // 电量大于15%或者正在充电
+        }
+        
+        var recommendedMaxQuality: VideoQuality {
+            if !canPerformHighQualityRecording {
+                return .low
+            }
+            
+            if memoryInfo.availableMemory > 1_000_000_000 && thermalState == .nominal {
+                return .high
+            } else if memoryInfo.availableMemory > 700_000_000 {
+                return .medium
+            } else {
+                return .low
+            }
+        }
+    }
+    
+    struct MemoryInfo {
+        let totalMemory: UInt64
+        let usedMemory: UInt64
+        let availableMemory: UInt64
+        
+        var memoryPressure: MemoryPressure {
+            let usageRatio = Double(usedMemory) / Double(totalMemory)
+            if usageRatio > 0.9 {
+                return .critical
+            } else if usageRatio > 0.8 {
+                return .high
+            } else if usageRatio > 0.6 {
+                return .medium
+            } else {
+                return .low
+            }
+        }
+    }
+    
+    enum MemoryPressure {
+        case low, medium, high, critical
+        
+        var displayName: String {
+            switch self {
+            case .low: return "内存充足"
+            case .medium: return "内存适中"
+            case .high: return "内存紧张"
+            case .critical: return "内存严重不足"
             }
         }
     }

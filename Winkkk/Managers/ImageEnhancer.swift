@@ -492,6 +492,8 @@ extension ImageEnhancer {
         let devicePerformance = DeviceInfo.performanceLevel
         
         switch devicePerformance {
+        case .ultra:
+            return CGSize(width: 8192, height: 8192)
         case .high:
             return CGSize(width: 4096, height: 4096)
         case .medium:

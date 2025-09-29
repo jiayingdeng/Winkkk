@@ -129,12 +129,14 @@ class VideoThumbnailCell: UICollectionViewCell {
         super.init(frame: frame)
         setupUI()
         setupConstraints()
+        setupNotifications()
     }
     
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         setupUI()
         setupConstraints()
+        setupNotifications()
     }
     
     // MARK: - Lifecycle
@@ -168,6 +170,29 @@ class VideoThumbnailCell: UICollectionViewCell {
         thumbnailImageView.layer.cornerRadius = ThemeManager.standardCornerRadius
         // 移除了selectionIndicatorView的样式设置
         selectionOverlayView.layer.cornerRadius = ThemeManager.standardCornerRadius
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    // MARK: - Notification Setup
+    private func setupNotifications() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleVideoQualityChange),
+            name: .videoQualityDidChange,
+            object: nil
+        )
+    }
+    
+    @objc private func handleVideoQualityChange(_ notification: Notification) {
+        guard let videoItem = videoItem else { return }
+        
+        // 重新配置缩略图和UI
+        DispatchQueue.main.async { [weak self] in
+            self?.configure(with: videoItem)
+        }
     }
     
     // MARK: - UI Setup
@@ -491,7 +516,7 @@ class EmptyStateView: UIView {
     
     private let messageLabel: UILabel = {
         let label = UILabel()
-        label.text = "点击正上方 ➕ 按钮添加视频\n在应用内拍摄或从相册导入"
+        label.text = "点击正上方 ➕ 按钮添加视频\n支持拍摄或相册导入"
         label.font = ThemeManager.bodyFont
         label.textColor = ThemeManager.secondaryText
         label.textAlignment = .center

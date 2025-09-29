@@ -251,6 +251,14 @@ class SettingsViewController: UIViewController {
             alert.addAction(UIAlertAction(title: quality, style: .default) { [weak self] _ in
                 UserDefaults.standard.set(presets[index].rawValue, forKey: "VideoQualityPreset")
                 self?.updateVideoQualitySubtitle(quality)
+                
+                // 🎯 发送通知更新相机质量设置
+                NotificationCenter.default.post(
+                    name: .videoQualityDidChange, 
+                    object: nil, 
+                    userInfo: ["preset": presets[index]]
+                )
+                print("✅ 用户更改视频质量为: \(quality)")
             })
         }
         
@@ -867,21 +875,161 @@ class StorageDetailViewController: UIViewController {
         ])
         
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: "StorageCell")
+        
+        // 添加下拉刷新
+        setupRefreshControl()
+    }
+    
+    private func setupRefreshControl() {
+        let refreshControl = UIRefreshControl()
+        refreshControl.tintColor = .white
+        refreshControl.addTarget(self, action: #selector(refreshStorageData), for: .valueChanged)
+        tableView.refreshControl = refreshControl
+    }
+    
+    @objc private func refreshStorageData() {
+        StorageAnalyzer.shared.getDetailedStorageInfo(forceRefresh: true) { [weak self] result in
+            DispatchQueue.main.async {
+                self?.tableView.refreshControl?.endRefreshing()
+                
+                switch result {
+                case .success(let storageInfo):
+                    self?.updateStorageItems(with: storageInfo)
+                    
+                case .failure(let error):
+                    print("❌ StorageDetail: 刷新存储信息失败: \(error)")
+                    self?.showErrorState(error)
+                }
+            }
+        }
     }
     
     private func loadStorageData() {
-        // TODO: 实现存储数据加载
+        // 显示加载状态
+        AnimationManager.shared.startLoadingAnimation(on: view)
+        
+        StorageAnalyzer.shared.getDetailedStorageInfo { [weak self] result in
+            DispatchQueue.main.async {
+                AnimationManager.shared.stopLoadingAnimation(on: self?.view ?? UIView())
+                
+                switch result {
+                case .success(let storageInfo):
+                    self?.updateStorageItems(with: storageInfo)
+                    
+                case .failure(let error):
+                    print("❌ StorageDetail: 加载存储信息失败: \(error)")
+                    // 显示错误状态，但保留基本界面
+                    self?.showErrorState(error)
+                }
+            }
+        }
+    }
+    
+    private func updateStorageItems(with storageInfo: DetailedStorageInfo) {
+        storageItems = storageInfo.categories.map { category in
+            StorageItem(
+                title: category.title,
+                size: category.formattedSize,
+                icon: category.icon,
+                fileCount: category.fileCount,
+                canCleanup: category.canCleanup,
+                categoryType: category.type
+            )
+        }
+        
+        // 更新导航标题显示总大小
+        title = "存储详情 (\(storageInfo.formattedTotalSize))"
+        
+        tableView.reloadData()
+    }
+    
+    private func showErrorState(_ error: Error) {
+        // 显示基本的错误信息，但不影响界面
         storageItems = [
-            StorageItem(title: "视频文件", size: "1.2 GB", icon: "video.fill"),
-            StorageItem(title: "截图文件", size: "156 MB", icon: "photo.fill"),
-            StorageItem(title: "缩略图缓存", size: "23.4 MB", icon: "square.grid.2x2.fill"),
-            StorageItem(title: "临时文件", size: "8.7 MB", icon: "doc.fill")
+            StorageItem(title: "加载失败", size: "请下拉刷新", icon: "exclamationmark.triangle.fill")
         ]
         tableView.reloadData()
     }
     
     @objc private func closeButtonTapped() {
         dismiss(animated: true)
+    }
+    
+    // MARK: - Storage Interaction Methods
+    
+    private func showInfoAlert(for item: StorageItem) {
+        let title = item.title
+        let message: String
+        
+        if item.title.contains("视频") {
+            message = "用户视频文件，包含您录制和导入的所有视频。这些文件不会被自动清理。"
+        } else if item.title.contains("截图") {
+            message = "从视频中截取的图片文件，这些是您的重要数据，不会被自动清理。"
+        } else {
+            message = "该类型文件暂不支持清理操作。"
+        }
+        
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
+    }
+    
+    private func showCleanupConfirmation(for item: StorageItem, categoryType: StorageCategoryType) {
+        let title = "清理 \(item.title)"
+        let message = "即将清理 \(item.size) 的\(categoryType.description)。\n\n此操作不会影响您的重要数据，清理后可以释放存储空间。"
+        
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        
+        // 取消按钮
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        // 确认清理按钮
+        alert.addAction(UIAlertAction(title: "确认清理", style: .destructive) { [weak self] _ in
+            self?.performCleanup(categoryType: categoryType, itemTitle: item.title)
+        })
+        
+        present(alert, animated: true)
+    }
+    
+    private func performCleanup(categoryType: StorageCategoryType, itemTitle: String) {
+        // 显示加载动画
+        AnimationManager.shared.startLoadingAnimation(on: view)
+        
+        StorageAnalyzer.shared.cleanupCategory(categoryType) { [weak self] result in
+            DispatchQueue.main.async {
+                AnimationManager.shared.stopLoadingAnimation(on: self?.view ?? UIView())
+                
+                switch result {
+                case .success(let cleanupResult):
+                    self?.showCleanupSuccess(result: cleanupResult, categoryTitle: itemTitle)
+                    // 重新加载数据
+                    self?.loadStorageData()
+                    
+                case .failure(let error):
+                    self?.showCleanupError(error: error, categoryTitle: itemTitle)
+                }
+            }
+        }
+    }
+    
+    private func showCleanupSuccess(result: CacheCleanupResult, categoryTitle: String) {
+        let title = "清理完成"
+        let message = "成功清理 \(categoryTitle)\n" +
+                     "删除文件: \(result.totalDeletedCount) 个\n" +
+                     "释放空间: \(String.formatFileSize(result.totalDeletedSize))"
+        
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
+    }
+    
+    private func showCleanupError(error: Error, categoryTitle: String) {
+        let title = "清理失败"
+        let message = "清理 \(categoryTitle) 时出现错误:\n\(error.localizedDescription)"
+        
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "确定", style: .default))
+        present(alert, animated: true)
     }
 }
 
@@ -898,17 +1046,45 @@ extension StorageDetailViewController: UITableViewDataSource, UITableViewDelegat
         let item = storageItems[indexPath.row]
         cell.backgroundColor = UIColor.white.withAlphaComponent(0.1)
         cell.textLabel?.text = item.title
-        cell.detailTextLabel?.text = item.size
+        
+        // 显示大小和文件数量
+        if item.fileCount > 0 {
+            cell.detailTextLabel?.text = "\(item.size) (\(item.fileCount) 个文件)"
+        } else {
+            cell.detailTextLabel?.text = item.size
+        }
+        
         cell.imageView?.image = UIImage(systemName: item.icon)
         cell.imageView?.tintColor = ThemeManager.buttonPrimary
         cell.textLabel?.textColor = .white
         cell.detailTextLabel?.textColor = UIColor.white.withAlphaComponent(0.7)
+        
+        // 可清理的项目显示不同的样式
+        if item.canCleanup {
+            cell.accessoryType = .disclosureIndicator
+        } else {
+            cell.accessoryType = .none
+        }
         
         return cell
     }
     
     func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
         return "存储详情"
+    }
+    
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        tableView.deselectRow(at: indexPath, animated: true)
+        
+        let item = storageItems[indexPath.row]
+        
+        // 只有可清理的项目才能点击
+        guard item.canCleanup, let categoryType = item.categoryType else {
+            showInfoAlert(for: item)
+            return
+        }
+        
+        showCleanupConfirmation(for: item, categoryType: categoryType)
     }
     
     func tableView(_ tableView: UITableView, willDisplayHeaderView view: UIView, forSection section: Int) {
@@ -922,4 +1098,32 @@ struct StorageItem {
     let title: String
     let size: String
     let icon: String
+    let fileCount: Int
+    let canCleanup: Bool
+    let categoryType: StorageCategoryType?
+    
+    // 便利初始化器，用于错误状态
+    init(title: String, size: String, icon: String) {
+        self.title = title
+        self.size = size
+        self.icon = icon
+        self.fileCount = 0
+        self.canCleanup = false
+        self.categoryType = nil
+    }
+    
+    // 完整初始化器，用于正常数据
+    init(title: String, size: String, icon: String, fileCount: Int, canCleanup: Bool, categoryType: StorageCategoryType) {
+        self.title = title
+        self.size = size
+        self.icon = icon
+        self.fileCount = fileCount
+        self.canCleanup = canCleanup
+        self.categoryType = categoryType
+    }
+}
+
+// MARK: - Notification Extensions
+extension Notification.Name {
+    static let videoQualityDidChange = Notification.Name("videoQualityDidChange")
 }

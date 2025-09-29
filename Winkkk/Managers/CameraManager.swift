@@ -41,6 +41,11 @@ class CameraManager: NSObject {
     // 设备性能配置
     private let devicePerformance = DeviceInfo.performanceLevel
     
+    // 🆕 性能监控
+    private let performanceMonitor = PerformanceMonitor.shared
+    private var currentRecordingQuality: VideoQuality = .medium
+    private var qualityDowngradeWarningShown = false
+    
     // MARK: - Public Properties  
     var sessionPreview: AVCaptureSession {
         return captureSession
@@ -149,23 +154,56 @@ class CameraManager: NSObject {
     }
     
     private func configureSessionPreset() {
-        // 根据设备性能设置不同的预设
+        // 🎯 优先使用用户设置的视频质量
         let preset: AVCaptureSession.Preset
         
-        switch devicePerformance {
-        case .high:
-            preset = .hd4K3840x2160
-        case .medium:
-            preset = .hd1920x1080
-        case .low:
-            preset = .hd1280x720
+        if let userPresetString = UserDefaults.standard.string(forKey: "VideoQualityPreset") {
+            let userPreset = AVCaptureSession.Preset(rawValue: userPresetString)
+            // 检查设备是否支持用户选择的质量
+            if captureSession.canSetSessionPreset(userPreset) {
+                preset = userPreset
+                print("📹 使用用户设置的视频质量: \(userPreset.displayName)")
+            } else {
+                // 用户设置的质量不被设备支持，回退到设备性能判断
+                preset = getDeviceBasedPreset()
+                print("⚠️ 用户设置的质量不支持，回退到设备性能判断: \(preset.displayName)")
+            }
+        } else {
+            // 没有用户设置，使用设备性能判断
+            preset = getDeviceBasedPreset()
+            print("📱 使用基于设备性能的视频质量: \(preset.displayName)")
         }
         
         if captureSession.canSetSessionPreset(preset) {
             captureSession.sessionPreset = preset
         } else {
-            // 降级处理
+            // 最终降级处理
             captureSession.sessionPreset = .hd1920x1080
+            print("🔄 降级到1080P")
+        }
+    }
+    
+    /// 根据设备性能获取预设（增强版本，支持动态调整）
+    private func getDeviceBasedPreset() -> AVCaptureSession.Preset {
+        // 检查当前性能状态
+        let (canPerform, reason) = DeviceInfo.canPerformHighQualityRecording()
+        
+        if !canPerform {
+            print("⚠️ 性能限制，降级录制质量: \(reason ?? "未知原因")")
+            return .hd1280x720 // 强制降级到720P
+        }
+        
+        // 根据设备性能和当前状态选择预设
+        switch devicePerformance {
+        case .ultra:
+            return .hd4K3840x2160
+        case .high:
+            let recommendedQuality = performanceMonitor.getRecommendedRecordingQuality()
+            return recommendedQuality == .high ? .hd4K3840x2160 : .hd1920x1080
+        case .medium:
+            return .hd1920x1080
+        case .low:
+            return .hd1280x720
         }
     }
     
@@ -333,12 +371,31 @@ extension CameraManager {
                 return
             }
             
+            // 🆕 录制前性能检查
+            let (canRecord, reason) = DeviceInfo.canPerformHighQualityRecording()
+            if !canRecord {
+                print("⚠️ 录制前性能检查失败: \(reason ?? "未知原因")")
+                
+                // 询问用户是否要降级录制
+                DispatchQueue.main.async {
+                    self.delegate?.cameraManager(self, didFailWithError: CameraError.performanceInsufficient(reason ?? "设备性能不足"))
+                }
+                return
+            }
+            
             guard let movieOutput = self.movieFileOutput else {
                 DispatchQueue.main.async {
                     completion(.failure(CameraError.outputSetupFailed))
                 }
                 return
             }
+            
+            // 🆕 启动性能监控
+            self.performanceMonitor.startMonitoring(delegate: self)
+            self.currentRecordingQuality = self.performanceMonitor.getRecommendedRecordingQuality()
+            self.qualityDowngradeWarningShown = false
+            
+            print("🎥 开始录制，初始质量: \(self.currentRecordingQuality.displayName)")
             
             // 生成输出文件URL
             let outputURL = self.generateOutputURL()
@@ -371,6 +428,10 @@ extension CameraManager {
                 }
                 return
             }
+            
+            // 🆕 停止性能监控
+            self.performanceMonitor.stopMonitoring()
+            print("🎥 录制结束，最终质量: \(self.currentRecordingQuality.displayName)")
             
             // 保存回调
             self.recordingCompletion = completion
@@ -511,6 +572,9 @@ enum CameraError: LocalizedError {
     case notRecording
     case permissionDenied
     case deviceNotAvailable
+    case performanceInsufficient(String) // 🆕 性能不足错误
+    case thermalStateWarning(ProcessInfo.ThermalState) // 🆕 温度警告
+    case memoryPressureWarning(String) // 🆕 内存压力警告
     
     var errorDescription: String? {
         switch self {
@@ -528,6 +592,12 @@ enum CameraError: LocalizedError {
             return "相机或麦克风权限被拒绝"
         case .deviceNotAvailable:
             return "相机设备不可用"
+        case .performanceInsufficient(let reason):
+            return "设备性能不足：\(reason)"
+        case .thermalStateWarning(let state):
+            return "设备温度警告：\(state.displayName)"
+        case .memoryPressureWarning(let message):
+            return "内存压力警告：\(message)"
         }
     }
 }
@@ -535,8 +605,8 @@ enum CameraError: LocalizedError {
 // MARK: - Camera Settings
 extension CameraManager {
     
-    /// 获取当前录制质量
-    var currentRecordingQuality: AVCaptureSession.Preset {
+    /// 获取当前录制预设
+    var currentRecordingPreset: AVCaptureSession.Preset {
         return captureSession.sessionPreset
     }
     
@@ -561,8 +631,21 @@ extension CameraManager {
                 self.captureSession.beginConfiguration()
                 self.captureSession.sessionPreset = preset
                 self.captureSession.commitConfiguration()
+                print("📹 动态更新视频质量为: \(preset.displayName)")
+            } else {
+                print("⚠️ 无法设置视频质量: \(preset.displayName)")
             }
         }
+    }
+    
+    /// 从用户设置更新录制质量
+    func updateQualityFromUserSettings() {
+        guard let userPresetString = UserDefaults.standard.string(forKey: "VideoQualityPreset") else {
+            return
+        }
+        
+        let userPreset = AVCaptureSession.Preset(rawValue: userPresetString)
+        setRecordingQuality(userPreset)
     }
     
     /// 是否支持前后摄像头切换
@@ -573,5 +656,128 @@ extension CameraManager {
     /// 当前是否使用前置摄像头
     var isUsingFrontCamera: Bool {
         return videoDeviceInput?.device.position == .front
+    }
+}
+
+// MARK: - AVCaptureSession.Preset Extension
+extension AVCaptureSession.Preset {
+    /// 获取视频质量的显示名称
+    var displayName: String {
+        switch self {
+        case .hd4K3840x2160:
+            return "4K (超高清)"
+        case .hd1920x1080:
+            return "1080P (高清)"
+        case .hd1280x720:
+            return "720P (标清)"
+        case .vga640x480:
+            return "480P (标清)"
+        default:
+            return rawValue
+        }
+    }
+}
+
+// MARK: - Performance Monitor Delegate
+extension CameraManager: PerformanceMonitorDelegate {
+    
+    func performanceMonitor(_ monitor: PerformanceMonitor, didUpdateStatus status: DeviceInfo.PerformanceStatus) {
+        // 检查是否需要降级录制质量
+        let recommendedQuality = status.recommendedMaxQuality
+        
+        if recommendedQuality.rawValue != currentRecordingQuality.rawValue {
+            print("🔄 性能监控建议调整录制质量: \(currentRecordingQuality.displayName) -> \(recommendedQuality.displayName)")
+            
+            // 动态调整录制预设
+            sessionQueue.async { [weak self] in
+                self?.adjustRecordingQualityBasedOnPerformance(recommendedQuality)
+            }
+        }
+    }
+    
+    func performanceMonitor(_ monitor: PerformanceMonitor, didDetectMemoryPressure memoryInfo: DeviceInfo.MemoryInfo) {
+        print("⚠️ 内存压力检测: \(memoryInfo.memoryPressure.displayName)")
+        
+        let message = "可用内存: \(String.formatFileSize(Int64(memoryInfo.availableMemory)))"
+        delegate?.cameraManager(self, didFailWithError: CameraError.memoryPressureWarning(message))
+        
+        // 强制降级到最低质量
+        if memoryInfo.memoryPressure == .critical {
+            sessionQueue.async { [weak self] in
+                self?.adjustRecordingQualityBasedOnPerformance(.low)
+            }
+        }
+    }
+    
+    func performanceMonitor(_ monitor: PerformanceMonitor, didDetectThermalStateChange thermalState: ProcessInfo.ThermalState) {
+        print("🌡️ 温度状态变化: \(thermalState.displayName)")
+        
+        switch thermalState {
+        case .serious:
+            if !qualityDowngradeWarningShown {
+                delegate?.cameraManager(self, didFailWithError: CameraError.thermalStateWarning(thermalState))
+                qualityDowngradeWarningShown = true
+            }
+            
+            // 降级录制质量
+            sessionQueue.async { [weak self] in
+                self?.adjustRecordingQualityBasedOnPerformance(.medium)
+            }
+            
+        case .critical:
+            delegate?.cameraManager(self, didFailWithError: CameraError.thermalStateWarning(thermalState))
+            
+            // 强制停止录制或降级到最低质量
+            if isRecording {
+                print("🚨 设备过热，强制降级到最低质量")
+                sessionQueue.async { [weak self] in
+                    self?.adjustRecordingQualityBasedOnPerformance(.low)
+                }
+            }
+            
+        default:
+            break
+        }
+    }
+    
+    func performanceMonitor(_ monitor: PerformanceMonitor, didActivateLowPowerMode isActive: Bool) {
+        if isActive {
+            print("🔋 低电量模式激活，降级录制质量")
+            sessionQueue.async { [weak self] in
+                self?.adjustRecordingQualityBasedOnPerformance(.low)
+            }
+        }
+    }
+    
+    func performanceMonitor(_ monitor: PerformanceMonitor, didReceiveMemoryWarning: Void) {
+        print("⚠️ 收到内存警告，立即降级录制质量")
+        sessionQueue.async { [weak self] in
+            self?.adjustRecordingQualityBasedOnPerformance(.low)
+        }
+    }
+    
+    /// 根据性能状态调整录制质量
+    private func adjustRecordingQualityBasedOnPerformance(_ recommendedQuality: VideoQuality) {
+        guard isRecording else { return }
+        
+        let newPreset: AVCaptureSession.Preset
+        switch recommendedQuality {
+        case .high:
+            newPreset = .hd4K3840x2160
+        case .medium:
+            newPreset = .hd1920x1080
+        case .low:
+            newPreset = .hd1280x720
+        }
+        
+        // 检查是否支持新预设
+        if captureSession.canSetSessionPreset(newPreset) && captureSession.sessionPreset != newPreset {
+            captureSession.beginConfiguration()
+            captureSession.sessionPreset = newPreset
+            captureSession.commitConfiguration()
+            
+            currentRecordingQuality = recommendedQuality
+            print("✅ 动态调整录制质量为: \(newPreset.displayName)")
+        }
     }
 }

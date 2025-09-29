@@ -289,6 +289,8 @@ class VideoSegmentExtractor {
         let maxSize: CGSize
         
         switch devicePerformance {
+        case .ultra:
+            maxSize = CGSize(width: 8192, height: 8192) // 🎯 超高性能设备：8K分辨率
         case .high:
             maxSize = CGSize(width: 6144, height: 6144) // 🎯 高性能设备：6K分辨率
         case .medium:

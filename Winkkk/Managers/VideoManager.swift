@@ -22,6 +22,62 @@ class VideoManager: NSObject {
     private let fileManager = FileManager.default
     private let persistenceController = PersistenceController.shared
     
+    // 当前视频质量设置
+    var currentVideoQuality: VideoQuality {
+        get {
+            let rawValue = UserDefaults.standard.string(forKey: "videoQuality") ?? "medium"
+            return VideoQuality.from(rawValue: rawValue) ?? .medium
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: "videoQuality")
+            // 当视频质量改变时发送通知
+            NotificationCenter.default.post(name: .videoQualityDidChange, object: self, userInfo: ["quality": newValue])
+        }
+    }
+    
+    // MARK: - 性能诊断工具
+    
+    /// 获取设备性能诊断报告
+    func getPerformanceDiagnostics() -> PerformanceDiagnostics {
+        let deviceLevel = DeviceInfo.performanceLevel
+        let (canRecord, reason) = DeviceInfo.canPerformHighQualityRecording()
+        let status = DeviceInfo.getCurrentPerformanceStatus()
+        let recommendedQuality = PerformanceMonitor.shared.getRecommendedRecordingQuality()
+        
+        return PerformanceDiagnostics(
+            devicePerformanceLevel: deviceLevel,
+            canPerformHighQualityRecording: canRecord,
+            performanceIssue: reason,
+            currentMemoryStatus: status.memoryInfo,
+            thermalState: status.thermalState,
+            batteryLevel: status.batteryLevel,
+            isLowPowerMode: status.isLowPowerMode,
+            recommendedQuality: recommendedQuality
+        )
+    }
+    
+    /// 验证用户设置的录制质量是否安全
+    func validateRecordingQuality(_ quality: VideoQuality) -> (isValid: Bool, issue: String?) {
+        let diagnostics = getPerformanceDiagnostics()
+        
+        // 检查设备是否支持该质量
+        if quality == .high && diagnostics.devicePerformanceLevel == .low {
+            return (false, "设备性能不足，建议使用中等或低质量")
+        }
+        
+        // 检查当前性能状态
+        if !diagnostics.canPerformHighQualityRecording {
+            if quality == .high {
+                return (false, diagnostics.performanceIssue ?? "当前状态不适合高质量录制")
+            }
+            if quality == .medium && diagnostics.thermalState == .critical {
+                return (false, "设备温度过高，建议使用低质量录制")
+            }
+        }
+        
+        return (true, nil)
+    }
+    
     private lazy var backgroundContext: NSManagedObjectContext = {
         return persistenceController.newBackgroundContext()
     }()
@@ -844,6 +900,23 @@ enum VideoQuality: CaseIterable {
             ]
         }
     }
+    
+    var rawValue: String {
+        switch self {
+        case .high: return "high"
+        case .medium: return "medium"
+        case .low: return "low"
+        }
+    }
+    
+    static func from(rawValue: String) -> VideoQuality? {
+        switch rawValue {
+        case "high": return .high
+        case "medium": return .medium
+        case "low": return .low
+        default: return nil
+        }
+    }
 }
 
 // MARK: - Cache Management Helper Methods
@@ -926,5 +999,89 @@ struct CacheCleanupResult {
     
     var totalDeletedCount: Int {
         return deletedVideoCount + deletedThumbnailCount
+    }
+}
+
+// MARK: - Performance Diagnostics
+struct PerformanceDiagnostics {
+    let devicePerformanceLevel: DeviceInfo.PerformanceLevel
+    let canPerformHighQualityRecording: Bool
+    let performanceIssue: String?
+    let currentMemoryStatus: DeviceInfo.MemoryInfo
+    let thermalState: ProcessInfo.ThermalState
+    let batteryLevel: Float
+    let isLowPowerMode: Bool
+    let recommendedQuality: VideoQuality
+    
+    /// 获取诊断摘要
+    var summary: String {
+        var lines: [String] = []
+        
+        lines.append("📱 设备性能等级: \(devicePerformanceLevel.displayName)")
+        lines.append("🎥 推荐录制质量: \(recommendedQuality.displayName)")
+        
+        if !canPerformHighQualityRecording, let issue = performanceIssue {
+            lines.append("⚠️ 性能限制: \(issue)")
+        }
+        
+        lines.append("💾 内存状态: \(currentMemoryStatus.memoryPressure.displayName)")
+        lines.append("🌡️ 温度状态: \(thermalState.displayName)")
+        
+        if batteryLevel > 0 {
+            lines.append("🔋 电池电量: \(Int(batteryLevel * 100))%")
+        }
+        
+        if isLowPowerMode {
+            lines.append("⚡ 低电量模式已开启")
+        }
+        
+        return lines.joined(separator: "\n")
+    }
+    
+    /// 是否有严重的性能问题
+    var hasCriticalIssues: Bool {
+        return thermalState == .critical ||
+               currentMemoryStatus.memoryPressure == .critical ||
+               (batteryLevel > 0 && batteryLevel < 0.1)
+    }
+    
+    /// 性能评分（0-100）
+    var performanceScore: Int {
+        var score = 70 // 基础分数
+        
+        // 设备性能加分
+        switch devicePerformanceLevel {
+        case .ultra: score += 20
+        case .high: score += 15
+        case .medium: score += 5
+        case .low: score -= 5
+        }
+        
+        // 内存状态调整
+        switch currentMemoryStatus.memoryPressure {
+        case .low: score += 10
+        case .medium: score += 0
+        case .high: score -= 10
+        case .critical: score -= 25
+        }
+        
+        // 温度状态调整
+        switch thermalState {
+        case .nominal: score += 5
+        case .fair: score -= 5
+        case .serious: score -= 15
+        case .critical: score -= 30
+        @unknown default: break
+        }
+        
+        // 电量和低电量模式调整
+        if batteryLevel > 0 {
+            if batteryLevel < 0.15 { score -= 10 }
+            else if batteryLevel > 0.5 { score += 5 }
+        }
+        
+        if isLowPowerMode { score -= 15 }
+        
+        return max(0, min(100, score))
     }
 }
