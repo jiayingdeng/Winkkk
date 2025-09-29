@@ -572,29 +572,13 @@ class VideoGalleryViewController: UIViewController {
     private func applyCurrentFilters() {
         filteredVideos = videos.filter { video in
             // 检查来源筛选
-            let sourceMatches: Bool
             if video.videoSource == VideoSourceType.appRecorded.rawValue {
-                sourceMatches = currentFilterOptions.showAppRecorded
+                return currentFilterOptions.showAppRecorded
             } else if video.videoSource == VideoSourceType.systemImported.rawValue {
-                sourceMatches = currentFilterOptions.showSystemImported
+                return currentFilterOptions.showSystemImported
             } else {
-                sourceMatches = false
+                return false
             }
-            
-            // 检查状态筛选 (仅对应用拍摄的视频)
-            let statusMatches: Bool
-            if video.videoSource == VideoSourceType.appRecorded.rawValue {
-                // 对于应用拍摄的视频，检查是否显示待导出状态
-                if video.exportStatus == ExportStatusType.pending.rawValue {
-                    statusMatches = currentFilterOptions.showPendingExport
-                } else {
-                    statusMatches = true // 已导出的视频总是显示
-                }
-            } else {
-                statusMatches = true // 系统导入的视频不需要状态筛选
-            }
-            
-            return sourceMatches && statusMatches
         }
         
         // 更新筛选栏的结果计数
@@ -1366,7 +1350,6 @@ extension VideoGalleryViewController: VideoGalleryGuideDelegate {
         var testOptions = VideoFilterOptions()
         testOptions.showSystemImported = true
         testOptions.showAppRecorded = false
-        testOptions.showPendingExport = true
         currentFilterOptions = testOptions
         applyCurrentFilters()
         
@@ -1383,7 +1366,6 @@ extension VideoGalleryViewController: VideoGalleryGuideDelegate {
         for (index, cell) in visibleCells.enumerated() {
             if index < filteredVideos.count {
                 let videoItem = filteredVideos[index]
-                let shouldShowStatus = videoItem.videoSource != VideoSourceType.appRecorded.rawValue || videoItem.exportStatus == ExportStatusType.exported.rawValue
                 // 状态标签应该根据业务逻辑正确显示
                 print("📱 视频 \(videoItem.fileName) 状态标签显示正确")
             }
@@ -1626,10 +1608,17 @@ extension VideoGalleryViewController: UICollectionViewDelegate {
             
             if isSelectionMode {
                 // 选择模式下处理多选
-                if selectedVideoItems.contains(video) {
+                let wasSelected = selectedVideoItems.contains(video)
+                if wasSelected {
                     selectedVideoItems.remove(video)
+                    // 取消选择的轻微触觉反馈
+                    let feedbackGenerator = UIImpactFeedbackGenerator(style: .light)
+                    feedbackGenerator.impactOccurred()
                 } else {
                     selectedVideoItems.insert(video)
+                    // 选择的中等强度触觉反馈
+                    let feedbackGenerator = UIImpactFeedbackGenerator(style: .medium)
+                    feedbackGenerator.impactOccurred()
                 }
                 updateSelectionUI()
                 

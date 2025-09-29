@@ -70,14 +70,43 @@ class VideoThumbnailCell: UICollectionViewCell {
         return view
     }()
     
-    private let selectionIndicatorView: UIView = {
+    // 新的iOS风格选择UI组件
+    private let selectionOverlayView: UIView = {
         let view = UIView()
-        view.backgroundColor = ThemeManager.buttonPrimary.withAlphaComponent(0.2)
-        view.layer.borderColor = ThemeManager.buttonPrimary.cgColor
-        view.layer.borderWidth = 2
+        view.backgroundColor = UIColor.white.withAlphaComponent(0.3)
         view.isHidden = true
         return view
     }()
+    
+    private let selectionCheckmarkView: UIView = {
+        let containerView = UIView()
+        containerView.backgroundColor = UIColor.white
+        containerView.layer.cornerRadius = 12
+        containerView.layer.shadowColor = UIColor.black.cgColor
+        containerView.layer.shadowOffset = CGSize(width: 0, height: 1)
+        containerView.layer.shadowRadius = 2
+        containerView.layer.shadowOpacity = 0.3
+        containerView.isHidden = true
+        
+        let checkmarkImageView = UIImageView(image: UIImage(systemName: "checkmark.circle.fill"))
+        checkmarkImageView.tintColor = UIColor.systemBlue
+        checkmarkImageView.contentMode = .scaleAspectFit
+        checkmarkImageView.translatesAutoresizingMaskIntoConstraints = false
+        
+        containerView.addSubview(checkmarkImageView)
+        
+        NSLayoutConstraint.activate([
+            checkmarkImageView.centerXAnchor.constraint(equalTo: containerView.centerXAnchor),
+            checkmarkImageView.centerYAnchor.constraint(equalTo: containerView.centerYAnchor),
+            checkmarkImageView.widthAnchor.constraint(equalToConstant: 20),
+            checkmarkImageView.heightAnchor.constraint(equalToConstant: 20)
+        ])
+        
+        return containerView
+    }()
+    
+    // 保留旧的选择指示器以便向后兼容（将在清理步骤中移除）
+    // 移除旧的selectionIndicatorView，使用新的选择UI
     
     private let statusLabel: UILabel = {
         let label = UILabel()
@@ -117,7 +146,9 @@ class VideoThumbnailCell: UICollectionViewCell {
         statusLabel.text = ""
         statusLabel.isHidden = true
         videoItem = nil
-        selectionIndicatorView.isHidden = true
+        // 移除了selectionIndicatorView
+        selectionOverlayView.isHidden = true
+        selectionCheckmarkView.isHidden = true
         
         // 取消缩略图加载任务
         thumbnailTask?.cancel()
@@ -135,7 +166,8 @@ class VideoThumbnailCell: UICollectionViewCell {
         // 更新圆角
         contentView.layer.cornerRadius = ThemeManager.standardCornerRadius
         thumbnailImageView.layer.cornerRadius = ThemeManager.standardCornerRadius
-        selectionIndicatorView.layer.cornerRadius = ThemeManager.standardCornerRadius
+        // 移除了selectionIndicatorView的样式设置
+        selectionOverlayView.layer.cornerRadius = ThemeManager.standardCornerRadius
     }
     
     // MARK: - UI Setup
@@ -152,12 +184,16 @@ class VideoThumbnailCell: UICollectionViewCell {
         layer.masksToBounds = false
         
         // 添加子视图
-        contentView.addSubview(selectionIndicatorView)
+        // 移除了旧的selectionIndicatorView
         contentView.addSubview(thumbnailImageView)
         contentView.addSubview(overlayGradientView)
         contentView.addSubview(playIconView)
         contentView.addSubview(durationLabel)
         contentView.addSubview(statusLabel)
+        
+        // 添加新的选择UI组件
+        contentView.addSubview(selectionOverlayView)
+        contentView.addSubview(selectionCheckmarkView)
     }
     
     private func setupConstraints() {
@@ -165,15 +201,13 @@ class VideoThumbnailCell: UICollectionViewCell {
         durationLabel.translatesAutoresizingMaskIntoConstraints = false
         playIconView.translatesAutoresizingMaskIntoConstraints = false
         overlayGradientView.translatesAutoresizingMaskIntoConstraints = false
-        selectionIndicatorView.translatesAutoresizingMaskIntoConstraints = false
+        // 移除了selectionIndicatorView的约束设置
+        selectionOverlayView.translatesAutoresizingMaskIntoConstraints = false
+        selectionCheckmarkView.translatesAutoresizingMaskIntoConstraints = false
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            // 选择指示器
-            selectionIndicatorView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            selectionIndicatorView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            selectionIndicatorView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            selectionIndicatorView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            // 移除了旧的选择指示器约束
             
             // 缩略图
             thumbnailImageView.topAnchor.constraint(equalTo: contentView.topAnchor),
@@ -203,7 +237,20 @@ class VideoThumbnailCell: UICollectionViewCell {
             statusLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 8),
             statusLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
             statusLabel.heightAnchor.constraint(equalToConstant: 24),
-            statusLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 32)
+            statusLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 32),
+            
+            // 新的选择UI约束
+            // 半透明遮罩层 - 覆盖整个cell
+            selectionOverlayView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            selectionOverlayView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            selectionOverlayView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            selectionOverlayView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            
+            // 打勾图标 - 右下角，与时长标签错开
+            selectionCheckmarkView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -8),
+            selectionCheckmarkView.bottomAnchor.constraint(equalTo: durationLabel.topAnchor, constant: -8),
+            selectionCheckmarkView.widthAnchor.constraint(equalToConstant: 24),
+            selectionCheckmarkView.heightAnchor.constraint(equalToConstant: 24)
         ])
     }
     
@@ -219,6 +266,36 @@ class VideoThumbnailCell: UICollectionViewCell {
         
         // 加载缩略图
         loadThumbnail(for: videoItem)
+        
+        // 配置无障碍支持
+        configureAccessibility(for: videoItem)
+    }
+    
+    private func configureAccessibility(for videoItem: VideoItem) {
+        // 启用无障碍功能
+        isAccessibilityElement = true
+        
+        // 设置基本描述
+        let durationText = videoItem.formattedDuration
+        let statusText = videoItem.statusLabel.isEmpty ? "" : "，状态：\(videoItem.statusLabel)"
+        accessibilityLabel = "视频，时长\(durationText)\(statusText)"
+        
+        // 设置操作提示 - 简化实现，避免引用不存在的属性
+        accessibilityHint = "双击选择或播放此视频"
+        
+        // 设置特征
+        accessibilityTraits = .button
+    }
+    
+    // 更新选择状态时也要更新无障碍信息
+    func updateAccessibilityForSelection(isSelected: Bool) {
+        if isSelected {
+            accessibilityValue = "已选择"
+            accessibilityHint = "双击取消选择此视频"
+        } else {
+            accessibilityValue = "未选择"
+            accessibilityHint = "双击选择此视频"
+        }
     }
     
     private func configureStatusLabel(for videoItem: VideoItem) {
@@ -242,12 +319,62 @@ class VideoThumbnailCell: UICollectionViewCell {
     }
     
     // MARK: - Selection
-    func setSelected(_ selected: Bool) {
-        selectionIndicatorView.isHidden = !selected
+    func setSelected(_ selected: Bool, animated: Bool = true) {
+        // 隐藏旧的选择指示器
+        // 移除了selectionIndicatorView
         
-        UIView.animate(withDuration: 0.2) {
-            self.contentView.transform = selected ? CGAffineTransform(scaleX: 0.95, y: 0.95) : .identity
+        if animated {
+            if selected {
+                // 选中动画：显示遮罩层和打勾
+                selectionOverlayView.alpha = 0
+                selectionCheckmarkView.alpha = 0
+                selectionCheckmarkView.transform = CGAffineTransform(scaleX: 0.5, y: 0.5)
+                
+                selectionOverlayView.isHidden = false
+                selectionCheckmarkView.isHidden = false
+                
+                UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5, options: [.allowUserInteraction], animations: {
+                    // 遮罩层淡入
+                    self.selectionOverlayView.alpha = 1.0
+                    // 打勾图标缩放动画
+                    self.selectionCheckmarkView.alpha = 1.0
+                    self.selectionCheckmarkView.transform = CGAffineTransform.identity
+                    // 轻微的整体缩放
+                    self.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+                }) { _ in
+                    // 更新无障碍信息
+                    self.updateAccessibilityForSelection(isSelected: true)
+                }
+            } else {
+                // 取消选中动画：隐藏遮罩层和打勾
+                UIView.animate(withDuration: 0.2, delay: 0, options: [.allowUserInteraction], animations: {
+                    self.selectionOverlayView.alpha = 0
+                    self.selectionCheckmarkView.alpha = 0
+                    self.selectionCheckmarkView.transform = CGAffineTransform(scaleX: 0.5, y: 0.5)
+                    self.transform = CGAffineTransform.identity
+                }, completion: { _ in
+                    self.selectionOverlayView.isHidden = true
+                    self.selectionCheckmarkView.isHidden = true
+                    // 更新无障碍信息
+                    self.updateAccessibilityForSelection(isSelected: false)
+                })
+            }
+        } else {
+            // 非动画方式直接设置状态
+            selectionOverlayView.isHidden = !selected
+            selectionCheckmarkView.isHidden = !selected
+            selectionOverlayView.alpha = selected ? 1.0 : 0
+            selectionCheckmarkView.alpha = selected ? 1.0 : 0
+            selectionCheckmarkView.transform = selected ? .identity : CGAffineTransform(scaleX: 0.5, y: 0.5)
+            transform = selected ? CGAffineTransform(scaleX: 0.95, y: 0.95) : .identity
+            // 更新无障碍信息
+            updateAccessibilityForSelection(isSelected: selected)
         }
+    }
+    
+    // 定义一个更简单的方法保持向后兼容
+    func setSelected(_ selected: Bool) {
+        setSelected(selected, animated: true)
     }
     
     private func loadThumbnail(for videoItem: VideoItem) {
@@ -338,19 +465,7 @@ class VideoThumbnailCell: UICollectionViewCell {
         }
     }
     
-    // MARK: - Selection
-    func setSelected(_ selected: Bool, animated: Bool = true) {
-        let animations = {
-            self.selectionIndicatorView.isHidden = !selected
-            self.transform = selected ? CGAffineTransform(scaleX: 0.95, y: 0.95) : .identity
-        }
-        
-        if animated {
-            UIView.animate(withDuration: 0.2, animations: animations)
-        } else {
-            animations()
-        }
-    }
+    // 这个方法已经被上面的新实现替换，这里保留是为了避免重复
 }
 
 // MARK: - AddVideoCell

@@ -155,12 +155,18 @@ extension VideoItem {
     /// 状态标签文本（图标+状态）
     var statusLabel: String {
         let sourceIcon = sourceType.icon
-        let statusIcon = exportStatusType.icon
         
-        if sourceType == .appRecorded {
-            return "\(sourceIcon)\(statusIcon)"
-        } else {
-            return sourceIcon
+        switch sourceType {
+        case .systemImported:
+            // 系统导入的视频显示导入图标
+            return sourceIcon  // 📥
+        case .appRecorded:
+            // App录制的视频根据导出状态显示
+            if exportStatusType == .exported {
+                return "\(sourceIcon)✓"  // 📱✓
+            } else {
+                return sourceIcon  // 📱
+            }
         }
     }
     

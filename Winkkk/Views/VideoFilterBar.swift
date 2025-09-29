@@ -17,16 +17,14 @@ protocol VideoFilterBarDelegate: AnyObject {
 struct VideoFilterOptions {
     var showAppRecorded: Bool = true     // 📱 应用拍摄
     var showSystemImported: Bool = true  // 📥 系统导入
-    var showPendingExport: Bool = true   // ⏳ 待导出（仅应用拍摄）
     
     var isShowingAll: Bool {
-        return showAppRecorded && showSystemImported && showPendingExport
+        return showAppRecorded && showSystemImported
     }
     
     mutating func reset() {
         showAppRecorded = true
         showSystemImported = true
-        showPendingExport = true
     }
 }
 
@@ -57,7 +55,6 @@ class VideoFilterBar: UIView {
     private lazy var allButton = createFilterButton(title: "全部", type: .all)
     private lazy var appRecordedButton = createFilterButton(title: "📱 应用拍摄", type: .appRecorded)
     private lazy var systemImportedButton = createFilterButton(title: "📥 系统导入", type: .systemImported)
-    private lazy var pendingExportButton = createFilterButton(title: "⏳ 待导出", type: .pendingExport)
     
     private lazy var resultCountLabel: UILabel = {
         let label = UILabel()
@@ -76,7 +73,6 @@ class VideoFilterBar: UIView {
         case all
         case appRecorded
         case systemImported
-        case pendingExport
     }
     
     // MARK: - Initialization
@@ -106,8 +102,6 @@ class VideoFilterBar: UIView {
         stackView.addArrangedSubview(createSeparator())
         stackView.addArrangedSubview(appRecordedButton)
         stackView.addArrangedSubview(systemImportedButton)
-        stackView.addArrangedSubview(createSeparator())
-        stackView.addArrangedSubview(pendingExportButton)
         stackView.addArrangedSubview(createSeparator())
         stackView.addArrangedSubview(resultCountLabel)
         
@@ -158,8 +152,6 @@ class VideoFilterBar: UIView {
             button.tag = 100
         case .systemImported:
             button.tag = 101
-        case .pendingExport:
-            button.tag = 200
         }
         
         return button
@@ -181,19 +173,13 @@ class VideoFilterBar: UIView {
         
         switch sender.tag {
         case 0: // 全部按钮
-            if filterOptions.isShowingAll {
-                return // 已经是全部状态，无需改变
-            }
-            filterOptions.reset()
+            selectAll()
             
         case 100: // 应用拍摄
-            toggleAppRecorded()
+            selectAppRecorded()
             
         case 101: // 系统导入
-            toggleSystemImported()
-            
-        case 200: // 待导出
-            togglePendingExport()
+            selectSystemImported()
             
         default:
             break
@@ -203,34 +189,27 @@ class VideoFilterBar: UIView {
         delegate?.videoFilterBar(self, didChangeFilters: filterOptions)
     }
     
-    private func toggleAppRecorded() {
-        filterOptions.showAppRecorded.toggle()
-        
-        // 确保至少有一个类别被选中
-        if !filterOptions.showAppRecorded && !filterOptions.showSystemImported {
-            filterOptions.showAppRecorded = true
-        }
+    // 单选模式方法
+    private func selectAll() {
+        filterOptions.showAppRecorded = true
+        filterOptions.showSystemImported = true
     }
     
-    private func toggleSystemImported() {
-        filterOptions.showSystemImported.toggle()
-        
-        // 确保至少有一个类别被选中
-        if !filterOptions.showAppRecorded && !filterOptions.showSystemImported {
-            filterOptions.showSystemImported = true
-        }
+    private func selectAppRecorded() {
+        filterOptions.showAppRecorded = true
+        filterOptions.showSystemImported = false
     }
     
-    private func togglePendingExport() {
-        filterOptions.showPendingExport.toggle()
+    private func selectSystemImported() {
+        filterOptions.showAppRecorded = false
+        filterOptions.showSystemImported = true
     }
     
     // MARK: - UI Updates
     private func updateButtonStates() {
         updateButtonAppearance(allButton, isSelected: filterOptions.isShowingAll)
-        updateButtonAppearance(appRecordedButton, isSelected: filterOptions.showAppRecorded)
-        updateButtonAppearance(systemImportedButton, isSelected: filterOptions.showSystemImported)
-        updateButtonAppearance(pendingExportButton, isSelected: filterOptions.showPendingExport)
+        updateButtonAppearance(appRecordedButton, isSelected: filterOptions.showAppRecorded && !filterOptions.showSystemImported)
+        updateButtonAppearance(systemImportedButton, isSelected: filterOptions.showSystemImported && !filterOptions.showAppRecorded)
     }
     
     private func updateButtonAppearance(_ button: UIButton, isSelected: Bool) {
