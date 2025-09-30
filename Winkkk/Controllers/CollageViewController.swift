@@ -17,6 +17,7 @@ class CollageViewController: UIViewController {
     private var selectedImageIndex: Int? // 当前选中的图片索引
     private var selectedAspectRatio: AspectRatio = .square1_1
     private var selectedLayoutTemplate: CollageLayoutTemplate = GridLayoutTemplate()
+    private var selectionBorderLayer: CAShapeLayer? // 预览框选中边框
     private let allTemplates: [CollageLayoutTemplate] = [
         GridLayoutTemplate(),
         HorizontalLayoutTemplate(),
@@ -167,6 +168,11 @@ class CollageViewController: UIViewController {
         setupUI()
         setupConstraints()
         configureNavigationBar()
+        
+        // 给预览框添加点击手势识别
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleCollageImageTap(_:)))
+        previewImageView.isUserInteractionEnabled = true
+        previewImageView.addGestureRecognizer(tapGesture)
         
         // 确保选择的模板可用
         validateSelectedTemplate()
@@ -902,6 +908,10 @@ class CollageViewController: UIViewController {
         // 如果有生成的拼图，自动重新生成预览
         if collageImage != nil {
             updatePreview()
+            // 延迟更新边框，确保图片已渲染
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.updateCollageSelectionBorder()
+            }
         }
     }
     
@@ -1153,6 +1163,129 @@ class CollageViewController: UIViewController {
         navigationController?.popViewController(animated: true)
     }
     
+    // MARK: - Collage Image Tap Handling
+    
+    @objc private func handleCollageImageTap(_ gesture: UITapGestureRecognizer) {
+        // 确保有拼图生成
+        guard collageImage != nil else { return }
+        
+        // 获取点击坐标
+        let tapLocation = gesture.location(in: previewImageView)
+        
+        // 判断点击的是哪张图片
+        if let tappedIndex = hitTestCollageImage(point: tapLocation) {
+            let previousSelectedIndex = selectedImageIndex
+            selectedImageIndex = tappedIndex
+            
+            if previousSelectedIndex != selectedImageIndex {
+                HapticFeedbackManager.shared.buttonTap()
+                
+                // 更新编辑按钮状态
+                updateEditingButtonsState()
+                
+                // 更新预览框选中边框
+                updateCollageSelectionBorder()
+                
+                // 同步更新下方小图面板的选中状态
+                var indexPathsToReload: [IndexPath] = [IndexPath(item: tappedIndex, section: 0)]
+                if let previousIndex = previousSelectedIndex {
+                    indexPathsToReload.append(IndexPath(item: previousIndex, section: 0))
+                }
+                imageSelectionCollectionView.reloadItems(at: indexPathsToReload)
+            }
+        }
+    }
+    
+    /// 根据点击坐标判断点击的是哪张图片
+    private func hitTestCollageImage(point: CGPoint) -> Int? {
+        let imageSize = previewImageView.bounds.size
+        
+        // 根据当前布局模板判断
+        if selectedLayoutTemplate is HorizontalLayoutTemplate {
+            // 横向布局：左右平分
+            let imageCount = imageItems.count
+            let sectionWidth = imageSize.width / CGFloat(imageCount)
+            let index = Int(point.x / sectionWidth)
+            return (index >= 0 && index < imageCount) ? index : nil
+        } else if selectedLayoutTemplate is VerticalLayoutTemplate {
+            // 纵向布局：上下平分
+            let imageCount = imageItems.count
+            let sectionHeight = imageSize.height / CGFloat(imageCount)
+            let index = Int(point.y / sectionHeight)
+            return (index >= 0 && index < imageCount) ? index : nil
+        } else if selectedLayoutTemplate is GridLayoutTemplate {
+            // 网格布局：计算行列
+            let imageCount = imageItems.count
+            let gridSize = calculateGridSizeForHitTest(for: imageCount)
+            let cellWidth = imageSize.width / CGFloat(gridSize.cols)
+            let cellHeight = imageSize.height / CGFloat(gridSize.rows)
+            
+            let col = Int(point.x / cellWidth)
+            let row = Int(point.y / cellHeight)
+            let index = row * gridSize.cols + col
+            return (index >= 0 && index < imageCount) ? index : nil
+        }
+        
+        return nil
+    }
+    
+    private func calculateGridSizeForHitTest(for count: Int) -> (rows: Int, cols: Int) {
+        switch count {
+        case 2: return (1, 2)
+        case 3: return (2, 2)
+        case 4: return (2, 2)
+        case 5, 6: return (2, 3)
+        case 7, 8, 9: return (3, 3)
+        default: return (2, 2)
+        }
+    }
+    
+    /// 更新预览框选中边框
+    private func updateCollageSelectionBorder() {
+        // 移除旧边框
+        selectionBorderLayer?.removeFromSuperlayer()
+        selectionBorderLayer = nil
+        
+        guard let selectedIndex = selectedImageIndex, collageImage != nil else { return }
+        
+        // 根据布局模式和选中索引，计算边框位置
+        let borderRect: CGRect
+        let imageSize = previewImageView.bounds.size
+        
+        if selectedLayoutTemplate is HorizontalLayoutTemplate {
+            // 横向布局
+            let imageCount = imageItems.count
+            let sectionWidth = imageSize.width / CGFloat(imageCount)
+            borderRect = CGRect(x: CGFloat(selectedIndex) * sectionWidth, y: 0, width: sectionWidth, height: imageSize.height)
+        } else if selectedLayoutTemplate is VerticalLayoutTemplate {
+            // 纵向布局
+            let imageCount = imageItems.count
+            let sectionHeight = imageSize.height / CGFloat(imageCount)
+            borderRect = CGRect(x: 0, y: CGFloat(selectedIndex) * sectionHeight, width: imageSize.width, height: sectionHeight)
+        } else if selectedLayoutTemplate is GridLayoutTemplate {
+            // 网格布局
+            let imageCount = imageItems.count
+            let gridSize = calculateGridSizeForHitTest(for: imageCount)
+            let cellWidth = imageSize.width / CGFloat(gridSize.cols)
+            let cellHeight = imageSize.height / CGFloat(gridSize.rows)
+            
+            let row = selectedIndex / gridSize.cols
+            let col = selectedIndex % gridSize.cols
+            borderRect = CGRect(x: CGFloat(col) * cellWidth, y: CGFloat(row) * cellHeight, width: cellWidth, height: cellHeight)
+        } else {
+            return
+        }
+        
+        // 创建并添加边框层
+        let borderLayer = CAShapeLayer()
+        borderLayer.path = UIBezierPath(rect: borderRect).cgPath
+        borderLayer.strokeColor = UIColor.systemBlue.cgColor
+        borderLayer.lineWidth = 4
+        borderLayer.fillColor = UIColor.clear.cgColor
+        previewImageView.layer.addSublayer(borderLayer)
+        selectionBorderLayer = borderLayer
+    }
+    
     // MARK: - Helper Methods
     
     private func validateSelectedTemplate() {
@@ -1182,6 +1315,11 @@ class CollageViewController: UIViewController {
                     self.enableBottomButtons(true)
                     self.statusLabel.text = "拼图已生成，可以保存或分享"
                     HapticFeedbackManager.shared.lightImpact()
+                    
+                    // 延迟更新选中边框，确保图片已渲染
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        self.updateCollageSelectionBorder()
+                    }
                 } else {
                     self.previewPlaceholder.isHidden = false
                     self.previewPlaceholder.text = "拼图生成失败"
@@ -1274,7 +1412,13 @@ extension CollageViewController {
                 if index < frames.count {
                     let frame = frames[index]
                     
-                    // 计算图片的绘制区域，保持宽高比并居中裁剪
+                    // 保存图形上下文状态
+                    context.cgContext.saveGState()
+                    
+                    // 裁剪到frame区域
+                    context.cgContext.clip(to: frame)
+                    
+                    // 计算图片的绘制区域，保持宽高比并居中裁剪（AspectFill）
                     let imageAspectRatio = image.size.width / image.size.height
                     let frameAspectRatio = frame.width / frame.height
                     
@@ -1291,6 +1435,9 @@ extension CollageViewController {
                     
                     // 绘制图片
                     image.draw(in: drawRect)
+                    
+                    // 恢复图形上下文状态
+                    context.cgContext.restoreGState()
                 }
             }
         }
