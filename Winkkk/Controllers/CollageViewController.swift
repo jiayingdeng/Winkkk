@@ -1225,8 +1225,13 @@ class CollageViewController: UIViewController {
     // MARK: - Collage Image Long Press Handling
     
     @objc private func handleCollageImageLongPress(_ gesture: UILongPressGestureRecognizer) {
+        // 调试：打印手势状态
+        print("🔍 长按手势状态: \(gesture.state.rawValue)")
+        
         // 只在手势开始时触发（避免重复触发）
         guard gesture.state == .began else { return }
+        
+        print("✅ 长按手势触发 (.began)")
         
         // 确保有拼图生成
         guard collageImage != nil else { return }
@@ -1236,6 +1241,8 @@ class CollageViewController: UIViewController {
         
         // 判断长按的是哪张图片
         if let longPressedIndex = hitTestCollageImage(point: longPressLocation) {
+            print("🎯 选中图片索引: \(longPressedIndex)")
+            
             // 先选中该图片（如果尚未选中）
             if selectedImageIndex != longPressedIndex {
                 selectedImageIndex = longPressedIndex
@@ -1248,6 +1255,7 @@ class CollageViewController: UIViewController {
             HapticFeedbackManager.shared.mediumImpact()
             
             // 显示浮动编辑工具栏
+            print("📋 显示浮动工具栏")
             showFloatingEditToolbar(at: longPressLocation)
         }
     }
@@ -1256,13 +1264,23 @@ class CollageViewController: UIViewController {
     
     /// 显示浮动编辑工具栏
     private func showFloatingEditToolbar(at touchPoint: CGPoint) {
-        // 如果已经显示，先隐藏
-        hideFloatingEditToolbar()
+        print("📋 showFloatingEditToolbar 开始")
+        
+        // 立即停止所有正在进行的动画
+        floatingToolbarBackdrop.layer.removeAllAnimations()
+        floatingEditToolbar.layer.removeAllAnimations()
+        
+        // 立即移除旧的视图（不使用动画）
+        floatingToolbarBackdrop.removeFromSuperview()
+        floatingEditToolbar.removeFromSuperview()
         
         // 配置半透明背景遮罩
         floatingToolbarBackdrop.backgroundColor = UIColor.black.withAlphaComponent(0.3)
         floatingToolbarBackdrop.frame = view.bounds
         floatingToolbarBackdrop.alpha = 0
+        
+        // 清理旧的手势识别器
+        floatingToolbarBackdrop.gestureRecognizers?.forEach { floatingToolbarBackdrop.removeGestureRecognizer($0) }
         
         // 添加点击手势关闭工具栏
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(hideFloatingEditToolbar))
@@ -1278,11 +1296,15 @@ class CollageViewController: UIViewController {
         
         view.addSubview(floatingEditToolbar)
         
+        print("📋 工具栏视图已添加，开始动画")
+        
         // 动画显示
         UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut) {
             self.floatingToolbarBackdrop.alpha = 1
             self.floatingEditToolbar.alpha = 1
             self.floatingEditToolbar.transform = .identity
+        } completion: { finished in
+            print("📋 显示动画完成: \(finished)")
         }
     }
     
@@ -1387,6 +1409,7 @@ class CollageViewController: UIViewController {
     
     /// 隐藏浮动编辑工具栏
     @objc private func hideFloatingEditToolbar() {
+        print("❌ 隐藏浮动工具栏")
         UIView.animate(withDuration: 0.2, animations: {
             self.floatingToolbarBackdrop.alpha = 0
             self.floatingEditToolbar.alpha = 0

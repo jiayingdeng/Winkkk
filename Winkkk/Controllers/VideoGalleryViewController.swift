@@ -716,6 +716,32 @@ class VideoGalleryViewController: UIViewController {
         }
     }
     
+    // 🆕 立即刷新数据，不使用防抖延迟（用于单个视频删除等需要即时反馈的场景）
+    private func refreshDataImmediately() {
+        print("📱 VideoGallery: Immediately refreshing Core Data")
+        
+        do {
+            try fetchedResultsController.performFetch()
+            let allVideos = fetchedResultsController.fetchedObjects ?? []
+            
+            // 🚀 立即过滤掉文件不存在的视频，避免UI闪烁
+            let validVideos = allVideos.filter { video in
+                let exists = FileManager.default.fileExists(atPath: video.filePath.path)
+                if !exists {
+                    print("🔍 隐藏孤儿记录: \(video.fileName) (文件不存在)")
+                }
+                return exists
+            }
+            
+            videos = validVideos
+            applyCurrentFilters()
+            
+            print("✅ VideoGallery: Immediately refreshed \(allVideos.count) total records, showing \(videos.count) valid videos, filtered to \(filteredVideos.count)")
+        } catch {
+            print("❌ VideoGallery: 立即刷新数据失败: \(error)")
+        }
+    }
+    
     private func updateUI() {
         // 异步更新UI，避免阻塞主线程
         DispatchQueue.main.async { [weak self] in
@@ -886,16 +912,47 @@ class VideoGalleryViewController: UIViewController {
     }
     
     private func deleteVideo(_ video: VideoItem) {
+        // 显示删除进度提示
+        let progressAlert = UIAlertController(
+            title: "删除中",
+            message: "正在删除视频...",
+            preferredStyle: .alert
+        )
+        present(progressAlert, animated: true)
+        
+        // 🔧 修复：先从本地数据源移除，避免UI闪烁
+        let videoID = video.id
+        
         videoManager.deleteVideo(video) { [weak self] result in
             self?.executeOnMainThread {
-                switch result {
-                case .success:
-                    print("✅ 视频删除成功: \(video.fileName)")
-                    // 数据会通过NSFetchedResultsController自动更新
-                    
-                case .failure(let error):
-                    print("❌ 视频删除失败: \(error)")
-                    self?.showError(error)
+                // 关闭进度提示
+                progressAlert.dismiss(animated: true) {
+                    switch result {
+                    case .success:
+                        print("✅ 视频删除成功: \(video.fileName)")
+                        
+                        // 🎯 关键修复：先从本地数据源中移除已删除的视频
+                        self?.videos.removeAll { $0.id == videoID }
+                        self?.applyCurrentFilters()
+                        
+                        // 🎯 延迟刷新，等待Core Data同步完成
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            // 刷新数据源
+                            self?.refreshDataImmediately()
+                            
+                            // 立即更新UI
+                            self?.updateUI()
+                            
+                            // 延迟显示成功提示
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                self?.showAlert(title: "删除完成", message: "成功删除 1 个视频")
+                            }
+                        }
+                        
+                    case .failure(let error):
+                        print("❌ 视频删除失败: \(error)")
+                        self?.showError(error)
+                    }
                 }
             }
         }
@@ -1064,17 +1121,49 @@ class VideoGalleryViewController: UIViewController {
     private func performDeleteVideo(_ video: VideoItem) {
         isDeletionInProgress = true
         
+        // 显示删除进度提示
+        let progressAlert = UIAlertController(
+            title: "删除中",
+            message: "正在删除视频...",
+            preferredStyle: .alert
+        )
+        present(progressAlert, animated: true)
+        
+        // 🔧 修复：先从本地数据源移除，避免UI闪烁
+        let videoID = video.id
+        
         videoManager.deleteVideo(video) { [weak self] result in
             DispatchQueue.main.async {
                 self?.isDeletionInProgress = false
                 
-                switch result {
-                case .success:
-                    // 数据会通过NSFetchedResultsController自动更新
-                    break
-                    
-                case .failure(let error):
-                    self?.showError(error)
+                // 关闭进度提示
+                progressAlert.dismiss(animated: true) {
+                    switch result {
+                    case .success:
+                        print("✅ 视频删除成功: \(video.fileName)")
+                        
+                        // 🎯 关键修复：先从本地数据源中移除已删除的视频
+                        self?.videos.removeAll { $0.id == videoID }
+                        self?.applyCurrentFilters()
+                        
+                        // 🎯 延迟刷新，等待Core Data同步完成
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            // 刷新数据源
+                            self?.refreshDataImmediately()
+                            
+                            // 立即更新UI
+                            self?.updateUI()
+                            
+                            // 延迟显示成功提示
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                self?.showAlert(title: "删除完成", message: "成功删除 1 个视频")
+                            }
+                        }
+                        
+                    case .failure(let error):
+                        print("❌ 视频删除失败: \(error)")
+                        self?.showError(error)
+                    }
                 }
             }
         }
@@ -1257,13 +1346,32 @@ class VideoGalleryViewController: UIViewController {
         var failedCount = 0
         var failedVideos: [String] = []
         
+        // 🔧 修复：收集已删除视频的ID
+        var deletedVideoIDs: Set<UUID> = []
+        
         func deleteNextVideo() {
             guard !remainingVideos.isEmpty else {
                 // 所有删除完成
                 DispatchQueue.main.async { [weak self] in
+                    // 🎯 关键修复：先从本地数据源批量移除已删除的视频
+                    self?.videos.removeAll { deletedVideoIDs.contains($0.id) }
+                    self?.applyCurrentFilters()
+                    
                     progressAlert.dismiss(animated: true) {
-                        self?.showBatchDeleteResult(completed: completedCount, failed: failedCount, failedVideos: failedVideos)
-                        self?.completeDeletion()
+                        // 🎯 延迟刷新，等待Core Data同步完成
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            // 刷新数据源
+                            self?.refreshDataImmediately()
+                            
+                            // 立即更新UI
+                            self?.updateUI()
+                            
+                            // 延迟显示结果和完成删除
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                self?.showBatchDeleteResult(completed: completedCount, failed: failedCount, failedVideos: failedVideos)
+                                self?.completeDeletion()
+                            }
+                        }
                     }
                 }
                 return
@@ -1281,6 +1389,8 @@ class VideoGalleryViewController: UIViewController {
                 switch result {
                 case .success:
                     print("✅ 删除成功: \(video.fileName)")
+                    // 🔧 记录已删除的视频ID
+                    deletedVideoIDs.insert(video.id)
                 case .failure(let error):
                     print("❌ 删除失败: \(video.fileName) - \(error.localizedDescription)")
                     failedCount += 1
@@ -1694,7 +1804,7 @@ extension VideoGalleryViewController: UICollectionViewDataSourcePrefetching {
     }
     
     private func saveThumbnailToDisk(_ image: UIImage, for videoItem: VideoItem) {
-        guard let imageData = image.jpegData(compressionQuality: 0.85) else { return }
+        guard let imageData = image.jpegData(compressionQuality: 0.98) else { return }
         
         let fileName = "\(videoItem.id.uuidString)_thumbnail.jpg"
         let thumbnailURL = FileManagerHelper.thumbnailsDirectory.appendingPathComponent(fileName)

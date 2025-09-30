@@ -912,7 +912,7 @@ class ImageEnhanceViewController: UIViewController {
             let fileName = "enhanced_\(Date().timeIntervalSince1970).jpg"
             let imageURL = FileManagerHelper.screenshotsDirectory.appendingPathComponent(fileName)
             
-            guard let imageData = image.jpegData(compressionQuality: 0.95) else {
+            guard let imageData = image.jpegData(compressionQuality: 0.98) else {
                 return
             }
             

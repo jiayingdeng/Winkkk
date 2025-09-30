@@ -424,7 +424,23 @@ class VideoPlayerViewController: UIViewController {
     private func setupPlayer() {
         let asset = AVAsset(url: videoURL)
         let playerItem = AVPlayerItem(asset: asset)
+        
+        // 🚀 关键优化1：配置缓冲策略（立即生效，减少卡顿）
+        playerItem.preferredForwardBufferDuration = 3.0  // 预缓冲3秒
+        
+        // 🚀 关键优化2：启用自动缓冲管理
+        if #available(iOS 10.0, *) {
+            playerItem.automaticallyPreservesTimeOffsetFromLive = false
+            playerItem.canUseNetworkResourcesForLiveStreamingWhilePaused = false
+        }
+        
+        // 🚀 关键优化3：配置高性能音视频输出（已移除，renderScale 是只读属性）
+        
         player = AVPlayer(playerItem: playerItem)
+        
+        // 🚀 关键优化4：AVPlayer播放性能配置
+        player?.automaticallyWaitsToMinimizeStalling = true  // 自动等待缓冲，避免卡顿
+        player?.actionAtItemEnd = .pause
         
         // 创建播放器层
         playerLayer = AVPlayerLayer(player: player)
@@ -904,7 +920,7 @@ class VideoPlayerViewController: UIViewController {
         let imagePath = screenshotsDirectory.appendingPathComponent(imageFileName)
         
         // 保存图片到文件系统
-        guard let imageData = image.jpegData(compressionQuality: 0.95) else {
+        guard let imageData = image.jpegData(compressionQuality: 0.98) else {
             handleScreenshotError(ScreenshotError.imageProcessingFailed)
             return
         }

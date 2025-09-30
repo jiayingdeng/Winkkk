@@ -455,7 +455,7 @@ class VideoManager: NSObject {
     }
     
     private func saveThumbnail(_ image: UIImage, for videoItem: VideoItem) throws -> URL {
-        guard let imageData = image.jpegData(compressionQuality: 0.95) else {
+        guard let imageData = image.jpegData(compressionQuality: 0.98) else {
             throw VideoManagerError.thumbnailSaveFailed
         }
         

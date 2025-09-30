@@ -406,6 +406,14 @@ class VideoThumbnailCell: UICollectionViewCell {
         // 取消之前的任务
         thumbnailTask?.cancel()
         
+        // 🔧 修复：检查videoItem是否已被删除
+        guard !videoItem.isDeleted else {
+            print("⚠️ VideoThumbnailCell: videoItem已被删除，跳过缩略图加载")
+            thumbnailImageView.image = UIImage(systemName: "video.slash")
+            thumbnailImageView.tintColor = ThemeManager.secondaryText
+            return
+        }
+        
         // 首先检查是否有缓存的缩略图
         if let thumbnailPath = videoItem.thumbnailPath,
            FileManager.default.fileExists(atPath: thumbnailPath.path) {
@@ -415,7 +423,10 @@ class VideoThumbnailCell: UICollectionViewCell {
         
         // 检查文件是否存在，避免尝试为不存在的文件生成缩略图
         guard FileManager.default.fileExists(atPath: videoItem.filePath.path) else {
-            print("❌ VideoThumbnailCell: 视频文件不存在: \(videoItem.filePath.path)")
+            // 🔧 修复：降低日志级别，避免误报
+            #if DEBUG
+            print("⚠️ VideoThumbnailCell: 视频文件不存在（可能已删除）: \(videoItem.fileName)")
+            #endif
             thumbnailImageView.image = UIImage(systemName: "video.slash")
             thumbnailImageView.tintColor = ThemeManager.secondaryText
             return
@@ -474,7 +485,7 @@ class VideoThumbnailCell: UICollectionViewCell {
     }
     
     private func saveThumbnailCache(_ image: UIImage, for videoItem: VideoItem) {
-        guard let imageData = image.jpegData(compressionQuality: 0.95) else { return }
+        guard let imageData = image.jpegData(compressionQuality: 0.98) else { return }
         
         let fileName = "\(videoItem.id.uuidString)_thumbnail.jpg"
         let thumbnailURL = FileManagerHelper.thumbnailsDirectory.appendingPathComponent(fileName)
