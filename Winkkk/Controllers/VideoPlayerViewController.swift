@@ -338,12 +338,12 @@ class VideoPlayerViewController: UIViewController {
             controlPanelBlurView.heightAnchor.constraint(greaterThanOrEqualToConstant: 420),  // 🆕 增加高度以容纳模式切换器+截图预览栏+截图预览条
             
             // 🎯 时间轴 - 允许视觉溢出屏幕边界 (Wink风格)
-            timelineView.topAnchor.constraint(equalTo: captureModeSwitcher.bottomAnchor, constant: 12),
+            timelineView.topAnchor.constraint(equalTo: captureModeSwitcher.bottomAnchor, constant: 8),
             timelineView.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
-            timelineView.heightAnchor.constraint(equalToConstant: 110),
+            timelineView.heightAnchor.constraint(equalToConstant: 95),
             
             // 时间标签
-            currentTimeLabel.topAnchor.constraint(equalTo: timelineView.bottomAnchor, constant: 8),
+            currentTimeLabel.topAnchor.constraint(equalTo: timelineView.bottomAnchor, constant: 5),
             currentTimeLabel.leadingAnchor.constraint(equalTo: timelineView.leadingAnchor),
             currentTimeLabel.widthAnchor.constraint(equalToConstant: 50),
             
@@ -359,17 +359,17 @@ class VideoPlayerViewController: UIViewController {
             playPauseButton.heightAnchor.constraint(equalToConstant: 50),
             
             // 🌟 截图按钮 - 移动到时间标签正下方，建立清晰的垂直布局链
-            screenshotButton.topAnchor.constraint(equalTo: currentTimeLabel.bottomAnchor, constant: 12),
+            screenshotButton.topAnchor.constraint(equalTo: currentTimeLabel.bottomAnchor, constant: 8),
             screenshotButton.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
             screenshotButton.widthAnchor.constraint(equalToConstant: 180),  // 🌟 增加宽度以完整显示"截取当前画面"
             screenshotButton.heightAnchor.constraint(equalToConstant: 48)   // 🌟 增加高度，更显眼
         ])
         
         // 🎯 初始化动态约束 - 三分屏布局
-        // 默认视频区域高度：53.3%
+        // 默认视频区域高度：45% (优化以适配小屏设备)
         playerContainerHeightConstraint = playerContainerView.heightAnchor.constraint(
             equalTo: view.safeAreaLayoutGuide.heightAnchor,
-            multiplier: 0.533
+            multiplier: 0.45
         )
         playerContainerHeightConstraint?.isActive = true
         
@@ -394,13 +394,13 @@ class VideoPlayerViewController: UIViewController {
         NSLayoutConstraint.activate([
             // 🎯 控制面板内：截图预览栏 - 紧贴截图按钮下方，只用高度约束
             // ⚠️ 移除 bottomAnchor 约束，避免与 heightAnchor 冲突导致预览栏超出屏幕
-            screenshotPreviewBar.topAnchor.constraint(equalTo: screenshotButton.bottomAnchor, constant: 12),
+            screenshotPreviewBar.topAnchor.constraint(equalTo: screenshotButton.bottomAnchor, constant: 8),
             screenshotPreviewBar.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 16),
             screenshotPreviewBar.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -16),
             // screenshotPreviewBar.bottomAnchor 已移除，改用动态 heightAnchor
             
             // 🎯 控制面板内：模式切换器 - 位于顶部
-            captureModeSwitcher.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 16),
+            captureModeSwitcher.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 8),
             captureModeSwitcher.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
             captureModeSwitcher.heightAnchor.constraint(equalToConstant: 44),
             captureModeSwitcher.widthAnchor.constraint(equalToConstant: 280)
@@ -532,7 +532,7 @@ class VideoPlayerViewController: UIViewController {
         screenshotPreviewBar.transform = .identity
         
         // 🆕 根据截图是否存在来更新预览栏的高度
-        let targetHeight: CGFloat = screenshots.isEmpty ? 0 : 150
+        let targetHeight: CGFloat = screenshots.isEmpty ? 0 : 105
         screenshotPreviewBarHeightConstraint?.constant = targetHeight
         
         // 使用动画使高度变化更平滑
