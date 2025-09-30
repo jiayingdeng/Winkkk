@@ -225,6 +225,88 @@ class ThemeManager: ObservableObject {
             return UIColor.white // 白色文字（黑色按钮上）
         }
     }
+    
+    // MARK: - 梦幻主题专属颜色（记录现有的硬编码颜色）
+    
+    /// FilterBar 背景色（协调的粉紫色）
+    static var filterBarBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 242/255, green: 194/255, blue: 237/255, alpha: 0.85) // #F2C2ED 粉紫色
+        case .lightMinimal:
+            return UIColor(red: 249/255, green: 249/255, blue: 249/255, alpha: 0.95) // #F9F9F9 浅灰白
+        }
+    }
+    
+    /// 按钮深紫色（主题色深色调）
+    static var buttonDeepPurple: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 0.4, green: 0.2, blue: 0.6, alpha: 1.0) // #663399 深紫色
+        case .lightMinimal:
+            return UIColor.systemBlue // iOS系统蓝
+        }
+    }
+    
+    /// 按钮浅紫色（主题色浅色调）
+    static var buttonLightPurple: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 0.6, green: 0.4, blue: 0.8, alpha: 1.0) // #9966CC 浅紫色
+        case .lightMinimal:
+            return UIColor.systemGray // iOS系统灰
+        }
+    }
+    
+    /// 按钮淡粉灰色（主题色柔和调）
+    static var buttonPinkGray: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 0.7, green: 0.5, blue: 0.5, alpha: 1.0) // #B38080 淡粉灰色
+        case .lightMinimal:
+            return UIColor.systemGray2 // iOS系统灰2
+        }
+    }
+    
+    /// 时间轴刻度线颜色
+    static var timelineTickColor: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 0.3, green: 0.2, blue: 0.5, alpha: 0.8) // #4D3380 深紫色
+        case .lightMinimal:
+            return UIColor(red: 0.2, green: 0.2, blue: 0.2, alpha: 0.6) // #333333 深灰色
+        }
+    }
+    
+    /// 叠加层文本色（在毛玻璃/半透明背景上的白色文字）
+    static var overlayTextWhite: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor.white.withAlphaComponent(0.9) // 保持白色
+        case .lightMinimal:
+            return UIColor.black.withAlphaComponent(0.9) // 改为黑色
+        }
+    }
+    
+    /// 叠加层副标题文本色
+    static var overlaySecondaryText: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor.white.withAlphaComponent(0.7) // 保持白色
+        case .lightMinimal:
+            return UIColor.black.withAlphaComponent(0.6) // 改为黑色
+        }
+    }
+    
+    /// 成功提示背景色（温暖的米白色）
+    static var successToastBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 255/255, green: 252/255, blue: 240/255, alpha: 0.95) // #FFFCF0 温暖的米白色
+        case .lightMinimal:
+            return UIColor(red: 52/255, green: 199/255, blue: 89/255, alpha: 0.15) // 系统绿色半透明背景
+        }
+    }
 }
 
 // MARK: - SwiftUI Color扩展

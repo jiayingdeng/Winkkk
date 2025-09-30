@@ -182,7 +182,7 @@ class VideoPlayerViewController: UIViewController {
     private func setupNavigationBar() {
         title = "视频编辑"
         navigationController?.navigationBar.tintColor = .white
-        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: UIColor.white]
+        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: ThemeManager.overlayTextWhite]
         
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             title: "取消",
@@ -737,7 +737,7 @@ class VideoPlayerViewController: UIViewController {
             string: currentStr,
             attributes: [
                 .font: UIFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium),
-                .foregroundColor: UIColor.white
+                .foregroundColor: ThemeManager.overlayTextWhite
             ]
         ))
         
@@ -746,7 +746,7 @@ class VideoPlayerViewController: UIViewController {
             string: " 当前",
             attributes: [
                 .font: UIFont.systemFont(ofSize: 10, weight: .regular),
-                .foregroundColor: UIColor.white.withAlphaComponent(0.6)
+                .foregroundColor: ThemeManager.overlaySecondaryText
             ]
         ))
         
@@ -755,7 +755,7 @@ class VideoPlayerViewController: UIViewController {
             string: " / ",
             attributes: [
                 .font: UIFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium),
-                .foregroundColor: UIColor.white
+                .foregroundColor: ThemeManager.overlayTextWhite
             ]
         ))
         
@@ -764,7 +764,7 @@ class VideoPlayerViewController: UIViewController {
             string: cachedDurationString,
             attributes: [
                 .font: UIFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium),
-                .foregroundColor: UIColor.white
+                .foregroundColor: ThemeManager.overlayTextWhite
             ]
         ))
         
@@ -773,7 +773,7 @@ class VideoPlayerViewController: UIViewController {
             string: " 总时长",
             attributes: [
                 .font: UIFont.systemFont(ofSize: 10, weight: .regular),
-                .foregroundColor: UIColor.white.withAlphaComponent(0.6)
+                .foregroundColor: ThemeManager.overlaySecondaryText
             ]
         ))
         

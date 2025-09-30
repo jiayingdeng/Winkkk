@@ -558,7 +558,7 @@ extension SettingsViewController: UITableViewDataSource, UITableViewDelegate {
     
     func tableView(_ tableView: UITableView, willDisplayHeaderView view: UIView, forSection section: Int) {
         if let headerView = view as? UITableViewHeaderFooterView {
-            headerView.textLabel?.textColor = UIColor.white.withAlphaComponent(0.8)
+            headerView.textLabel?.textColor = ThemeManager.overlayTextWhite
             headerView.textLabel?.font = ThemeManager.subheadlineFont
         }
     }
@@ -636,7 +636,7 @@ class SettingsCell: UITableViewCell {
         selectionStyle = .none
         
         // 容器
-        containerView.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        containerView.backgroundColor = ThemeManager.overlayTextWhite.withAlphaComponent(0.1)
         containerView.layer.cornerRadius = 12
         contentView.addSubview(containerView)
         
@@ -652,13 +652,13 @@ class SettingsCell: UITableViewCell {
         
         // 副标题
         subtitleLabel.font = ThemeManager.captionFont
-        subtitleLabel.textColor = UIColor.white.withAlphaComponent(0.7)
+        subtitleLabel.textColor = ThemeManager.overlaySecondaryText
         containerView.addSubview(subtitleLabel)
         
         // 辅助图标
         accessoryImageView.image = UIImage(systemName: "chevron.right")
         accessoryImageView.contentMode = .scaleAspectFit
-        accessoryImageView.tintColor = UIColor.white.withAlphaComponent(0.5)
+        accessoryImageView.tintColor = ThemeManager.overlaySecondaryText.withAlphaComponent(0.7)
         containerView.addSubview(accessoryImageView)
         
         setupConstraints()
@@ -730,7 +730,7 @@ class SettingsSwitchCell: UITableViewCell {
         selectionStyle = .none
         
         // 容器
-        containerView.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        containerView.backgroundColor = ThemeManager.overlayTextWhite.withAlphaComponent(0.1)
         containerView.layer.cornerRadius = 12
         contentView.addSubview(containerView)
         
@@ -746,7 +746,7 @@ class SettingsSwitchCell: UITableViewCell {
         
         // 副标题
         subtitleLabel.font = ThemeManager.captionFont
-        subtitleLabel.textColor = UIColor.white.withAlphaComponent(0.7)
+        subtitleLabel.textColor = ThemeManager.overlaySecondaryText
         containerView.addSubview(subtitleLabel)
         
         // 开关
@@ -822,7 +822,7 @@ class SettingsDetailCell: UITableViewCell {
         selectionStyle = .none
         
         // 容器
-        containerView.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        containerView.backgroundColor = ThemeManager.overlayTextWhite.withAlphaComponent(0.1)
         containerView.layer.cornerRadius = 12
         contentView.addSubview(containerView)
         
@@ -838,7 +838,7 @@ class SettingsDetailCell: UITableViewCell {
         
         // 副标题
         subtitleLabel.font = ThemeManager.captionFont
-        subtitleLabel.textColor = UIColor.white.withAlphaComponent(0.7)
+        subtitleLabel.textColor = ThemeManager.overlaySecondaryText
         subtitleLabel.textAlignment = .right
         containerView.addSubview(subtitleLabel)
         
@@ -1093,7 +1093,7 @@ extension StorageDetailViewController: UITableViewDataSource, UITableViewDelegat
         let cell = tableView.dequeueReusableCell(withIdentifier: "StorageCell", for: indexPath)
         
         let item = storageItems[indexPath.row]
-        cell.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        cell.backgroundColor = ThemeManager.overlayTextWhite.withAlphaComponent(0.1)
         cell.textLabel?.text = item.title
         
         // 显示大小和文件数量
@@ -1106,7 +1106,7 @@ extension StorageDetailViewController: UITableViewDataSource, UITableViewDelegat
         cell.imageView?.image = UIImage(systemName: item.icon)
         cell.imageView?.tintColor = ThemeManager.buttonPrimary
         cell.textLabel?.textColor = .white
-        cell.detailTextLabel?.textColor = UIColor.white.withAlphaComponent(0.7)
+        cell.detailTextLabel?.textColor = ThemeManager.overlaySecondaryText
         
         // 可清理的项目显示不同的样式
         if item.canCleanup {
@@ -1138,7 +1138,7 @@ extension StorageDetailViewController: UITableViewDataSource, UITableViewDelegat
     
     func tableView(_ tableView: UITableView, willDisplayHeaderView view: UIView, forSection section: Int) {
         if let headerView = view as? UITableViewHeaderFooterView {
-            headerView.textLabel?.textColor = UIColor.white.withAlphaComponent(0.8)
+            headerView.textLabel?.textColor = ThemeManager.overlayTextWhite
         }
     }
 }

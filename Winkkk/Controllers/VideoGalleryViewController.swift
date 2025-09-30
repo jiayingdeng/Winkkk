@@ -97,8 +97,8 @@ class VideoGalleryViewController: UIViewController {
         let button = UIButton(type: .system)
         button.setImage(UIImage(systemName: "plus"), for: .normal)
         
-        // 添加背景色强调重要性 - 深紫色
-        button.backgroundColor = UIColor(red: 0.4, green: 0.2, blue: 0.6, alpha: 1.0) // 深紫色
+        // 添加背景色强调重要性 - 使用主题色
+        button.backgroundColor = ThemeManager.buttonDeepPurple
         button.tintColor = .white
         button.layer.masksToBounds = true
         
@@ -146,8 +146,8 @@ class VideoGalleryViewController: UIViewController {
         button.setTitleColor(.white.withAlphaComponent(0.6), for: .disabled)
         button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
         
-        // 胶囊形状设计 - 深紫色与粉紫色背景协调
-        button.backgroundColor = UIColor(red: 0.4, green: 0.2, blue: 0.6, alpha: 1.0) // 深紫色
+        // 胶囊形状设计 - 使用主题色与粉紫色背景协调
+        button.backgroundColor = ThemeManager.buttonDeepPurple
         button.layer.cornerRadius = 16
         
         // 内边距让按钮更饱满
@@ -183,7 +183,7 @@ class VideoGalleryViewController: UIViewController {
         button.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
         
         // 浅紫色背景，与深紫色全选按钮形成层次感
-        button.backgroundColor = UIColor(red: 0.6, green: 0.4, blue: 0.8, alpha: 1.0) // 浅紫色
+        button.backgroundColor = ThemeManager.buttonLightPurple
         
         // 胶囊形状设计，与全选按钮保持一致
         button.layer.cornerRadius = 16
@@ -221,7 +221,7 @@ class VideoGalleryViewController: UIViewController {
         button.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
         
         // 极其柔和的淡粉灰色，几乎不刺眼
-        button.backgroundColor = UIColor(red: 0.7, green: 0.5, blue: 0.5, alpha: 1.0) // 淡粉灰色
+        button.backgroundColor = ThemeManager.buttonPinkGray
         
         // 胶囊形状设计，与全选按钮保持一致
         button.layer.cornerRadius = 16

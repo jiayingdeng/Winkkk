@@ -902,8 +902,8 @@ class TimelineView: UIView {
         if tickX >= -1 && tickX <= timeScaleView.bounds.width + 1 {
             // 绘制刻度线
             let tickLayer = CALayer()
-            // 🎯 修复问题2：改为深紫色，与粉紫背景协调且清晰
-            tickLayer.backgroundColor = UIColor(red: 0.3, green: 0.2, blue: 0.5, alpha: 0.8).cgColor
+            // 🎯 修复问题2：改为深紫色，与粉紫背景协调且清晰（使用主题色）
+            tickLayer.backgroundColor = ThemeManager.timelineTickColor.cgColor
             tickLayer.frame = CGRect(
                 x: tickX,
                 y: timeScaleView.bounds.height - (isMainTick ? 12 : 8),
@@ -919,8 +919,8 @@ class TimelineView: UIView {
             textLayer.string = formatTimeForDisplay(time)
             textLayer.font = UIFont.systemFont(ofSize: 11, weight: .medium)
             textLayer.fontSize = 11
-            // 🎯 修复：改为深紫色，与刻度线颜色一致
-            textLayer.foregroundColor = UIColor(red: 0.3, green: 0.2, blue: 0.5, alpha: 0.8).cgColor
+            // 🎯 修复：改为深紫色，与刻度线颜色一致（使用主题色）
+            textLayer.foregroundColor = ThemeManager.timelineTickColor.cgColor
             textLayer.alignmentMode = .center
             textLayer.contentsScale = UIScreen.main.scale
             

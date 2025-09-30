@@ -90,9 +90,9 @@ class VideoFilterBar: UIView {
     
     // MARK: - Setup
     private func setupUI() {
-        // 设置与主界面渐变背景协调的粉紫色背景
-        // 使用ThemeManager渐变色的中间色调，半透明效果
-        backgroundColor = UIColor(red: 242/255, green: 194/255, blue: 237/255, alpha: 0.85)
+        // 设置与主界面渐变背景协调的背景色
+        // 使用ThemeManager统一管理，支持主题切换
+        backgroundColor = ThemeManager.filterBarBackground
         
         addSubview(scrollView)
         scrollView.addSubview(stackView)
