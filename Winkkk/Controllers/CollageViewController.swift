@@ -104,6 +104,16 @@ class CollageViewController: UIViewController {
     private let flipVerticalButton = UIButton()
     private let resetEditingButton = UIButton()
     
+    // 移动控制按钮
+    private let moveUpButton = UIButton()
+    private let moveDownButton = UIButton()
+    private let moveLeftButton = UIButton()
+    private let moveRightButton = UIButton()
+    
+    // 缩放控制按钮
+    private let scaleUpButton = UIButton()
+    private let scaleDownButton = UIButton()
+    
     // 底部按钮
     private let bottomButtonsView = UIView()
     
@@ -373,8 +383,72 @@ class CollageViewController: UIViewController {
         resetEditingButton.addTarget(self, action: #selector(resetEditingTapped), for: .touchUpInside)
         editingControlsView.addSubview(resetEditingButton)
         
+        // 移动按钮设置
+        setupMovementButtons()
+        
+        // 缩放按钮设置
+        setupScaleButtons()
+        
         // 默认禁用编辑按钮
         updateEditingButtonsState()
+    }
+    
+    private func setupMovementButtons() {
+        // 向上移动按钮
+        moveUpButton.setTitle("↑", for: .normal)
+        moveUpButton.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .medium)
+        moveUpButton.setTitleColor(.white, for: .normal)
+        moveUpButton.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        moveUpButton.layer.cornerRadius = 6
+        moveUpButton.addTarget(self, action: #selector(moveUpTapped), for: .touchUpInside)
+        editingControlsView.addSubview(moveUpButton)
+        
+        // 向下移动按钮
+        moveDownButton.setTitle("↓", for: .normal)
+        moveDownButton.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .medium)
+        moveDownButton.setTitleColor(.white, for: .normal)
+        moveDownButton.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        moveDownButton.layer.cornerRadius = 6
+        moveDownButton.addTarget(self, action: #selector(moveDownTapped), for: .touchUpInside)
+        editingControlsView.addSubview(moveDownButton)
+        
+        // 向左移动按钮
+        moveLeftButton.setTitle("←", for: .normal)
+        moveLeftButton.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .medium)
+        moveLeftButton.setTitleColor(.white, for: .normal)
+        moveLeftButton.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        moveLeftButton.layer.cornerRadius = 6
+        moveLeftButton.addTarget(self, action: #selector(moveLeftTapped), for: .touchUpInside)
+        editingControlsView.addSubview(moveLeftButton)
+        
+        // 向右移动按钮
+        moveRightButton.setTitle("→", for: .normal)
+        moveRightButton.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .medium)
+        moveRightButton.setTitleColor(.white, for: .normal)
+        moveRightButton.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        moveRightButton.layer.cornerRadius = 6
+        moveRightButton.addTarget(self, action: #selector(moveRightTapped), for: .touchUpInside)
+        editingControlsView.addSubview(moveRightButton)
+    }
+    
+    private func setupScaleButtons() {
+        // 放大按钮
+        scaleUpButton.setTitle("+", for: .normal)
+        scaleUpButton.titleLabel?.font = UIFont.systemFont(ofSize: 20, weight: .medium)
+        scaleUpButton.setTitleColor(.white, for: .normal)
+        scaleUpButton.backgroundColor = UIColor.green.withAlphaComponent(0.7)
+        scaleUpButton.layer.cornerRadius = 6
+        scaleUpButton.addTarget(self, action: #selector(scaleUpTapped), for: .touchUpInside)
+        editingControlsView.addSubview(scaleUpButton)
+        
+        // 缩小按钮
+        scaleDownButton.setTitle("-", for: .normal)
+        scaleDownButton.titleLabel?.font = UIFont.systemFont(ofSize: 20, weight: .medium)
+        scaleDownButton.setTitleColor(.white, for: .normal)
+        scaleDownButton.backgroundColor = UIColor.orange.withAlphaComponent(0.7)
+        scaleDownButton.layer.cornerRadius = 6
+        scaleDownButton.addTarget(self, action: #selector(scaleDownTapped), for: .touchUpInside)
+        editingControlsView.addSubview(scaleDownButton)
     }
     
     
@@ -480,6 +554,14 @@ class CollageViewController: UIViewController {
         flipHorizontalButton.translatesAutoresizingMaskIntoConstraints = false
         flipVerticalButton.translatesAutoresizingMaskIntoConstraints = false
         resetEditingButton.translatesAutoresizingMaskIntoConstraints = false
+        
+        // 移动和缩放按钮
+        moveUpButton.translatesAutoresizingMaskIntoConstraints = false
+        moveDownButton.translatesAutoresizingMaskIntoConstraints = false
+        moveLeftButton.translatesAutoresizingMaskIntoConstraints = false
+        moveRightButton.translatesAutoresizingMaskIntoConstraints = false
+        scaleUpButton.translatesAutoresizingMaskIntoConstraints = false
+        scaleDownButton.translatesAutoresizingMaskIntoConstraints = false
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         bottomButtonsView.translatesAutoresizingMaskIntoConstraints = false
         
@@ -584,11 +666,11 @@ class CollageViewController: UIViewController {
             templateCollectionView.heightAnchor.constraint(equalToConstant: 80),
             templateCollectionView.bottomAnchor.constraint(lessThanOrEqualTo: layoutSectionView.bottomAnchor, constant: -16),
             
-            // 图片编辑区域 - 优化高度
+            // 图片编辑区域 - 增加高度以容纳新按钮
             editingSectionView.topAnchor.constraint(equalTo: layoutSectionView.bottomAnchor, constant: 16),
             editingSectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             editingSectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            editingSectionView.heightAnchor.constraint(greaterThanOrEqualToConstant: 140),
+            editingSectionView.heightAnchor.constraint(greaterThanOrEqualToConstant: 200), // 增加高度
             
             editingTitleLabel.topAnchor.constraint(equalTo: editingSectionView.topAnchor, constant: 16),
             editingTitleLabel.leadingAnchor.constraint(equalTo: editingSectionView.leadingAnchor, constant: 16),
@@ -603,33 +685,66 @@ class CollageViewController: UIViewController {
             editingControlsView.topAnchor.constraint(equalTo: imageSelectionCollectionView.bottomAnchor, constant: 8),
             editingControlsView.leadingAnchor.constraint(equalTo: editingSectionView.leadingAnchor, constant: 16),
             editingControlsView.trailingAnchor.constraint(equalTo: editingSectionView.trailingAnchor, constant: -16),
-            editingControlsView.heightAnchor.constraint(equalToConstant: 36),
+            editingControlsView.heightAnchor.constraint(equalToConstant: 100), // 增加高度以容纳多行按钮
             editingControlsView.bottomAnchor.constraint(lessThanOrEqualTo: editingSectionView.bottomAnchor, constant: -16),
             
+            // 第一行：旋转和镜像按钮
             rotateLeftButton.leadingAnchor.constraint(equalTo: editingControlsView.leadingAnchor, constant: 8),
-            rotateLeftButton.centerYAnchor.constraint(equalTo: editingControlsView.centerYAnchor),
+            rotateLeftButton.topAnchor.constraint(equalTo: editingControlsView.topAnchor, constant: 8),
             rotateLeftButton.widthAnchor.constraint(equalToConstant: 36),
             rotateLeftButton.heightAnchor.constraint(equalToConstant: 28),
             
             rotateRightButton.leadingAnchor.constraint(equalTo: rotateLeftButton.trailingAnchor, constant: 8),
-            rotateRightButton.centerYAnchor.constraint(equalTo: editingControlsView.centerYAnchor),
+            rotateRightButton.topAnchor.constraint(equalTo: editingControlsView.topAnchor, constant: 8),
             rotateRightButton.widthAnchor.constraint(equalToConstant: 36),
             rotateRightButton.heightAnchor.constraint(equalToConstant: 28),
             
             flipHorizontalButton.leadingAnchor.constraint(equalTo: rotateRightButton.trailingAnchor, constant: 8),
-            flipHorizontalButton.centerYAnchor.constraint(equalTo: editingControlsView.centerYAnchor),
+            flipHorizontalButton.topAnchor.constraint(equalTo: editingControlsView.topAnchor, constant: 8),
             flipHorizontalButton.widthAnchor.constraint(equalToConstant: 36),
             flipHorizontalButton.heightAnchor.constraint(equalToConstant: 28),
             
             flipVerticalButton.leadingAnchor.constraint(equalTo: flipHorizontalButton.trailingAnchor, constant: 8),
-            flipVerticalButton.centerYAnchor.constraint(equalTo: editingControlsView.centerYAnchor),
+            flipVerticalButton.topAnchor.constraint(equalTo: editingControlsView.topAnchor, constant: 8),
             flipVerticalButton.widthAnchor.constraint(equalToConstant: 36),
             flipVerticalButton.heightAnchor.constraint(equalToConstant: 28),
             
             resetEditingButton.trailingAnchor.constraint(equalTo: editingControlsView.trailingAnchor, constant: -8),
-            resetEditingButton.centerYAnchor.constraint(equalTo: editingControlsView.centerYAnchor),
+            resetEditingButton.topAnchor.constraint(equalTo: editingControlsView.topAnchor, constant: 8),
             resetEditingButton.widthAnchor.constraint(equalToConstant: 48),
             resetEditingButton.heightAnchor.constraint(equalToConstant: 28),
+            
+            // 第二行：移动按钮和缩放按钮
+            moveUpButton.leadingAnchor.constraint(equalTo: editingControlsView.leadingAnchor, constant: 50),
+            moveUpButton.topAnchor.constraint(equalTo: rotateLeftButton.bottomAnchor, constant: 8),
+            moveUpButton.widthAnchor.constraint(equalToConstant: 36),
+            moveUpButton.heightAnchor.constraint(equalToConstant: 28),
+            
+            scaleUpButton.leadingAnchor.constraint(equalTo: moveUpButton.trailingAnchor, constant: 50),
+            scaleUpButton.topAnchor.constraint(equalTo: rotateLeftButton.bottomAnchor, constant: 8),
+            scaleUpButton.widthAnchor.constraint(equalToConstant: 36),
+            scaleUpButton.heightAnchor.constraint(equalToConstant: 28),
+            
+            scaleDownButton.leadingAnchor.constraint(equalTo: scaleUpButton.trailingAnchor, constant: 8),
+            scaleDownButton.topAnchor.constraint(equalTo: rotateLeftButton.bottomAnchor, constant: 8),
+            scaleDownButton.widthAnchor.constraint(equalToConstant: 36),
+            scaleDownButton.heightAnchor.constraint(equalToConstant: 28),
+            
+            // 第三行：左下右移动按钮
+            moveLeftButton.leadingAnchor.constraint(equalTo: editingControlsView.leadingAnchor, constant: 8),
+            moveLeftButton.topAnchor.constraint(equalTo: moveUpButton.bottomAnchor, constant: 8),
+            moveLeftButton.widthAnchor.constraint(equalToConstant: 36),
+            moveLeftButton.heightAnchor.constraint(equalToConstant: 28),
+            
+            moveDownButton.leadingAnchor.constraint(equalTo: moveLeftButton.trailingAnchor, constant: 8),
+            moveDownButton.topAnchor.constraint(equalTo: moveUpButton.bottomAnchor, constant: 8),
+            moveDownButton.widthAnchor.constraint(equalToConstant: 36),
+            moveDownButton.heightAnchor.constraint(equalToConstant: 28),
+            
+            moveRightButton.leadingAnchor.constraint(equalTo: moveDownButton.trailingAnchor, constant: 8),
+            moveRightButton.topAnchor.constraint(equalTo: moveUpButton.bottomAnchor, constant: 8),
+            moveRightButton.widthAnchor.constraint(equalToConstant: 36),
+            moveRightButton.heightAnchor.constraint(equalToConstant: 28),
             
             // 底部按钮 - 直接连接编辑区域
             bottomButtonsView.topAnchor.constraint(equalTo: editingSectionView.bottomAnchor, constant: 24),
@@ -852,21 +967,133 @@ class CollageViewController: UIViewController {
         statusLabel.text = "图片编辑已重置，拼图已更新"
     }
     
+    // MARK: - Movement Actions
+    
+    @objc private func moveUpTapped() {
+        guard let selectedIndex = selectedImageIndex else { return }
+        
+        HapticFeedbackManager.shared.buttonTap()
+        imageItems[selectedIndex].moveUp()
+        
+        // 更新图片选择集合视图
+        imageSelectionCollectionView.reloadItems(at: [IndexPath(item: selectedIndex, section: 0)])
+        
+        // 如果有生成的拼图，自动重新生成预览
+        if collageImage != nil {
+            updatePreview()
+        }
+    }
+    
+    @objc private func moveDownTapped() {
+        guard let selectedIndex = selectedImageIndex else { return }
+        
+        HapticFeedbackManager.shared.buttonTap()
+        imageItems[selectedIndex].moveDown()
+        
+        // 更新图片选择集合视图
+        imageSelectionCollectionView.reloadItems(at: [IndexPath(item: selectedIndex, section: 0)])
+        
+        // 如果有生成的拼图，自动重新生成预览
+        if collageImage != nil {
+            updatePreview()
+        }
+    }
+    
+    @objc private func moveLeftTapped() {
+        guard let selectedIndex = selectedImageIndex else { return }
+        
+        HapticFeedbackManager.shared.buttonTap()
+        imageItems[selectedIndex].moveLeft()
+        
+        // 更新图片选择集合视图
+        imageSelectionCollectionView.reloadItems(at: [IndexPath(item: selectedIndex, section: 0)])
+        
+        // 如果有生成的拼图，自动重新生成预览
+        if collageImage != nil {
+            updatePreview()
+        }
+    }
+    
+    @objc private func moveRightTapped() {
+        guard let selectedIndex = selectedImageIndex else { return }
+        
+        HapticFeedbackManager.shared.buttonTap()
+        imageItems[selectedIndex].moveRight()
+        
+        // 更新图片选择集合视图
+        imageSelectionCollectionView.reloadItems(at: [IndexPath(item: selectedIndex, section: 0)])
+        
+        // 如果有生成的拼图，自动重新生成预览
+        if collageImage != nil {
+            updatePreview()
+        }
+    }
+    
+    // MARK: - Scale Actions
+    
+    @objc private func scaleUpTapped() {
+        guard let selectedIndex = selectedImageIndex else { return }
+        
+        HapticFeedbackManager.shared.buttonTap()
+        imageItems[selectedIndex].scaleUp()
+        
+        // 更新图片选择集合视图
+        imageSelectionCollectionView.reloadItems(at: [IndexPath(item: selectedIndex, section: 0)])
+        
+        // 如果有生成的拼图，自动重新生成预览
+        if collageImage != nil {
+            updatePreview()
+        }
+    }
+    
+    @objc private func scaleDownTapped() {
+        guard let selectedIndex = selectedImageIndex else { return }
+        
+        HapticFeedbackManager.shared.buttonTap()
+        imageItems[selectedIndex].scaleDown()
+        
+        // 更新图片选择集合视图
+        imageSelectionCollectionView.reloadItems(at: [IndexPath(item: selectedIndex, section: 0)])
+        
+        // 如果有生成的拼图，自动重新生成预览
+        if collageImage != nil {
+            updatePreview()
+        }
+    }
+    
     private func updateEditingButtonsState() {
         let hasSelection = selectedImageIndex != nil
         
+        // 旧按钮
         rotateLeftButton.isEnabled = hasSelection
         rotateRightButton.isEnabled = hasSelection
         flipHorizontalButton.isEnabled = hasSelection
         flipVerticalButton.isEnabled = hasSelection
         resetEditingButton.isEnabled = hasSelection
         
+        // 新按钮
+        moveUpButton.isEnabled = hasSelection
+        moveDownButton.isEnabled = hasSelection
+        moveLeftButton.isEnabled = hasSelection
+        moveRightButton.isEnabled = hasSelection
+        scaleUpButton.isEnabled = hasSelection
+        scaleDownButton.isEnabled = hasSelection
+        
         let alpha: CGFloat = hasSelection ? 1.0 : 0.5
+        // 旧按钮
         rotateLeftButton.alpha = alpha
         rotateRightButton.alpha = alpha
         flipHorizontalButton.alpha = alpha
         flipVerticalButton.alpha = alpha
         resetEditingButton.alpha = alpha
+        
+        // 新按钮
+        moveUpButton.alpha = alpha
+        moveDownButton.alpha = alpha
+        moveLeftButton.alpha = alpha
+        moveRightButton.alpha = alpha
+        scaleUpButton.alpha = alpha
+        scaleDownButton.alpha = alpha
     }
     
     @objc private func saveCollage() {
@@ -1326,6 +1553,54 @@ class CollageImageItem {
     /// 垂直镜像
     func flipVertically() {
         isFlippedVertically.toggle()
+        markNeedsUpdate()
+    }
+    
+    /// 向上移动
+    func moveUp(_ distance: CGFloat = 10.0) {
+        translation.y -= distance
+        // 边界检查
+        translation.y = max(translation.y, -100.0)
+        markNeedsUpdate()
+    }
+    
+    /// 向下移动
+    func moveDown(_ distance: CGFloat = 10.0) {
+        translation.y += distance
+        // 边界检查
+        translation.y = min(translation.y, 100.0)
+        markNeedsUpdate()
+    }
+    
+    /// 向左移动
+    func moveLeft(_ distance: CGFloat = 10.0) {
+        translation.x -= distance
+        // 边界检查
+        translation.x = max(translation.x, -100.0)
+        markNeedsUpdate()
+    }
+    
+    /// 向右移动
+    func moveRight(_ distance: CGFloat = 10.0) {
+        translation.x += distance
+        // 边界检查
+        translation.x = min(translation.x, 100.0)
+        markNeedsUpdate()
+    }
+    
+    /// 放大
+    func scaleUp(_ factor: CGFloat = 0.1) {
+        scale += factor
+        // 边界检查
+        scale = min(scale, 3.0)
+        markNeedsUpdate()
+    }
+    
+    /// 缩小
+    func scaleDown(_ factor: CGFloat = 0.1) {
+        scale -= factor
+        // 边界检查
+        scale = max(scale, 0.2)
         markNeedsUpdate()
     }
     

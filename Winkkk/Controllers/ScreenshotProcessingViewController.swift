@@ -418,6 +418,9 @@ class ScreenshotProcessingViewController: UIViewController {
     private func setupProcessingOptions() {
         switch mode {
         case .stillImage:
+            // 🎯 根据截图数量动态调整按钮文字
+            let enhanceTitle = screenshots.count == 1 ? "✨ 画质修复" : "✨ 批量画质修复"
+            
             processingOptions = [
                 ProcessingOption(
                     title: "✨ 开始新的创作",
@@ -426,7 +429,7 @@ class ScreenshotProcessingViewController: UIViewController {
                     action: { [weak self] in self?.startNewCreation() }
                 ),
                 ProcessingOption(
-                    title: "✨ 批量画质修复",
+                    title: enhanceTitle,
                     description: "AI智能修复图片质量",
                     icon: "wand.and.stars",
                     action: { [weak self] in self?.showBatchImageEnhancement() }
@@ -509,15 +512,12 @@ extension ScreenshotProcessingViewController: UICollectionViewDataSource {
 extension ScreenshotProcessingViewController: UICollectionViewDelegate {
     
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        let screenshot = screenshots[indexPath.item]
+        // 触觉反馈
+        HapticFeedbackManager.shared.lightImpact()
         
-        // 弹出Sheet查看大图
-        let viewSheet = ScreenshotViewSheet(screenshot: screenshot)
-        viewSheet.modalPresentationStyle = .pageSheet
-        if #available(iOS 15.0, *) {
-            viewSheet.sheetPresentationController?.detents = [.medium(), .large()]
-        }
-        present(viewSheet, animated: true)
+        // 弹出Sheet查看大图 - 支持左右滑动查看所有截图
+        let detailSheet = ScreenshotDetailSheet(screenshots: screenshots, currentIndex: indexPath.item)
+        present(detailSheet, animated: true)
     }
 }
 

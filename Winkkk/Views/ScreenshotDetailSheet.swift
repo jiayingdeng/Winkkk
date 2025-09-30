@@ -22,6 +22,7 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     private var currentIndex: Int
     
     // MARK: - UI Components
+    private let gradientBackgroundView = GradientBackgroundView()
     private let scrollView = UIScrollView()
     private let stackView = UIStackView()
     private let navigationBar = UIView()
@@ -76,8 +77,8 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     
     // MARK: - UI Setup
     private func setupUI() {
-        // 使用app主题的粉紫色背景 - 不透明版本确保颜色明显
-        view.backgroundColor = UIColor(red: 252/255, green: 240/255, blue: 255/255, alpha: 1.0) // #FCF0FF 不透明版本
+        // 使用渐变背景，与截图处理中心保持一致
+        view.addSubview(gradientBackgroundView)
         
         setupNavigationBar()
         setupScrollView()
@@ -89,21 +90,21 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     private func setupNavigationBar() {
         navigationBar.backgroundColor = .clear
         
-        // 标题
+        // 标题 - 使用白色文字
         titleLabel.text = "\(currentIndex + 1) / \(screenshots.count)"
         titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
-        titleLabel.textColor = .label
+        titleLabel.textColor = .white
         titleLabel.textAlignment = .center
         
-        // 关闭按钮
+        // 关闭按钮 - 使用白色
         closeButton.setTitle("✕", for: .normal)
-        closeButton.setTitleColor(.label, for: .normal)
+        closeButton.setTitleColor(.white, for: .normal)
         closeButton.titleLabel?.font = .systemFont(ofSize: 18, weight: .medium)
         closeButton.addTarget(self, action: #selector(closeButtonTapped), for: .touchUpInside)
         
-        // 分享按钮
+        // 分享按钮 - 使用白色
         shareButton.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
-        shareButton.tintColor = .label
+        shareButton.tintColor = .white
         shareButton.addTarget(self, action: #selector(shareButtonTapped), for: .touchUpInside)
         
         navigationBar.addSubview(titleLabel)
@@ -132,7 +133,7 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     
     private func createImageView(for screenshot: ScreenshotItem) -> UIView {
         let containerView = UIView()
-        containerView.backgroundColor = .black
+        containerView.backgroundColor = .clear  // 🎨 使用透明背景，展示粉紫色渐变
         
         // 设置固定宽度为屏幕宽度
         containerView.widthAnchor.constraint(equalToConstant: UIScreen.main.bounds.width).isActive = true
@@ -266,6 +267,7 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     }
     
     private func setupConstraints() {
+        gradientBackgroundView.translatesAutoresizingMaskIntoConstraints = false
         navigationBar.translatesAutoresizingMaskIntoConstraints = false
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         stackView.translatesAutoresizingMaskIntoConstraints = false
@@ -274,6 +276,11 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
         shareButton.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
+            // 渐变背景
+            gradientBackgroundView.topAnchor.constraint(equalTo: view.topAnchor),
+            gradientBackgroundView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            gradientBackgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            gradientBackgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             // 导航栏
             navigationBar.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             navigationBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -536,7 +543,7 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
         // 创建静态图片视图
         let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFit
-        imageView.backgroundColor = .black
+        imageView.backgroundColor = .clear  // 🎨 使用透明背景，展示粉紫色渐变
         imageView.translatesAutoresizingMaskIntoConstraints = false
         
         // 加载图片

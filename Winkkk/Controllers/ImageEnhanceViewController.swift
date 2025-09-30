@@ -99,6 +99,14 @@ class ImageEnhanceViewController: UIViewController {
         }
     }
     
+    // MARK: - Computed Properties
+    /// 判断是否应该显示"返回截图中心"按钮
+    private var shouldShowReturnButton: Bool {
+        return sourceType == .fromScreenshots || 
+               sourceType == .fromBatch || 
+               sourceType == .fromBatchCompleted
+    }
+    
     // MARK: - Initialization
     init(image: UIImage, timestamp: Double) {
         self.originalImage = image
@@ -172,7 +180,9 @@ class ImageEnhanceViewController: UIViewController {
         // 🔧 调整基础高度以适应双行按钮布局：
         // segmentedControl(32) + enhanceButton(40) + progressView(6) + statusLabel(20) + 第一行按钮(36) + 第二行按钮(40) + 间距(20+16+12+8+16+12) = 约218px
         // 加上上下内边距20px共约238px，保留额外空间使用300px
-        let hasReturnButton = sourceType == .fromBatch || sourceType == .fromBatchCompleted
+        let hasReturnButton = sourceType == .fromScreenshots || 
+                             sourceType == .fromBatch || 
+                             sourceType == .fromBatchCompleted
         let panelHeight = (hasReturnButton ? 300 : 260) + safeAreaBottom
         
         // 调整最大高度比例从40%到45%，给小屏幕设备更多空间
@@ -259,7 +269,11 @@ class ImageEnhanceViewController: UIViewController {
         setupBottomButtons()
         
         // 🆕 返回截图中心按钮（条件显示）
-        if sourceType == .fromBatch || sourceType == .fromBatchCompleted {
+        // 从截图中心、批量修复页面进入时都显示返回按钮
+        let shouldShowReturnButton = sourceType == .fromScreenshots || 
+                                     sourceType == .fromBatch || 
+                                     sourceType == .fromBatchCompleted
+        if shouldShowReturnButton {
             setupReturnToCenterButton()
         }
         
@@ -273,7 +287,7 @@ class ImageEnhanceViewController: UIViewController {
         controlPanelBlurView.contentView.addSubview(shareButton)
         
         // 🆕 条件添加返回截图中心按钮
-        if sourceType == .fromBatch || sourceType == .fromBatchCompleted {
+        if shouldShowReturnButton {
             controlPanelBlurView.contentView.addSubview(returnToCenterButton)
         }
     }
@@ -373,7 +387,10 @@ class ImageEnhanceViewController: UIViewController {
         saveButton.translatesAutoresizingMaskIntoConstraints = false
         shareButton.translatesAutoresizingMaskIntoConstraints = false
         // 🆕 条件设置返回截图中心按钮的约束
-        if sourceType == .fromBatch || sourceType == .fromBatchCompleted {
+        let shouldShowReturnButton = sourceType == .fromScreenshots || 
+                                     sourceType == .fromBatch || 
+                                     sourceType == .fromBatchCompleted
+        if shouldShowReturnButton {
             returnToCenterButton.translatesAutoresizingMaskIntoConstraints = false
         }
         
@@ -449,7 +466,7 @@ class ImageEnhanceViewController: UIViewController {
         ])
         
         // 🆕 条件添加返回截图中心按钮约束（第二行）
-        if sourceType == .fromBatch || sourceType == .fromBatchCompleted {
+        if shouldShowReturnButton {
             NSLayoutConstraint.activate([
                 // 🎨 第二行：返回截图中心按钮 - 居中显示，底部安全区域考虑
                 returnToCenterButton.topAnchor.constraint(equalTo: resetButton.bottomAnchor, constant: 12),
