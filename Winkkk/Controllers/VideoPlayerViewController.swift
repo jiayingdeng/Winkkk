@@ -347,15 +347,15 @@ class VideoPlayerViewController: UIViewController {
             controlPanelBlurView.leadingAnchor.constraint(equalTo: unifiedControlPanelView.leadingAnchor),
             controlPanelBlurView.trailingAnchor.constraint(equalTo: unifiedControlPanelView.trailingAnchor),
             controlPanelBlurView.bottomAnchor.constraint(equalTo: unifiedControlPanelView.bottomAnchor),  // 🎯 直接贴底部
-            controlPanelBlurView.heightAnchor.constraint(greaterThanOrEqualToConstant: 420),  // 🆕 增加高度以容纳模式切换器+截图预览栏+截图预览条
+            controlPanelBlurView.heightAnchor.constraint(greaterThanOrEqualToConstant: 400),  // 🎯 优化高度约束以适配压缩后的布局
             
             // 🎯 时间轴 - 允许视觉溢出屏幕边界 (Wink风格)
-            timelineView.topAnchor.constraint(equalTo: captureModeSwitcher.bottomAnchor, constant: 8),
+            timelineView.topAnchor.constraint(equalTo: captureModeSwitcher.bottomAnchor, constant: 6),  // 🎯 压缩：8pt → 6pt
             timelineView.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
-            timelineView.heightAnchor.constraint(equalToConstant: 95),
+            timelineView.heightAnchor.constraint(equalToConstant: 88),  // 🎯 压缩：95pt → 88pt
             
             // 🎯 合并的时间标签 - 居中显示 "当前时间 / 总时长"
-            timeInfoLabel.topAnchor.constraint(equalTo: timelineView.bottomAnchor, constant: 6),
+            timeInfoLabel.topAnchor.constraint(equalTo: timelineView.bottomAnchor, constant: 4),  // 🎯 压缩：6pt → 4pt
             timeInfoLabel.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
             timeInfoLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 100),  // 最小宽度，支持自动扩展
             
@@ -367,10 +367,10 @@ class VideoPlayerViewController: UIViewController {
             playPauseButton.heightAnchor.constraint(equalToConstant: 50),
             
             // 🌟 截图按钮 - 移动到时间标签正下方，建立清晰的垂直布局链
-            screenshotButton.topAnchor.constraint(equalTo: timeInfoLabel.bottomAnchor, constant: 8),
+            screenshotButton.topAnchor.constraint(equalTo: timeInfoLabel.bottomAnchor, constant: 6),  // 🎯 压缩：8pt → 6pt
             screenshotButton.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
             screenshotButton.widthAnchor.constraint(equalToConstant: 180),  // 🌟 增加宽度以完整显示"截取当前画面"
-            screenshotButton.heightAnchor.constraint(equalToConstant: 44)   // 🎯 优化：降低到标准触摸高度 (48pt → 44pt)
+            screenshotButton.heightAnchor.constraint(equalToConstant: 42)   // 🎯 压缩：44pt → 42pt
         ])
         
         // 🎯 初始化动态约束 - 三分屏布局
@@ -402,13 +402,14 @@ class VideoPlayerViewController: UIViewController {
         NSLayoutConstraint.activate([
             // 🎯 控制面板内：截图预览栏 - 紧贴截图按钮下方，只用高度约束
             // ⚠️ 移除 bottomAnchor 约束，避免与 heightAnchor 冲突导致预览栏超出屏幕
-            screenshotPreviewBar.topAnchor.constraint(equalTo: screenshotButton.bottomAnchor, constant: 8),
+            screenshotPreviewBar.topAnchor.constraint(equalTo: screenshotButton.bottomAnchor, constant: 6),  // 🎯 压缩：8pt → 6pt
             screenshotPreviewBar.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 16),
             screenshotPreviewBar.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -16),
-            // screenshotPreviewBar.bottomAnchor 已移除，改用动态 heightAnchor
+            // 🎯 关键：添加底部约束，确保预览栏不会超出安全区域
+            screenshotPreviewBar.bottomAnchor.constraint(lessThanOrEqualTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -8),
             
             // 🎯 控制面板内：模式切换器 - 位于顶部
-            captureModeSwitcher.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 8),
+            captureModeSwitcher.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 6),  // 🎯 压缩：8pt → 6pt
             captureModeSwitcher.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
             captureModeSwitcher.heightAnchor.constraint(equalToConstant: 44),
             captureModeSwitcher.widthAnchor.constraint(equalToConstant: 280)
@@ -711,8 +712,56 @@ class VideoPlayerViewController: UIViewController {
     // 🎯 更新合并的时间信息标签
     private func updateTimeInfoLabel() {
         let currentStr = currentTime.formattedString
-        // 🔧 使用缓存的总时长字符串，避免重复格式化和跳动
-        timeInfoLabel.text = "\(currentStr) / \(cachedDurationString)"
+        
+        // 🔧 创建带样式的文本：当前时间 + 小字标签 / 总时长 + 小字标签
+        let attributedString = NSMutableAttributedString()
+        
+        // 当前时间（正常大小）
+        attributedString.append(NSAttributedString(
+            string: currentStr,
+            attributes: [
+                .font: UIFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium),
+                .foregroundColor: UIColor.white
+            ]
+        ))
+        
+        // "当前"标签（小字，半透明）
+        attributedString.append(NSAttributedString(
+            string: " 当前",
+            attributes: [
+                .font: UIFont.systemFont(ofSize: 10, weight: .regular),
+                .foregroundColor: UIColor.white.withAlphaComponent(0.6)
+            ]
+        ))
+        
+        // 分隔符
+        attributedString.append(NSAttributedString(
+            string: " / ",
+            attributes: [
+                .font: UIFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium),
+                .foregroundColor: UIColor.white
+            ]
+        ))
+        
+        // 总时长（正常大小）
+        attributedString.append(NSAttributedString(
+            string: cachedDurationString,
+            attributes: [
+                .font: UIFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium),
+                .foregroundColor: UIColor.white
+            ]
+        ))
+        
+        // "总时长"标签（小字，半透明）
+        attributedString.append(NSAttributedString(
+            string: " 总时长",
+            attributes: [
+                .font: UIFont.systemFont(ofSize: 10, weight: .regular),
+                .foregroundColor: UIColor.white.withAlphaComponent(0.6)
+            ]
+        ))
+        
+        timeInfoLabel.attributedText = attributedString
     }
     
     private func updateTimeLabels() {
