@@ -55,8 +55,7 @@ class VideoPlayerViewController: UIViewController {
     // 播放控制
     private let playPauseButton = UIButton()
     private let timelineView = TimelineView()
-    private let currentTimeLabel = UILabel()
-    private let totalTimeLabel = UILabel()
+    private let timeInfoLabel = UILabel()  // 🎯 合并的时间信息标签 (当前时间 / 总时长)
     
     // 截图按钮
     private let screenshotButton = UIButton()
@@ -231,8 +230,7 @@ class VideoPlayerViewController: UIViewController {
         
         // 添加到控制面板 - 🔧 时间轴放在最下层，避免遮挡按钮
         controlPanelBlurView.contentView.addSubview(timelineView)
-        controlPanelBlurView.contentView.addSubview(currentTimeLabel)
-        controlPanelBlurView.contentView.addSubview(totalTimeLabel)
+        controlPanelBlurView.contentView.addSubview(timeInfoLabel)  // 🎯 合并的时间标签
         controlPanelBlurView.contentView.addSubview(playPauseButton)
         controlPanelBlurView.contentView.addSubview(screenshotButton)
         
@@ -289,15 +287,12 @@ class VideoPlayerViewController: UIViewController {
     }
     
     private func setupTimeLabels() {
-        currentTimeLabel.text = "00:00"
-        currentTimeLabel.textColor = .white
-        currentTimeLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 14, weight: .medium)
-        currentTimeLabel.textAlignment = .center
-        
-        totalTimeLabel.text = "00:00"
-        totalTimeLabel.textColor = .white.withAlphaComponent(0.7)
-        totalTimeLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 14, weight: .medium)
-        totalTimeLabel.textAlignment = .center
+        // 🎯 合并时间标签：显示 "当前时间 / 总时长"
+        timeInfoLabel.text = "00:00 / 00:00"
+        timeInfoLabel.textColor = .white
+        timeInfoLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 14, weight: .medium)
+        timeInfoLabel.textAlignment = .center
+        timeInfoLabel.numberOfLines = 1
     }
     
     private func setupConstraints() {
@@ -309,8 +304,7 @@ class VideoPlayerViewController: UIViewController {
         playPauseButton.translatesAutoresizingMaskIntoConstraints = false
         screenshotButton.translatesAutoresizingMaskIntoConstraints = false
         timelineView.translatesAutoresizingMaskIntoConstraints = false
-        currentTimeLabel.translatesAutoresizingMaskIntoConstraints = false
-        totalTimeLabel.translatesAutoresizingMaskIntoConstraints = false
+        timeInfoLabel.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
             // 渐变背景
@@ -328,7 +322,7 @@ class VideoPlayerViewController: UIViewController {
             unifiedControlPanelView.topAnchor.constraint(equalTo: playerContainerView.bottomAnchor, constant: 8),
             unifiedControlPanelView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             unifiedControlPanelView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            unifiedControlPanelView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            unifiedControlPanelView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),  // 🎯 方案1：使用安全区域，避免被Home Indicator遮挡
             
             // 🎯 控制面板内容区域 - 在统一容器内部，使用弹性高度
             controlPanelBlurView.topAnchor.constraint(equalTo: unifiedControlPanelView.topAnchor),
@@ -342,14 +336,10 @@ class VideoPlayerViewController: UIViewController {
             timelineView.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
             timelineView.heightAnchor.constraint(equalToConstant: 95),
             
-            // 时间标签
-            currentTimeLabel.topAnchor.constraint(equalTo: timelineView.bottomAnchor, constant: 5),
-            currentTimeLabel.leadingAnchor.constraint(equalTo: timelineView.leadingAnchor),
-            currentTimeLabel.widthAnchor.constraint(equalToConstant: 50),
-            
-            totalTimeLabel.topAnchor.constraint(equalTo: timelineView.bottomAnchor, constant: 8),
-            totalTimeLabel.trailingAnchor.constraint(equalTo: timelineView.trailingAnchor),
-            totalTimeLabel.widthAnchor.constraint(equalToConstant: 50),
+            // 🎯 合并的时间标签 - 居中显示 "当前时间 / 总时长"
+            timeInfoLabel.topAnchor.constraint(equalTo: timelineView.bottomAnchor, constant: 6),
+            timeInfoLabel.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
+            timeInfoLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 100),  // 最小宽度，支持自动扩展
             
             // 🎯 修复：播放和截图按钮与时间轴在同一水平区域，但固定在屏幕边界内
             // 播放按钮 - 位于屏幕左侧，与时间轴同一水平线
@@ -359,10 +349,10 @@ class VideoPlayerViewController: UIViewController {
             playPauseButton.heightAnchor.constraint(equalToConstant: 50),
             
             // 🌟 截图按钮 - 移动到时间标签正下方，建立清晰的垂直布局链
-            screenshotButton.topAnchor.constraint(equalTo: currentTimeLabel.bottomAnchor, constant: 8),
+            screenshotButton.topAnchor.constraint(equalTo: timeInfoLabel.bottomAnchor, constant: 8),
             screenshotButton.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
             screenshotButton.widthAnchor.constraint(equalToConstant: 180),  // 🌟 增加宽度以完整显示"截取当前画面"
-            screenshotButton.heightAnchor.constraint(equalToConstant: 48)   // 🌟 增加高度，更显眼
+            screenshotButton.heightAnchor.constraint(equalToConstant: 44)   // 🎯 优化：降低到标准触摸高度 (48pt → 44pt)
         ])
         
         // 🎯 初始化动态约束 - 三分屏布局
@@ -462,7 +452,7 @@ class VideoPlayerViewController: UIViewController {
                 
                 if let duration = player.currentItem?.asset.duration {
                     self.videoDuration = duration
-                    self.totalTimeLabel.text = duration.formattedString
+                    self.updateTimeInfoLabel()  // 🎯 使用合并标签更新
                     
                     // 设置时间轴
                     self.timelineView.setDuration(duration.seconds)
@@ -699,17 +689,23 @@ class VideoPlayerViewController: UIViewController {
         // 时间轴现在只负责截取位置控制，不跟随播放进度
     }
     
-    private func updateTimeLabels() {
-        currentTimeLabel.text = currentTime.formattedString
+    // 🎯 更新合并的时间信息标签
+    private func updateTimeInfoLabel() {
+        let currentStr = currentTime.formattedString
+        let totalStr = videoDuration.formattedString
+        timeInfoLabel.text = "\(currentStr) / \(totalStr)"
     }
     
-    // 🎯 更新截取时间标签（Wink风格）
+    private func updateTimeLabels() {
+        updateTimeInfoLabel()
+    }
+    
+    // 🎯 更新截取时间标签（Wink风格）- 现在更新合并标签的总时长部分
     private func updateCaptureTimeLabel(_ captureTime: CMTime) {
-        // 显示截取时间，区别于播放时间
-        let captureTimeString = captureTime.formattedString
-        // 更新：不再显示为绿色，也不再添加“截取:”前缀
-        totalTimeLabel.text = captureTimeString
-        totalTimeLabel.textColor = .white.withAlphaComponent(0.7)
+        // 在合并标签中显示截取时间
+        let currentStr = currentTime.formattedString
+        let captureStr = captureTime.formattedString
+        timeInfoLabel.text = "\(currentStr) / \(captureStr)"
     }
     
     // 🎯 实时视频预览更新（防抖优化）
@@ -744,8 +740,8 @@ class VideoPlayerViewController: UIViewController {
             if completed {
                 DispatchQueue.main.async {
                     self?.currentTime = time
-                    // 只更新当前播放时间，不更新截取时间标签
-                    self?.currentTimeLabel.text = time.formattedString
+                    // 🎯 更新合并的时间标签
+                    self?.updateTimeInfoLabel()
                     print("🎯 预览模式：已跳转到 \(time.formattedString)")
                 }
             }

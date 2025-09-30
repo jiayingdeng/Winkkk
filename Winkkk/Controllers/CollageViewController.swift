@@ -93,6 +93,9 @@ class CollageViewController: UIViewController {
     // 状态标签（移到头部区域）
     private let statusLabel = UILabel()
     
+    // 长按提示文字
+    private let longPressHintLabel = UILabel()
+    
     // 图片编辑区域
     private let editingSectionView = UIView()
     private let editingTitleLabel = UILabel()
@@ -173,6 +176,11 @@ class CollageViewController: UIViewController {
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleCollageImageTap(_:)))
         previewImageView.isUserInteractionEnabled = true
         previewImageView.addGestureRecognizer(tapGesture)
+        
+        // 添加长按手势识别器
+        let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleCollageImageLongPress(_:)))
+        longPressGesture.minimumPressDuration = 0.5  // 0.5秒触发长按
+        previewImageView.addGestureRecognizer(longPressGesture)
         
         // 确保选择的模板可用
         validateSelectedTemplate()
@@ -275,6 +283,20 @@ class CollageViewController: UIViewController {
         previewPlaceholder.text = "选择布局后自动生成拼图"
         previewPlaceholder.numberOfLines = 0
         previewContainerView.addSubview(previewPlaceholder)
+        
+        // 长按提示文字
+        longPressHintLabel.font = UIFont.systemFont(ofSize: 11, weight: .regular)
+        longPressHintLabel.textColor = UIColor.white.withAlphaComponent(0.5)
+        longPressHintLabel.textAlignment = .center
+        longPressHintLabel.text = "💡 长按每张图片可进行编辑"
+        longPressHintLabel.translatesAutoresizingMaskIntoConstraints = false
+        previewContainerView.addSubview(longPressHintLabel)
+        
+        // 长按提示文字约束
+        NSLayoutConstraint.activate([
+            longPressHintLabel.bottomAnchor.constraint(equalTo: previewContainerView.bottomAnchor, constant: -8),
+            longPressHintLabel.centerXAnchor.constraint(equalTo: previewContainerView.centerXAnchor)
+        ])
     }
     
     private func setupLayoutSection() {
@@ -1196,22 +1218,157 @@ class CollageViewController: UIViewController {
         }
     }
     
+    // MARK: - Collage Image Long Press Handling
+    
+    @objc private func handleCollageImageLongPress(_ gesture: UILongPressGestureRecognizer) {
+        // 只在手势开始时触发（避免重复触发）
+        guard gesture.state == .began else { return }
+        
+        // 确保有拼图生成
+        guard collageImage != nil else { return }
+        
+        // 获取长按位置
+        let longPressLocation = gesture.location(in: previewImageView)
+        
+        // 判断长按的是哪张图片
+        if let longPressedIndex = hitTestCollageImage(point: longPressLocation) {
+            // 先选中该图片（如果尚未选中）
+            if selectedImageIndex != longPressedIndex {
+                selectedImageIndex = longPressedIndex
+                updateCollageSelectionBorder()
+                updateEditingButtonsState()
+                imageSelectionCollectionView.reloadData()
+            }
+            
+            // 触觉反馈
+            HapticFeedbackManager.shared.mediumImpact()
+            
+            // 显示编辑菜单
+            showEditMenuForImage(at: longPressedIndex, touchPoint: longPressLocation)
+        }
+    }
+    
+    /// 显示图片编辑菜单
+    private func showEditMenuForImage(at index: Int, touchPoint: CGPoint) {
+        // 确保有选中的图片
+        guard selectedImageIndex == index else { return }
+        
+        // 构建菜单动作
+        let actions = createEditMenuActions()
+        
+        // 使用 UIAlertController 显示菜单（兼容所有iOS版本）
+        let alert = UIAlertController(title: "编辑图片 \(index + 1)", message: nil, preferredStyle: .actionSheet)
+        
+        // 添加所有动作
+        for action in actions {
+            alert.addAction(action)
+        }
+        
+        // 取消按钮
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        // 设置 popover 位置（iPad）
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = previewImageView
+            popover.sourceRect = CGRect(origin: touchPoint, size: .zero)
+            popover.permittedArrowDirections = [.up, .down]
+        }
+        
+        present(alert, animated: true)
+    }
+    
+    /// 创建编辑菜单动作列表
+    private func createEditMenuActions() -> [UIAlertAction] {
+        var actions: [UIAlertAction] = []
+        
+        // 🔄 旋转左
+        actions.append(UIAlertAction(title: "↺ 向左旋转", style: .default) { [weak self] _ in
+            self?.rotateLeftTapped()
+        })
+        
+        // 🔄 旋转右
+        actions.append(UIAlertAction(title: "↻ 向右旋转", style: .default) { [weak self] _ in
+            self?.rotateRightTapped()
+        })
+        
+        // ↔️ 水平翻转
+        actions.append(UIAlertAction(title: "↔️ 水平翻转", style: .default) { [weak self] _ in
+            self?.flipHorizontalTapped()
+        })
+        
+        // ↕️ 垂直翻转
+        actions.append(UIAlertAction(title: "↕️ 垂直翻转", style: .default) { [weak self] _ in
+            self?.flipVerticalTapped()
+        })
+        
+        // ⬆️ 向上移动
+        actions.append(UIAlertAction(title: "⬆️ 向上移动", style: .default) { [weak self] _ in
+            self?.moveUpTapped()
+        })
+        
+        // ⬇️ 向下移动
+        actions.append(UIAlertAction(title: "⬇️ 向下移动", style: .default) { [weak self] _ in
+            self?.moveDownTapped()
+        })
+        
+        // ⬅️ 向左移动
+        actions.append(UIAlertAction(title: "⬅️ 向左移动", style: .default) { [weak self] _ in
+            self?.moveLeftTapped()
+        })
+        
+        // ➡️ 向右移动
+        actions.append(UIAlertAction(title: "➡️ 向右移动", style: .default) { [weak self] _ in
+            self?.moveRightTapped()
+        })
+        
+        // 🔍 放大
+        actions.append(UIAlertAction(title: "🔍 放大", style: .default) { [weak self] _ in
+            self?.scaleUpTapped()
+        })
+        
+        // 🔎 缩小
+        actions.append(UIAlertAction(title: "🔎 缩小", style: .default) { [weak self] _ in
+            self?.scaleDownTapped()
+        })
+        
+        // ♻️ 重置编辑（红色警告样式）
+        actions.append(UIAlertAction(title: "♻️ 重置编辑", style: .destructive) { [weak self] _ in
+            self?.resetEditingTapped()
+        })
+        
+        return actions
+    }
+    
     /// 根据点击坐标判断点击的是哪张图片
     private func hitTestCollageImage(point: CGPoint) -> Int? {
-        let imageSize = previewImageView.bounds.size
+        // 获取实际图片显示区域
+        let actualImageRect = getImageDisplayRect()
+        
+        // 判断点击是否在图片区域内
+        guard actualImageRect.contains(point) else {
+            return nil
+        }
+        
+        // 转换为相对于图片区域的坐标
+        let relativePoint = CGPoint(
+            x: point.x - actualImageRect.origin.x,
+            y: point.y - actualImageRect.origin.y
+        )
+        
+        let imageSize = actualImageRect.size
         
         // 根据当前布局模板判断
         if selectedLayoutTemplate is HorizontalLayoutTemplate {
             // 横向布局：左右平分
             let imageCount = imageItems.count
             let sectionWidth = imageSize.width / CGFloat(imageCount)
-            let index = Int(point.x / sectionWidth)
+            let index = Int(relativePoint.x / sectionWidth)
             return (index >= 0 && index < imageCount) ? index : nil
         } else if selectedLayoutTemplate is VerticalLayoutTemplate {
             // 纵向布局：上下平分
             let imageCount = imageItems.count
             let sectionHeight = imageSize.height / CGFloat(imageCount)
-            let index = Int(point.y / sectionHeight)
+            let index = Int(relativePoint.y / sectionHeight)
             return (index >= 0 && index < imageCount) ? index : nil
         } else if selectedLayoutTemplate is GridLayoutTemplate {
             // 网格布局：计算行列
@@ -1220,8 +1377,8 @@ class CollageViewController: UIViewController {
             let cellWidth = imageSize.width / CGFloat(gridSize.cols)
             let cellHeight = imageSize.height / CGFloat(gridSize.rows)
             
-            let col = Int(point.x / cellWidth)
-            let row = Int(point.y / cellHeight)
+            let col = Int(relativePoint.x / cellWidth)
+            let row = Int(relativePoint.y / cellHeight)
             let index = row * gridSize.cols + col
             return (index >= 0 && index < imageCount) ? index : nil
         }
@@ -1248,20 +1405,23 @@ class CollageViewController: UIViewController {
         
         guard let selectedIndex = selectedImageIndex, collageImage != nil else { return }
         
-        // 根据布局模式和选中索引，计算边框位置
-        let borderRect: CGRect
-        let imageSize = previewImageView.bounds.size
+        // 获取实际图片显示区域
+        let actualImageRect = getImageDisplayRect()
+        let imageSize = actualImageRect.size
+        
+        // 根据布局模式和选中索引，计算相对于图片区域的边框位置
+        let relativeBorderRect: CGRect
         
         if selectedLayoutTemplate is HorizontalLayoutTemplate {
             // 横向布局
             let imageCount = imageItems.count
             let sectionWidth = imageSize.width / CGFloat(imageCount)
-            borderRect = CGRect(x: CGFloat(selectedIndex) * sectionWidth, y: 0, width: sectionWidth, height: imageSize.height)
+            relativeBorderRect = CGRect(x: CGFloat(selectedIndex) * sectionWidth, y: 0, width: sectionWidth, height: imageSize.height)
         } else if selectedLayoutTemplate is VerticalLayoutTemplate {
             // 纵向布局
             let imageCount = imageItems.count
             let sectionHeight = imageSize.height / CGFloat(imageCount)
-            borderRect = CGRect(x: 0, y: CGFloat(selectedIndex) * sectionHeight, width: imageSize.width, height: sectionHeight)
+            relativeBorderRect = CGRect(x: 0, y: CGFloat(selectedIndex) * sectionHeight, width: imageSize.width, height: sectionHeight)
         } else if selectedLayoutTemplate is GridLayoutTemplate {
             // 网格布局
             let imageCount = imageItems.count
@@ -1271,10 +1431,18 @@ class CollageViewController: UIViewController {
             
             let row = selectedIndex / gridSize.cols
             let col = selectedIndex % gridSize.cols
-            borderRect = CGRect(x: CGFloat(col) * cellWidth, y: CGFloat(row) * cellHeight, width: cellWidth, height: cellHeight)
+            relativeBorderRect = CGRect(x: CGFloat(col) * cellWidth, y: CGFloat(row) * cellHeight, width: cellWidth, height: cellHeight)
         } else {
             return
         }
+        
+        // 转换为相对于 previewImageView 的绝对坐标
+        let borderRect = CGRect(
+            x: actualImageRect.origin.x + relativeBorderRect.origin.x,
+            y: actualImageRect.origin.y + relativeBorderRect.origin.y,
+            width: relativeBorderRect.width,
+            height: relativeBorderRect.height
+        )
         
         // 创建并添加边框层
         let borderLayer = CAShapeLayer()
@@ -1287,6 +1455,43 @@ class CollageViewController: UIViewController {
     }
     
     // MARK: - Helper Methods
+    
+    /// 计算图片在 UIImageView 中的实际显示区域（scaleAspectFit 模式）
+    private func getImageDisplayRect() -> CGRect {
+        guard let image = previewImageView.image else {
+            return previewImageView.bounds
+        }
+        
+        let imageSize = image.size
+        let viewSize = previewImageView.bounds.size
+        
+        // 防止除零错误
+        guard imageSize.width > 0 && imageSize.height > 0 && viewSize.width > 0 && viewSize.height > 0 else {
+            return previewImageView.bounds
+        }
+        
+        // 计算宽高比
+        let imageAspect = imageSize.width / imageSize.height
+        let viewAspect = viewSize.width / viewSize.height
+        
+        var displayRect = CGRect.zero
+        
+        if imageAspect > viewAspect {
+            // 图片更宽，以宽度为准
+            let displayWidth = viewSize.width
+            let displayHeight = displayWidth / imageAspect
+            let y = (viewSize.height - displayHeight) / 2
+            displayRect = CGRect(x: 0, y: y, width: displayWidth, height: displayHeight)
+        } else {
+            // 图片更高或相等，以高度为准
+            let displayHeight = viewSize.height
+            let displayWidth = displayHeight * imageAspect
+            let x = (viewSize.width - displayWidth) / 2
+            displayRect = CGRect(x: x, y: 0, width: displayWidth, height: displayHeight)
+        }
+        
+        return displayRect
+    }
     
     private func validateSelectedTemplate() {
         // 检查当前选择的模板是否在可用模板中
