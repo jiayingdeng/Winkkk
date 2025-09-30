@@ -335,7 +335,7 @@ class VideoPlayerViewController: UIViewController {
             controlPanelBlurView.leadingAnchor.constraint(equalTo: unifiedControlPanelView.leadingAnchor),
             controlPanelBlurView.trailingAnchor.constraint(equalTo: unifiedControlPanelView.trailingAnchor),
             controlPanelBlurView.bottomAnchor.constraint(equalTo: unifiedControlPanelView.bottomAnchor),  // 🎯 直接贴底部
-            controlPanelBlurView.heightAnchor.constraint(greaterThanOrEqualToConstant: 320),  // 🆕 增加高度以容纳模式切换器+截图预览栏
+            controlPanelBlurView.heightAnchor.constraint(greaterThanOrEqualToConstant: 420),  // 🆕 增加高度以容纳模式切换器+截图预览栏+截图预览条
             
             // 🎯 时间轴 - 允许视觉溢出屏幕边界 (Wink风格)
             timelineView.topAnchor.constraint(equalTo: captureModeSwitcher.bottomAnchor, constant: 12),
