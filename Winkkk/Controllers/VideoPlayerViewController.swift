@@ -52,6 +52,9 @@ class VideoPlayerViewController: UIViewController {
     private let unifiedControlPanelView = BlurEffectView(style: .regular, intensity: 0.92, shouldAddShadow: false)
     private let controlPanelBlurView = BlurEffectView(style: .regular, intensity: 0.9)  // 保留作为内容容器
     
+    // 🆕 底部安全区域填充视图 - 毛玻璃延伸到底部
+    private let bottomSafeAreaFillerView = BlurEffectView(style: .regular, intensity: 0.92, shouldAddShadow: false)
+    
     // 播放控制
     private let playPauseButton = UIButton()
     private let timelineView = TimelineView()
@@ -207,6 +210,10 @@ class VideoPlayerViewController: UIViewController {
     }
     
     private func setupControlPanel() {
+        // 🆕 先添加底部安全区域填充视图（最底层）
+        bottomSafeAreaFillerView.backgroundColor = .clear
+        view.addSubview(bottomSafeAreaFillerView)
+        
         // 🆕 设置统一毛玻璃容器
         unifiedControlPanelView.layer.cornerRadius = ThemeManager.largeCornerRadius
         unifiedControlPanelView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
@@ -299,6 +306,7 @@ class VideoPlayerViewController: UIViewController {
         // 🔧 关键修复：确保所有视图都禁用自动布局掩码
         gradientBackgroundView.translatesAutoresizingMaskIntoConstraints = false
         playerContainerView.translatesAutoresizingMaskIntoConstraints = false
+        bottomSafeAreaFillerView.translatesAutoresizingMaskIntoConstraints = false  // 🆕 底部填充视图
         unifiedControlPanelView.translatesAutoresizingMaskIntoConstraints = false  // 🚨 关键修复
         controlPanelBlurView.translatesAutoresizingMaskIntoConstraints = false
         playPauseButton.translatesAutoresizingMaskIntoConstraints = false
@@ -317,6 +325,12 @@ class VideoPlayerViewController: UIViewController {
             playerContainerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
             playerContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             playerContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            
+            // 🆕 底部安全区域填充视图 - 毛玻璃延伸到底部
+            bottomSafeAreaFillerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            bottomSafeAreaFillerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            bottomSafeAreaFillerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            bottomSafeAreaFillerView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
             // 🎯 统一毛玻璃容器 - 包含控制面板+模式切换器+截图预览栏
             unifiedControlPanelView.topAnchor.constraint(equalTo: playerContainerView.bottomAnchor, constant: 8),
