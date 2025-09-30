@@ -91,6 +91,9 @@ class VideoPlayerViewController: UIViewController {
     // private var controlPanelHeightConstraint: NSLayoutConstraint? // 三分屏布局使用比例约束，不需要动态高度
     private var timelineWidthConstraint: NSLayoutConstraint?  // 动态宽度约束
     
+    // 🆕 三分屏自适应布局约束（用于动态修改）
+    private var playerContainerHeightConstraint: NSLayoutConstraint?
+    
     // MARK: - Dependencies
     private let screenshotEngine = ScreenshotEngine()
     private let screenshotManager = ScreenshotManager.shared
@@ -122,6 +125,9 @@ class VideoPlayerViewController: UIViewController {
         setupPlayer()
         setupTimelineView()
         setupMultiScreenshotSystem()  // 🆕 新增
+        
+        // 🆕 启用三分屏自适应布局（解决约束冲突）
+        applyAdaptiveTriplePanelLayout()
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -313,11 +319,10 @@ class VideoPlayerViewController: UIViewController {
             gradientBackgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             gradientBackgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
-            // 🎯 三分屏布局：视频区域 (53.3%)
+            // 🎯 三分屏布局：视频区域 (53.3% - 默认值，可通过applyAdaptiveTriplePanelLayout()修改)
             playerContainerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
             playerContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             playerContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
-            playerContainerView.heightAnchor.constraint(equalTo: view.safeAreaLayoutGuide.heightAnchor, multiplier: 0.533),
             
             // 🎯 统一毛玻璃容器 - 包含控制面板+模式切换器+截图预览栏
             unifiedControlPanelView.topAnchor.constraint(equalTo: playerContainerView.bottomAnchor, constant: 8),
@@ -360,8 +365,13 @@ class VideoPlayerViewController: UIViewController {
             screenshotButton.heightAnchor.constraint(equalToConstant: 48)   // 🌟 增加高度，更显眼
         ])
         
-        // 🎯 初始化动态约束 - 三分屏布局不需要动态高度约束，使用比例约束
-        // controlPanelHeightConstraint 现在由比例约束替代
+        // 🎯 初始化动态约束 - 三分屏布局
+        // 默认视频区域高度：53.3%
+        playerContainerHeightConstraint = playerContainerView.heightAnchor.constraint(
+            equalTo: view.safeAreaLayoutGuide.heightAnchor,
+            multiplier: 0.533
+        )
+        playerContainerHeightConstraint?.isActive = true
         
         // 🎯 初始化时间轴动态宽度约束 (实现15%溢出效果)
         let screenWidth = UIScreen.main.bounds.width
@@ -382,11 +392,12 @@ class VideoPlayerViewController: UIViewController {
         screenshotPreviewBar.translatesAutoresizingMaskIntoConstraints = false
         
         NSLayoutConstraint.activate([
-            // 🎯 控制面板内：截图预览栏 - 紧贴截图按钮下方，建立清晰的垂直布局链
+            // 🎯 控制面板内：截图预览栏 - 紧贴截图按钮下方，只用高度约束
+            // ⚠️ 移除 bottomAnchor 约束，避免与 heightAnchor 冲突导致预览栏超出屏幕
             screenshotPreviewBar.topAnchor.constraint(equalTo: screenshotButton.bottomAnchor, constant: 12),
             screenshotPreviewBar.leadingAnchor.constraint(equalTo: controlPanelBlurView.leadingAnchor, constant: 16),
             screenshotPreviewBar.trailingAnchor.constraint(equalTo: controlPanelBlurView.trailingAnchor, constant: -16),
-            screenshotPreviewBar.bottomAnchor.constraint(equalTo: controlPanelBlurView.bottomAnchor, constant: -16),
+            // screenshotPreviewBar.bottomAnchor 已移除，改用动态 heightAnchor
             
             // 🎯 控制面板内：模式切换器 - 位于顶部
             captureModeSwitcher.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 16),
@@ -1385,6 +1396,47 @@ class VideoPlayerViewController: UIViewController {
         // 🎯 动态调整控制面板高度，确保适配不同设备
         updateControlPanelHeight()
         
+    }
+    
+    // MARK: - 🆕 三分屏自适应布局方法（可选启用）
+    /// 应用三分屏自适应布局 - 此方法不会自动调用，需要手动启用
+    /// 调用方式：在viewDidLoad中添加 applyAdaptiveTriplePanelLayout()
+    private func applyAdaptiveTriplePanelLayout() {
+        // 计算最优布局
+        let config = AdaptiveTriplePanelLayoutManager.calculateOptimalLayout(for: view)
+        
+        guard config.isValid else {
+            print("⚠️ 布局配置无效，保持原有布局")
+            return
+        }
+        
+        // 🎯 关键：只修改约束的 multiplier 和 priority，不改变业务逻辑
+        // 这些修改不会影响任何按钮的 action 和 delegate 回调
+        
+        // 1️⃣ 修改视频区域高度约束
+        if let oldConstraint = playerContainerHeightConstraint {
+            oldConstraint.isActive = false
+            playerContainerHeightConstraint = playerContainerView.heightAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.heightAnchor,
+                multiplier: config.videoRatio
+            )
+            playerContainerHeightConstraint?.isActive = true
+        }
+        
+        // 2️⃣ 修改控制面板高度约束（如果需要）
+        // 注意：由于我们使用的是统一毛玻璃容器，它的高度由子视图（screenshotPreviewBar）决定
+        // 所以这里不需要修改控制面板本身的高度
+        
+        print("✅ 三分屏自适应布局已应用")
+        print("📱 当前设备类型: \(ScreenCategory.categorize(availableHeight: config.availableHeight))")
+        print("📐 视频区域高度比例: \(String(format: "%.1f%%", config.videoRatio * 100))")
+        print("📐 控制面板高度: \(config.controlPanelHeight)pt")
+        
+        // 布局会在下次 layoutSubviews 时自动生效
+        view.setNeedsLayout()
+        UIView.animate(withDuration: 0.3) {
+            self.view.layoutIfNeeded()
+        }
     }
     
     // 🎯 三分屏布局响应式适配
