@@ -52,8 +52,8 @@ class VideoPlayerViewController: UIViewController {
     private let unifiedControlPanelView = BlurEffectView(style: .regular, intensity: 0.92, shouldAddShadow: false)
     private let controlPanelBlurView = BlurEffectView(style: .regular, intensity: 0.9)  // 保留作为内容容器
     
-    // 🆕 底部安全区域填充视图 - 毛玻璃延伸到底部
-    private let bottomSafeAreaFillerView = BlurEffectView(style: .regular, intensity: 0.92, shouldAddShadow: false)
+    // 🆕 底部安全区域填充视图 - 普通视图，让渐变背景透过来
+    private let bottomSafeAreaFillerView = UIView()
     
     // 播放控制
     private let playPauseButton = UIButton()
@@ -79,6 +79,7 @@ class VideoPlayerViewController: UIViewController {
 
     private var videoDuration: CMTime = .zero
     private var currentTime: CMTime = .zero
+    private var cachedDurationString: String = "00:00"  // 🔧 缓存总时长字符串，避免重复格式化
     
     // 🎯 流动控制参数
     private var flowTimer: Timer?
@@ -220,7 +221,7 @@ class VideoPlayerViewController: UIViewController {
         // 🆕 设置统一毛玻璃容器
         unifiedControlPanelView.layer.cornerRadius = ThemeManager.largeCornerRadius
         unifiedControlPanelView.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        unifiedControlPanelView.clipsToBounds = false
+        unifiedControlPanelView.clipsToBounds = false  // 🎯 改为 false，让毛玻璃效果延伸到底部
         view.addSubview(unifiedControlPanelView)
         
         // 控制面板内容容器 - 透明背景
@@ -339,7 +340,7 @@ class VideoPlayerViewController: UIViewController {
             unifiedControlPanelView.topAnchor.constraint(equalTo: playerContainerView.bottomAnchor, constant: 8),
             unifiedControlPanelView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             unifiedControlPanelView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            unifiedControlPanelView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),  // 🎯 方案1：使用安全区域，避免被Home Indicator遮挡
+            unifiedControlPanelView.bottomAnchor.constraint(equalTo: view.bottomAnchor),  // 🎯 延伸到真正的底部，让毛玻璃颜色覆盖 Home Indicator 区域
             
             // 🎯 控制面板内容区域 - 在统一容器内部，使用弹性高度
             controlPanelBlurView.topAnchor.constraint(equalTo: unifiedControlPanelView.topAnchor),
@@ -469,6 +470,7 @@ class VideoPlayerViewController: UIViewController {
                 
                 if let duration = player.currentItem?.asset.duration {
                     self.videoDuration = duration
+                    self.cachedDurationString = duration.formattedString  // 🔧 缓存总时长字符串
                     self.updateTimeInfoLabel()  // 🎯 使用合并标签更新
                     
                     // 设置时间轴
@@ -709,20 +711,19 @@ class VideoPlayerViewController: UIViewController {
     // 🎯 更新合并的时间信息标签
     private func updateTimeInfoLabel() {
         let currentStr = currentTime.formattedString
-        let totalStr = videoDuration.formattedString
-        timeInfoLabel.text = "\(currentStr) / \(totalStr)"
+        // 🔧 使用缓存的总时长字符串，避免重复格式化和跳动
+        timeInfoLabel.text = "\(currentStr) / \(cachedDurationString)"
     }
     
     private func updateTimeLabels() {
         updateTimeInfoLabel()
     }
     
-    // 🎯 更新截取时间标签（Wink风格）- 现在更新合并标签的总时长部分
+    // 🎯 更新截取时间标签（Wink风格）- 已移除，总时长保持固定
     private func updateCaptureTimeLabel(_ captureTime: CMTime) {
-        // 在合并标签中显示截取时间
-        let currentStr = currentTime.formattedString
-        let captureStr = captureTime.formattedString
-        timeInfoLabel.text = "\(currentStr) / \(captureStr)"
+        // 🔧 修复：不再修改timeInfoLabel，避免总时长跳动
+        // 总时长应该始终显示视频的总时长，而不是截取时间
+        // 截取时间仅用于内部逻辑，不影响UI显示
     }
     
     // 🎯 实时视频预览更新（防抖优化）

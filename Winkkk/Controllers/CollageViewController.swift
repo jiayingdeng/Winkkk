@@ -118,6 +118,10 @@ class CollageViewController: UIViewController {
     private let scaleUpButton = UIButton()
     private let scaleDownButton = UIButton()
     
+    // 浮动编辑工具栏
+    private let floatingEditToolbar = UIView()
+    private let floatingToolbarBackdrop = UIView() // 半透明背景遮罩
+    
     // 底部按钮
     private let bottomButtonsView = UIView()
     
@@ -1243,100 +1247,154 @@ class CollageViewController: UIViewController {
             // 触觉反馈
             HapticFeedbackManager.shared.mediumImpact()
             
-            // 显示编辑菜单
-            showEditMenuForImage(at: longPressedIndex, touchPoint: longPressLocation)
+            // 显示浮动编辑工具栏
+            showFloatingEditToolbar(at: longPressLocation)
         }
     }
     
-    /// 显示图片编辑菜单
-    private func showEditMenuForImage(at index: Int, touchPoint: CGPoint) {
-        // 确保有选中的图片
-        guard selectedImageIndex == index else { return }
+    // MARK: - 浮动编辑工具栏
+    
+    /// 显示浮动编辑工具栏
+    private func showFloatingEditToolbar(at touchPoint: CGPoint) {
+        // 如果已经显示，先隐藏
+        hideFloatingEditToolbar()
         
-        // 构建菜单动作
-        let actions = createEditMenuActions()
+        // 配置半透明背景遮罩
+        floatingToolbarBackdrop.backgroundColor = UIColor.black.withAlphaComponent(0.3)
+        floatingToolbarBackdrop.frame = view.bounds
+        floatingToolbarBackdrop.alpha = 0
         
-        // 使用 UIAlertController 显示菜单（兼容所有iOS版本）
-        let alert = UIAlertController(title: "编辑图片 \(index + 1)", message: nil, preferredStyle: .actionSheet)
+        // 添加点击手势关闭工具栏
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(hideFloatingEditToolbar))
+        floatingToolbarBackdrop.addGestureRecognizer(tapGesture)
         
-        // 添加所有动作
-        for action in actions {
-            alert.addAction(action)
+        view.addSubview(floatingToolbarBackdrop)
+        
+        // 配置浮动工具栏
+        setupFloatingToolbar()
+        
+        // 定位工具栏（在触摸点附近，但避免遮挡图片中心）
+        positionFloatingToolbar(near: touchPoint)
+        
+        view.addSubview(floatingEditToolbar)
+        
+        // 动画显示
+        UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseOut) {
+            self.floatingToolbarBackdrop.alpha = 1
+            self.floatingEditToolbar.alpha = 1
+            self.floatingEditToolbar.transform = .identity
         }
-        
-        // 取消按钮
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        
-        // 设置 popover 位置（iPad）
-        if let popover = alert.popoverPresentationController {
-            popover.sourceView = previewImageView
-            popover.sourceRect = CGRect(origin: touchPoint, size: .zero)
-            popover.permittedArrowDirections = [.up, .down]
-        }
-        
-        present(alert, animated: true)
     }
     
-    /// 创建编辑菜单动作列表
-    private func createEditMenuActions() -> [UIAlertAction] {
-        var actions: [UIAlertAction] = []
+    /// 设置浮动工具栏内容
+    private func setupFloatingToolbar() {
+        floatingEditToolbar.subviews.forEach { $0.removeFromSuperview() }
         
-        // 🔄 旋转左
-        actions.append(UIAlertAction(title: "↺ 向左旋转", style: .default) { [weak self] _ in
-            self?.rotateLeftTapped()
-        })
+        // 工具栏样式
+        floatingEditToolbar.backgroundColor = UIColor.black.withAlphaComponent(0.85)
+        floatingEditToolbar.layer.cornerRadius = 16
+        floatingEditToolbar.layer.shadowColor = UIColor.black.cgColor
+        floatingEditToolbar.layer.shadowOpacity = 0.3
+        floatingEditToolbar.layer.shadowOffset = CGSize(width: 0, height: 4)
+        floatingEditToolbar.layer.shadowRadius = 12
         
-        // 🔄 旋转右
-        actions.append(UIAlertAction(title: "↻ 向右旋转", style: .default) { [weak self] _ in
-            self?.rotateRightTapped()
-        })
+        // 创建按钮网格布局
+        let buttonSize: CGFloat = 44
+        let spacing: CGFloat = 12
+        let padding: CGFloat = 16
         
-        // ↔️ 水平翻转
-        actions.append(UIAlertAction(title: "↔️ 水平翻转", style: .default) { [weak self] _ in
-            self?.flipHorizontalTapped()
-        })
+        // 按钮数据：图标、action
+        let buttonConfigs: [(String, Selector, UIColor)] = [
+            ("↶", #selector(rotateLeftTapped), .white),
+            ("↷", #selector(rotateRightTapped), .white),
+            ("↔", #selector(flipHorizontalTapped), .white),
+            ("↕", #selector(flipVerticalTapped), .white),
+            ("↑", #selector(moveUpTapped), .white),
+            ("↓", #selector(moveDownTapped), .white),
+            ("←", #selector(moveLeftTapped), .white),
+            ("→", #selector(moveRightTapped), .white),
+            ("+", #selector(scaleUpTapped), .systemGreen),
+            ("-", #selector(scaleDownTapped), .systemOrange),
+            ("♻️", #selector(resetEditingTapped), .systemRed),
+            ("✕", #selector(hideFloatingEditToolbar), .white)
+        ]
         
-        // ↕️ 垂直翻转
-        actions.append(UIAlertAction(title: "↕️ 垂直翻转", style: .default) { [weak self] _ in
-            self?.flipVerticalTapped()
-        })
+        // 4列布局
+        let columns = 4
+        let rows = Int(ceil(Double(buttonConfigs.count) / Double(columns)))
         
-        // ⬆️ 向上移动
-        actions.append(UIAlertAction(title: "⬆️ 向上移动", style: .default) { [weak self] _ in
-            self?.moveUpTapped()
-        })
+        for (index, config) in buttonConfigs.enumerated() {
+            let button = UIButton(type: .system)
+            button.setTitle(config.0, for: .normal)
+            button.titleLabel?.font = UIFont.systemFont(ofSize: 22, weight: .medium)
+            button.setTitleColor(.white, for: .normal)
+            button.backgroundColor = config.2.withAlphaComponent(0.3)
+            button.layer.cornerRadius = 8
+            button.addTarget(self, action: config.1, for: .touchUpInside)
+            
+            let row = index / columns
+            let col = index % columns
+            
+            button.frame = CGRect(
+                x: padding + CGFloat(col) * (buttonSize + spacing),
+                y: padding + CGFloat(row) * (buttonSize + spacing),
+                width: buttonSize,
+                height: buttonSize
+            )
+            
+            floatingEditToolbar.addSubview(button)
+        }
         
-        // ⬇️ 向下移动
-        actions.append(UIAlertAction(title: "⬇️ 向下移动", style: .default) { [weak self] _ in
-            self?.moveDownTapped()
-        })
+        // 设置工具栏大小
+        let toolbarWidth = padding * 2 + CGFloat(columns) * buttonSize + CGFloat(columns - 1) * spacing
+        let toolbarHeight = padding * 2 + CGFloat(rows) * buttonSize + CGFloat(rows - 1) * spacing
+        floatingEditToolbar.bounds = CGRect(x: 0, y: 0, width: toolbarWidth, height: toolbarHeight)
         
-        // ⬅️ 向左移动
-        actions.append(UIAlertAction(title: "⬅️ 向左移动", style: .default) { [weak self] _ in
-            self?.moveLeftTapped()
-        })
+        // 初始状态（缩小）
+        floatingEditToolbar.alpha = 0
+        floatingEditToolbar.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+    }
+    
+    /// 定位浮动工具栏
+    private func positionFloatingToolbar(near point: CGPoint) {
+        let toolbarSize = floatingEditToolbar.bounds.size
+        let viewBounds = view.bounds
         
-        // ➡️ 向右移动
-        actions.append(UIAlertAction(title: "➡️ 向右移动", style: .default) { [weak self] _ in
-            self?.moveRightTapped()
-        })
+        // 默认在触摸点上方
+        var x = point.x
+        var y = point.y - toolbarSize.height - 20
         
-        // 🔍 放大
-        actions.append(UIAlertAction(title: "🔍 放大", style: .default) { [weak self] _ in
-            self?.scaleUpTapped()
-        })
+        // 边界检查
+        if x + toolbarSize.width / 2 > viewBounds.width - 20 {
+            x = viewBounds.width - toolbarSize.width / 2 - 20
+        }
+        if x - toolbarSize.width / 2 < 20 {
+            x = toolbarSize.width / 2 + 20
+        }
         
-        // 🔎 缩小
-        actions.append(UIAlertAction(title: "🔎 缩小", style: .default) { [weak self] _ in
-            self?.scaleDownTapped()
-        })
+        // 如果上方空间不足，放在下方
+        if y < 20 {
+            y = point.y + 20
+        }
         
-        // ♻️ 重置编辑（红色警告样式）
-        actions.append(UIAlertAction(title: "♻️ 重置编辑", style: .destructive) { [weak self] _ in
-            self?.resetEditingTapped()
-        })
+        // 如果下方也不足，居中显示
+        if y + toolbarSize.height > viewBounds.height - 20 {
+            y = (viewBounds.height - toolbarSize.height) / 2
+        }
         
-        return actions
+        floatingEditToolbar.center = CGPoint(x: x, y: y + toolbarSize.height / 2)
+    }
+    
+    /// 隐藏浮动编辑工具栏
+    @objc private func hideFloatingEditToolbar() {
+        UIView.animate(withDuration: 0.2, animations: {
+            self.floatingToolbarBackdrop.alpha = 0
+            self.floatingEditToolbar.alpha = 0
+            self.floatingEditToolbar.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+        }) { _ in
+            self.floatingToolbarBackdrop.removeFromSuperview()
+            self.floatingEditToolbar.removeFromSuperview()
+        }
     }
     
     /// 根据点击坐标判断点击的是哪张图片
