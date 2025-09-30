@@ -211,7 +211,10 @@ class VideoPlayerViewController: UIViewController {
     
     private func setupControlPanel() {
         // 🆕 先添加底部安全区域填充视图（最底层）
+        // 🎯 保持透明，让渐变背景透过来
         bottomSafeAreaFillerView.backgroundColor = .clear
+        bottomSafeAreaFillerView.layer.cornerRadius = 0  // 移除圆角，完全填充底部
+        bottomSafeAreaFillerView.clipsToBounds = true
         view.addSubview(bottomSafeAreaFillerView)
         
         // 🆕 设置统一毛玻璃容器

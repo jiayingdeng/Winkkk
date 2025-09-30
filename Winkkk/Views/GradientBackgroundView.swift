@@ -17,11 +17,17 @@ class GradientBackgroundView: UIView {
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupGradient()
+        setupThemeObserver()
     }
     
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         setupGradient()
+        setupThemeObserver()
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     override func layoutSubviews() {
@@ -57,63 +63,82 @@ class GradientBackgroundView: UIView {
             self.gradientLayer.endPoint = endPoint
         }
     }
+    
+    // MARK: - 主题监听
+    
+    /// 设置主题切换监听
+    private func setupThemeObserver() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(themeDidChange),
+            name: .themeDidChange,
+            object: nil
+        )
+    }
+    
+    /// 主题切换回调
+    @objc private func themeDidChange() {
+        print("🎨 GradientBackgroundView: Theme changed, updating gradient colors")
+        // 平滑过渡到新主题颜色
+        updateGradient(
+            startColor: ThemeManager.primaryGradientStart,
+            endColor: ThemeManager.primaryGradientEnd
+        )
+    }
 }
 
-/// SwiftUI版本的渐变背景视图
+/// SwiftUI版本的渐变背景视图（支持主题切换）
 struct GradientBackground: View {
-    let startColor: Color
-    let endColor: Color
+    @ObservedObject private var themeManager = ThemeManager.shared
+    
     let startPoint: UnitPoint
     let endPoint: UnitPoint
     
     init(
-        startColor: Color = ThemeManager.swiftUIPrimaryGradientStart,
-        endColor: Color = ThemeManager.swiftUIPrimaryGradientEnd,
         startPoint: UnitPoint = .topLeading,
         endPoint: UnitPoint = .bottomTrailing
     ) {
-        self.startColor = startColor
-        self.endColor = endColor
         self.startPoint = startPoint
         self.endPoint = endPoint
     }
     
     var body: some View {
         LinearGradient(
-            gradient: Gradient(colors: [startColor, endColor]),
+            gradient: Gradient(colors: [
+                ThemeManager.swiftUIPrimaryGradientStart,
+                ThemeManager.swiftUIPrimaryGradientEnd
+            ]),
             startPoint: startPoint,
             endPoint: endPoint
         )
         .ignoresSafeArea()
+        .animation(.easeInOut(duration: 0.3), value: themeManager.currentTheme)
     }
 }
 
-/// 动画渐变背景视图（SwiftUI）
+/// 动画渐变背景视图（SwiftUI，支持主题切换）
 struct AnimatedGradientBackground: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
     @State private var animateGradient = false
     
-    let colors: [Color]
     let animationDuration: Double
     
-    init(
-        colors: [Color] = [
-            ThemeManager.swiftUIPrimaryGradientStart,
-            ThemeManager.swiftUIPrimaryGradientEnd,
-            Color.white.opacity(0.8)
-        ],
-        animationDuration: Double = 3.0
-    ) {
-        self.colors = colors
+    init(animationDuration: Double = 3.0) {
         self.animationDuration = animationDuration
     }
     
     var body: some View {
         LinearGradient(
-            gradient: Gradient(colors: colors),
+            gradient: Gradient(colors: [
+                ThemeManager.swiftUIPrimaryGradientStart,
+                ThemeManager.swiftUIPrimaryGradientEnd,
+                Color.white.opacity(0.8)
+            ]),
             startPoint: animateGradient ? .topLeading : .bottomLeading,
             endPoint: animateGradient ? .bottomTrailing : .topTrailing
         )
         .ignoresSafeArea()
+        .animation(.easeInOut(duration: 0.3), value: themeManager.currentTheme)
         .onAppear {
             withAnimation(
                 Animation.easeInOut(duration: animationDuration)

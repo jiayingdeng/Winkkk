@@ -92,6 +92,19 @@ class SettingsViewController: UIViewController {
                 ]
             ),
             
+            // 外观
+            SettingsSection(
+                title: "外观",
+                items: [
+                    SettingsItem(
+                        type: .selection,
+                        title: "主题",
+                        subtitle: ThemeManager.shared.currentTheme.displayName,
+                        icon: "paintbrush.fill",
+                        action: { [weak self] in self?.showThemeSettings() }
+                    )
+                ]
+            ),
             
             // 存储管理
             SettingsSection(
@@ -295,6 +308,38 @@ class SettingsViewController: UIViewController {
         present(alert, animated: true)
     }
     
+    private func showThemeSettings() {
+        let alert = UIAlertController(title: "选择主题", message: "切换应用外观主题", preferredStyle: .actionSheet)
+        
+        // 遍历所有主题
+        for theme in AppTheme.allCases {
+            let isCurrentTheme = ThemeManager.shared.currentTheme == theme
+            let title = isCurrentTheme ? "\(theme.displayName) ✓" : theme.displayName
+            
+            alert.addAction(UIAlertAction(title: title, style: .default) { [weak self] _ in
+                // 切换主题
+                ThemeManager.shared.switchTheme(to: theme, animated: true)
+                
+                // 更新设置项显示
+                self?.updateThemeSubtitle(theme.displayName)
+                
+                // 刷新界面（渐变背景会自动监听主题变化）
+                self?.tableView.reloadData()
+                
+                print("✅ 用户切换主题为: \(theme.displayName)")
+            })
+        }
+        
+        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
+        
+        if let popover = alert.popoverPresentationController {
+            popover.sourceView = view
+            popover.sourceRect = view.bounds
+        }
+        
+        present(alert, animated: true)
+    }
+    
     
     private func showStorageDetails() {
         let storageVC = StorageDetailViewController()
@@ -446,6 +491,10 @@ class SettingsViewController: UIViewController {
     
     private func updateRecordingDurationSubtitle(_ duration: String) {
         updateSubtitle(sectionTitle: "视频设置", itemTitle: "录制时长限制", newSubtitle: duration)
+    }
+    
+    private func updateThemeSubtitle(_ themeName: String) {
+        updateSubtitle(sectionTitle: "外观", itemTitle: "主题", newSubtitle: themeName)
     }
     
     

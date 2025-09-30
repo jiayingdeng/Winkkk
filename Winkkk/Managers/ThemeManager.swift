@@ -3,66 +3,228 @@
 //  Winkkk
 //
 //  Created by Winkkk on 2024/12/20.
-//  梦幻少女主题管理器
+//  主题管理器 - 支持多主题切换
 //
 
 import UIKit
 import SwiftUI
 
-/// 梦幻少女主题管理器
+// MARK: - 主题枚举定义
+
+/// 应用主题类型
+enum AppTheme: String, CaseIterable {
+    case dreamyGirl      // 梦幻少女
+    case lightMinimal    // 简约浅色
+    
+    var displayName: String {
+        switch self {
+        case .dreamyGirl: return "梦幻少女 💕"
+        case .lightMinimal: return "简约浅色 ☀️"
+        }
+    }
+}
+
+// MARK: - 主题管理器
+
+/// 主题管理器 - 支持多主题切换
 class ThemeManager: ObservableObject {
     
     // MARK: - 单例
     static let shared = ThemeManager()
     
-    private init() {}
+    private init() {
+        // 从 UserDefaults 读取保存的主题
+        if let savedThemeRaw = UserDefaults.standard.string(forKey: "AppTheme"),
+           let savedTheme = AppTheme(rawValue: savedThemeRaw) {
+            self.currentTheme = savedTheme
+        }
+    }
     
-    // MARK: - 主题色彩定义
+    // MARK: - 当前主题
     
-    /// 主渐变色 - 粉紫色
-    static let primaryGradientStart = UIColor(red: 230/255, green: 179/255, blue: 255/255, alpha: 1.0) // #E6B3FF
+    /// 当前应用主题（默认：梦幻少女）
+    @Published var currentTheme: AppTheme = .dreamyGirl {
+        didSet {
+            // 保存到 UserDefaults
+            UserDefaults.standard.set(currentTheme.rawValue, forKey: "AppTheme")
+            // 发送主题切换通知
+            NotificationCenter.default.post(name: .themeDidChange, object: nil)
+            print("✅ ThemeManager: 主题已切换为 \(currentTheme.displayName)")
+        }
+    }
     
-    /// 主渐变色 - 粉色
-    static let primaryGradientEnd = UIColor(red: 255/255, green: 209/255, blue: 220/255, alpha: 1.0) // #FFD1DC
+    /// 切换到指定主题
+    func switchTheme(to theme: AppTheme, animated: Bool = true) {
+        if animated {
+            UIView.animate(withDuration: ThemeManager.standardAnimationDuration) {
+                self.currentTheme = theme
+            }
+        } else {
+            currentTheme = theme
+        }
+    }
     
-    /// 主要文本色 - 深紫色
-    static let primaryText = UIColor(red: 102/255, green: 51/255, blue: 153/255, alpha: 1.0) // #663399
+    // MARK: - 主题色彩定义（计算属性 - 根据当前主题动态返回）
     
-    /// 次要文本色 - 中紫色
-    static let secondaryText = UIColor(red: 153/255, green: 102/255, blue: 204/255, alpha: 0.8) // #9966CC
+    /// 主渐变色 - 起始色
+    static var primaryGradientStart: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 230/255, green: 179/255, blue: 255/255, alpha: 1.0) // #E6B3FF 粉紫色
+        case .lightMinimal:
+            return UIColor(red: 255/255, green: 255/255, blue: 255/255, alpha: 1.0) // #FFFFFF 纯白
+        }
+    }
+    
+    /// 主渐变色 - 结束色
+    static var primaryGradientEnd: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 255/255, green: 209/255, blue: 220/255, alpha: 1.0) // #FFD1DC 粉色
+        case .lightMinimal:
+            return UIColor(red: 245/255, green: 245/255, blue: 247/255, alpha: 1.0) // #F5F5F7 浅灰白
+        }
+    }
+    
+    /// 主要文本色
+    static var primaryText: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 102/255, green: 51/255, blue: 153/255, alpha: 1.0) // #663399 深紫色
+        case .lightMinimal:
+            return UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0) // #1C1C1E 几乎黑
+        }
+    }
+    
+    /// 次要文本色
+    static var secondaryText: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 153/255, green: 102/255, blue: 204/255, alpha: 0.8) // #9966CC 中紫色
+        case .lightMinimal:
+            return UIColor(red: 142/255, green: 142/255, blue: 147/255, alpha: 1.0) // #8E8E93 中灰色
+        }
+    }
     
     /// 占位符文本色
-    static let placeholderText = UIColor(red: 200/255, green: 170/255, blue: 230/255, alpha: 0.6)
+    static var placeholderText: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 200/255, green: 170/255, blue: 230/255, alpha: 0.6) // 浅紫色
+        case .lightMinimal:
+            return UIColor(red: 199/255, green: 199/255, blue: 204/255, alpha: 0.6) // #C7C7CC 浅灰色
+        }
+    }
     
-    /// 背景色 - 纯白
-    static let background = UIColor.white
+    /// 背景色
+    static var background: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor.white // 纯白
+        case .lightMinimal:
+            return UIColor.white // 纯白
+        }
+    }
     
-    /// 卡片背景色 - 浅粉色
-    static let cardBackground = UIColor(red: 252/255, green: 240/255, blue: 255/255, alpha: 0.8) // #FCF0FF
+    /// 卡片背景色
+    static var cardBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 252/255, green: 240/255, blue: 255/255, alpha: 0.8) // #FCF0FF 浅粉色
+        case .lightMinimal:
+            return UIColor(red: 255/255, green: 255/255, blue: 255/255, alpha: 0.95) // #FFFFFF 纯白（稍微半透明）
+        }
+    }
     
     /// 按钮主色调
-    static let buttonPrimary = UIColor(red: 255/255, green: 182/255, blue: 193/255, alpha: 1.0) // #FFB6C1
+    static var buttonPrimary: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 255/255, green: 182/255, blue: 193/255, alpha: 1.0) // #FFB6C1 粉色
+        case .lightMinimal:
+            return UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0) // #1C1C1E 深灰黑
+        }
+    }
     
     /// 按钮次要色调
-    static let buttonSecondary = UIColor(red: 230/255, green: 179/255, blue: 255/255, alpha: 0.6)
+    static var buttonSecondary: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 230/255, green: 179/255, blue: 255/255, alpha: 0.6) // 粉紫透明
+        case .lightMinimal:
+            return UIColor(red: 242/255, green: 242/255, blue: 247/255, alpha: 1.0) // #F2F2F7 浅灰背景
+        }
+    }
     
-    /// 成功色 - 温柔的绿色
-    static let success = UIColor(red: 144/255, green: 238/255, blue: 144/255, alpha: 1.0) // #90EE90
+    /// 成功色（功能色 - 所有主题通用）
+    static var success: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 144/255, green: 238/255, blue: 144/255, alpha: 1.0) // #90EE90 温柔绿
+        case .lightMinimal:
+            return UIColor(red: 52/255, green: 199/255, blue: 89/255, alpha: 1.0) // #34C759 iOS系统绿
+        }
+    }
     
-    /// 警告色 - 温柔的橙色  
-    static let warning = UIColor(red: 255/255, green: 218/255, blue: 185/255, alpha: 1.0) // #FFDAB9
+    /// 警告色（功能色 - 所有主题通用）
+    static var warning: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 255/255, green: 218/255, blue: 185/255, alpha: 1.0) // #FFDAB9 温柔橙
+        case .lightMinimal:
+            return UIColor(red: 255/255, green: 149/255, blue: 0/255, alpha: 1.0) // #FF9500 iOS系统橙
+        }
+    }
     
-    /// 错误色 - 温柔的红色
-    static let error = UIColor(red: 255/255, green: 182/255, blue: 193/255, alpha: 1.0) // #FFB6C1
+    /// 错误色（功能色 - 所有主题通用）
+    static var error: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 255/255, green: 182/255, blue: 193/255, alpha: 1.0) // #FFB6C1 温柔红
+        case .lightMinimal:
+            return UIColor(red: 255/255, green: 59/255, blue: 48/255, alpha: 1.0) // #FF3B30 iOS系统红
+        }
+    }
     
     /// 分割线色
-    static let separator = UIColor(red: 230/255, green: 179/255, blue: 255/255, alpha: 0.3)
+    static var separator: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 230/255, green: 179/255, blue: 255/255, alpha: 0.3) // 粉紫透明
+        case .lightMinimal:
+            return UIColor(red: 229/255, green: 229/255, blue: 229/255, alpha: 1.0) // #E5E5E5 浅灰线
+        }
+    }
     
-    /// 次要背景色 - 更浅的粉色
-    static let backgroundSecondary = UIColor(red: 248/255, green: 235/255, blue: 255/255, alpha: 0.5) // #F8EBFF
+    /// 次要背景色
+    static var backgroundSecondary: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 248/255, green: 235/255, blue: 255/255, alpha: 0.5) // #F8EBFF 更浅的粉色
+        case .lightMinimal:
+            return UIColor(red: 249/255, green: 249/255, blue: 249/255, alpha: 1.0) // #F9F9F9 极浅灰
+        }
+    }
     
-    /// 破坏性操作色 - 温柔的红色（用于删除等操作）
-    static let destructive = UIColor(red: 255/255, green: 182/255, blue: 193/255, alpha: 1.0) // #FFB6C1
+    /// 破坏性操作色（用于删除等危险操作）
+    static var destructive: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 255/255, green: 182/255, blue: 193/255, alpha: 1.0) // #FFB6C1 温柔红
+        case .lightMinimal:
+            return UIColor(red: 255/255, green: 59/255, blue: 48/255, alpha: 1.0) // #FF3B30 iOS系统红
+        }
+    }
+    
+    /// 按钮文本色（用于深色按钮上的白色文字）
+    static var buttonTextOnPrimary: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return primaryText // 深紫色文字
+        case .lightMinimal:
+            return UIColor.white // 白色文字（黑色按钮上）
+        }
+    }
 }
 
 // MARK: - SwiftUI Color扩展
@@ -180,30 +342,57 @@ extension ThemeManager {
 extension ThemeManager {
     
     /// 轻微阴影
-    static let lightShadow = NSShadow()
+    static var lightShadow: NSShadow {
+        let shadow = NSShadow()
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            shadow.shadowColor = UIColor.black.withAlphaComponent(0.1)
+            shadow.shadowOffset = CGSize(width: 0, height: 2)
+            shadow.shadowBlurRadius = 4
+        case .lightMinimal:
+            shadow.shadowColor = UIColor.black.withAlphaComponent(0.05)
+            shadow.shadowOffset = CGSize(width: 0, height: 1)
+            shadow.shadowBlurRadius = 2
+        }
+        return shadow
+    }
     
     /// 中等阴影
-    static let mediumShadow = NSShadow()
+    static var mediumShadow: NSShadow {
+        let shadow = NSShadow()
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            shadow.shadowColor = UIColor.black.withAlphaComponent(0.15)
+            shadow.shadowOffset = CGSize(width: 0, height: 4)
+            shadow.shadowBlurRadius = 8
+        case .lightMinimal:
+            shadow.shadowColor = UIColor.black.withAlphaComponent(0.08)
+            shadow.shadowOffset = CGSize(width: 0, height: 2)
+            shadow.shadowBlurRadius = 4
+        }
+        return shadow
+    }
     
     /// 重阴影
-    static let heavyShadow = NSShadow()
+    static var heavyShadow: NSShadow {
+        let shadow = NSShadow()
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            shadow.shadowColor = UIColor.black.withAlphaComponent(0.2)
+            shadow.shadowOffset = CGSize(width: 0, height: 6)
+            shadow.shadowBlurRadius = 12
+        case .lightMinimal:
+            shadow.shadowColor = UIColor.black.withAlphaComponent(0.12)
+            shadow.shadowOffset = CGSize(width: 0, height: 4)
+            shadow.shadowBlurRadius = 8
+        }
+        return shadow
+    }
     
-    /// 配置阴影
+    /// 配置阴影（保留以兼容旧代码，但已改为计算属性，此方法可以为空）
     static func configureShadows() {
-        // 轻微阴影
-        lightShadow.shadowColor = UIColor.black.withAlphaComponent(0.1)
-        lightShadow.shadowOffset = CGSize(width: 0, height: 2)
-        lightShadow.shadowBlurRadius = 4
-        
-        // 中等阴影
-        mediumShadow.shadowColor = UIColor.black.withAlphaComponent(0.15)
-        mediumShadow.shadowOffset = CGSize(width: 0, height: 4)
-        mediumShadow.shadowBlurRadius = 8
-        
-        // 重阴影
-        heavyShadow.shadowColor = UIColor.black.withAlphaComponent(0.2)
-        heavyShadow.shadowOffset = CGSize(width: 0, height: 6)
-        heavyShadow.shadowBlurRadius = 12
+        // 阴影已改为计算属性，此方法保留用于向后兼容
+        print("✅ ThemeManager: Shadows configured (now using computed properties)")
     }
 }
 
@@ -266,12 +455,19 @@ extension ThemeManager {
     static let largeButtonHeight: CGFloat = 56
 }
 
+// MARK: - 通知名称定义
+extension Notification.Name {
+    /// 主题切换通知
+    static let themeDidChange = Notification.Name("ThemeDidChangeNotification")
+}
+
 // MARK: - 初始化方法
 extension ThemeManager {
     
     /// 配置主题
     func configureTheme() {
         print("🎨 ThemeManager: configureTheme() - START")
+        print("🎨 ThemeManager: Current theme is \(currentTheme.displayName)")
         
         do {
             Self.configureShadows()
