@@ -166,6 +166,12 @@ class TimelineView: UIView {
     // MARK: - Layout Constraints
     // 🎯 播放头指示器约束将由VideoPlayerViewController管理
     
+    // 🔑 动态约束引用 - 用于实时更新缩略图和时间刻度的位置
+    private var thumbnailContainerLeadingConstraint: NSLayoutConstraint!
+    private var thumbnailContainerWidthConstraint: NSLayoutConstraint!
+    private var timeScaleLeadingConstraint: NSLayoutConstraint!
+    private var timeScaleWidthConstraint: NSLayoutConstraint!
+    
     // MARK: - Initialization
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -464,6 +470,12 @@ class TimelineView: UIView {
         thumbView.translatesAutoresizingMaskIntoConstraints = false
         playheadIndicator.translatesAutoresizingMaskIntoConstraints = false  // 🎯 新增
         
+        // 🔑 创建动态约束引用
+        thumbnailContainerLeadingConstraint = thumbnailContainerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 0)
+        thumbnailContainerWidthConstraint = thumbnailContainerView.widthAnchor.constraint(equalToConstant: 0)
+        timeScaleLeadingConstraint = timeScaleView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 0)
+        timeScaleWidthConstraint = timeScaleView.widthAnchor.constraint(equalToConstant: 0)
+        
         NSLayoutConstraint.activate([
             // 滚动视图 - 填满整个TimelineView
             scrollView.topAnchor.constraint(equalTo: topAnchor),
@@ -473,16 +485,16 @@ class TimelineView: UIView {
             
             // 内容视图约束将在updateContentSize中动态设置
             
-            // 🎯 优化布局：缩略图条置顶（占60%高度）
+            // 🎯 关键修复：缩略图容器与视频内容区域对齐
             thumbnailContainerView.topAnchor.constraint(equalTo: contentView.topAnchor),
-            thumbnailContainerView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            thumbnailContainerView.widthAnchor.constraint(equalTo: self.widthAnchor),  // 🎯 与TimelineView同宽
+            thumbnailContainerLeadingConstraint, // 🔑 动态约束
+            thumbnailContainerWidthConstraint, // 🔑 动态约束
             thumbnailContainerView.heightAnchor.constraint(equalTo: self.heightAnchor, multiplier: 0.6),  // 60%高度
             
-            // 🎯 优化布局：时间刻度在底部（占20%高度）
+            // 🎯 关键修复：时间刻度与视频内容区域对齐
             timeScaleView.topAnchor.constraint(equalTo: thumbnailContainerView.bottomAnchor),
-            timeScaleView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            timeScaleView.widthAnchor.constraint(equalTo: self.widthAnchor),  // 🎯 与TimelineView同宽
+            timeScaleLeadingConstraint, // 🔑 动态约束
+            timeScaleWidthConstraint, // 🔑 动态约束
             timeScaleView.heightAnchor.constraint(equalTo: self.heightAnchor, multiplier: 0.2),  // 20%高度
             
             // 🎯 优化布局：播放轨道紧贴时间刻度（占20%高度）
@@ -556,6 +568,33 @@ class TimelineView: UIView {
             timeToPixelRatio = Double(actualVideoWidth) / duration
             // 内容更新调试日志已优化
         }
+        
+        // 🔑 关键修复：动态更新缩略图和时间刻度的约束，使其与视频内容区域对齐
+        updateVideoContentAreaConstraints()
+    }
+    
+    /// 🔑 核心修复方法：更新视频内容区域约束，确保缩略图和时间刻度对齐
+    private func updateVideoContentAreaConstraints() {
+        guard thumbnailContainerLeadingConstraint != nil,
+              thumbnailContainerWidthConstraint != nil,
+              timeScaleLeadingConstraint != nil,
+              timeScaleWidthConstraint != nil else {
+            return // 约束尚未初始化
+        }
+        
+        // 🎯 关键：视频内容区域 = leftPadding起始 + 实际视频宽度
+        let videoContentStartX = leftPadding
+        let videoContentWidth = getActualVideoWidth()
+        
+        // 🔑 更新缩略图容器约束：与视频内容区域完全对齐
+        thumbnailContainerLeadingConstraint.constant = videoContentStartX
+        thumbnailContainerWidthConstraint.constant = videoContentWidth
+        
+        // 🔑 更新时间刻度约束：与视频内容区域完全对齐
+        timeScaleLeadingConstraint.constant = videoContentStartX
+        timeScaleWidthConstraint.constant = videoContentWidth
+        
+        print("🔧 视频内容区域约束更新: startX=\(videoContentStartX), width=\(videoContentWidth), leftPadding=\(leftPadding)")
     }
     
     /// 时间坐标转换为像素坐标（考虑leftPadding偏移）
@@ -564,6 +603,13 @@ class TimelineView: UIView {
         // 时间 → 视频内容区域的像素位置 → 加上leftPadding得到最终位置
         let videoContentX = CGFloat(time * timeToPixelRatio)
         return leftPadding + videoContentX
+    }
+    
+    /// 🔑 新增：时间坐标转换为视频内容区域内的相对坐标（用于时间刻度绘制）
+    private func timeToVideoContentCoordinate(_ time: Double) -> CGFloat {
+        guard duration > 0, timeToPixelRatio > 0 else { return 0 }
+        // 时间 → 视频内容区域内的像素位置（0秒 = x:0, duration = x:videoContentWidth）
+        return CGFloat(time * timeToPixelRatio)
     }
     
     /// 像素坐标转换为时间（考虑leftPadding偏移）
@@ -803,21 +849,18 @@ class TimelineView: UIView {
         
         var tickCount = 0
         
-        // 🎯 关键时间点优先绘制 - 修复：不裁剪坐标位置
-        let zeroAbsoluteX = timeToCoordinate(0)
-        let zeroRelativeX = zeroAbsoluteX - scrollView.contentOffset.x
-        if zeroRelativeX >= -10 && zeroRelativeX <= timeScaleView.bounds.width + 10 {
-            // ✅ 修复：使用真实坐标位置，不进行裁剪
-            drawTickMark(at: zeroRelativeX, for: 0, interval: interval)
+        // 🔑 关键修复：时间刻度坐标转换为相对于时间刻度视图的坐标
+        // 0秒在视频内容区域的起始位置，对应时间刻度视图的x=0位置
+        let zeroTimeScaleX = timeToVideoContentCoordinate(0)
+        if zeroTimeScaleX >= -10 && zeroTimeScaleX <= timeScaleView.bounds.width + 10 {
+            drawTickMark(at: zeroTimeScaleX, for: 0, interval: interval)
             tickCount += 1
         }
         
-        // 强制绘制结尾刻度 - 修复：不裁剪坐标位置
-        let endAbsoluteX = timeToCoordinate(duration)
-        let endRelativeX = endAbsoluteX - scrollView.contentOffset.x
-        if endRelativeX >= -10 && endRelativeX <= timeScaleView.bounds.width + 10 {
-            // ✅ 修复：使用真实坐标位置，不进行裁剪
-            drawTickMark(at: endRelativeX, for: duration, interval: interval)
+        // 结尾刻度：duration对应视频内容区域的结尾位置
+        let endTimeScaleX = timeToVideoContentCoordinate(duration)
+        if endTimeScaleX >= -10 && endTimeScaleX <= timeScaleView.bounds.width + 10 {
+            drawTickMark(at: endTimeScaleX, for: duration, interval: interval)
             tickCount += 1
         }
         
@@ -830,13 +873,12 @@ class TimelineView: UIView {
             let isEndTick = abs(tickTime - duration) < epsilon
             
             if !isZeroTick && !isEndTick {
-                let absoluteX = timeToCoordinate(tickTime)
-                let relativeX = absoluteX - scrollView.contentOffset.x
+                // 🔑 使用视频内容区域坐标系
+                let timeScaleX = timeToVideoContentCoordinate(tickTime)
                 
                 // 扩展绘制范围，减少边界闪烁
-                if relativeX >= -10 && relativeX <= timeScaleView.bounds.width + 10 {
-                    // ✅ 修复：使用真实坐标位置，不进行裁剪
-                    drawTickMark(at: relativeX, for: tickTime, interval: interval)
+                if timeScaleX >= -10 && timeScaleX <= timeScaleView.bounds.width + 10 {
+                    drawTickMark(at: timeScaleX, for: tickTime, interval: interval)
                     tickCount += 1
                 }
             }
@@ -1022,8 +1064,8 @@ class TimelineView: UIView {
         let asset = AVAsset(url: videoURL)
         let imageGenerator = AVAssetImageGenerator(asset: asset)
         
-        // 🎯 计算显示尺寸 - 缩略图容器现在与TimelineView同宽
-        let containerWidth = bounds.width
+        // 🔑 关键修复：缩略图基于视频内容区域宽度，不再基于TimelineView宽度
+        let containerWidth = getActualVideoWidth()  // 使用视频内容宽度
         let thumbnailWidth = containerWidth / CGFloat(count)
         let thumbnailHeight: CGFloat = 60  // 40 → 60px，与约束保持一致
         
