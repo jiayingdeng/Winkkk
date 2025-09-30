@@ -864,8 +864,10 @@ extension BatchImageEnhanceViewController {
             startButton.alpha = 0.6
             startButton.setTitle("处理中...", for: .normal)
         } else {
-            // 根据选择状态更新按钮
-            updateStartButtonText()
+            // 根据页面状态决定是否更新按钮（完成状态保持"已成功修复"）
+            if pageState != .completed {
+                updateStartButtonText()
+            }
         }
         
         pauseButton.isHidden = !isProcessing
@@ -895,6 +897,11 @@ extension BatchImageEnhanceViewController {
     }
     
     private func updateStartButtonText() {
+        // 如果是完成状态，不修改按钮（保持"已成功修复"状态）
+        if pageState == .completed {
+            return
+        }
+        
         let selectedCount = selectedIndices.count
         if selectedCount > 0 {
             startButton.setTitle("开始修复(\(selectedCount)张)", for: .normal)
