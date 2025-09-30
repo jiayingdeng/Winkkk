@@ -571,6 +571,9 @@ class TimelineView: UIView {
         
         // 🔑 关键修复：动态更新缩略图和时间刻度的约束，使其与视频内容区域对齐
         updateVideoContentAreaConstraints()
+        
+        // 🎯 修复问题3：缩放时重新生成缩略图，确保与视频帧精确对应
+        generateThumbnails()
     }
     
     /// 🔑 核心修复方法：更新视频内容区域约束，确保缩略图和时间刻度对齐
@@ -706,6 +709,7 @@ class TimelineView: UIView {
         updateContentSize()
         generateThumbnails()
         updateTimeResolution()
+        generateTimeScale()  // 🎯 修复问题1：确保初始刻度立即生成
     }
     
     func setVideoURL(_ url: URL) {
@@ -898,7 +902,8 @@ class TimelineView: UIView {
         if tickX >= -1 && tickX <= timeScaleView.bounds.width + 1 {
             // 绘制刻度线
             let tickLayer = CALayer()
-            tickLayer.backgroundColor = UIColor.white.withAlphaComponent(0.6).cgColor
+            // 🎯 修复问题2：改为深紫色，与粉紫背景协调且清晰
+            tickLayer.backgroundColor = UIColor(red: 0.3, green: 0.2, blue: 0.5, alpha: 0.8).cgColor
             tickLayer.frame = CGRect(
                 x: tickX,
                 y: timeScaleView.bounds.height - (isMainTick ? 12 : 8),
@@ -914,7 +919,8 @@ class TimelineView: UIView {
             textLayer.string = formatTimeForDisplay(time)
             textLayer.font = UIFont.systemFont(ofSize: 11, weight: .medium)
             textLayer.fontSize = 11
-            textLayer.foregroundColor = UIColor.white.withAlphaComponent(0.8).cgColor
+            // 🎯 修复：改为深紫色，与刻度线颜色一致
+            textLayer.foregroundColor = UIColor(red: 0.3, green: 0.2, blue: 0.5, alpha: 0.8).cgColor
             textLayer.alignmentMode = .center
             textLayer.contentsScale = UIScreen.main.scale
             
@@ -928,8 +934,9 @@ class TimelineView: UIView {
             let textLeftEdge = x - halfTextWidth
             let textRightEdge = x + halfTextWidth
             
-            // 只有文字完全在可见范围内才绘制
-            if textLeftEdge >= 0 && textRightEdge <= timeScaleView.bounds.width {
+            // 🎯 修复问题4：放宽边界检查，确保0秒和结尾时间可见
+            let margin: CGFloat = 25  // 允许边界文字部分超出
+            if textLeftEdge >= -margin && textRightEdge <= timeScaleView.bounds.width + margin {
                 textLayer.frame = CGRect(
                     x: textLeftEdge,
                     y: 2,
@@ -993,21 +1000,51 @@ class TimelineView: UIView {
     
     /// 基于内容宽度和缩放级别计算最优缩略图数量
     private func calculateOptimalThumbnailCount() -> Int {
-        // 每个缩略图的理想宽度（像素）
-        let idealThumbnailWidth: CGFloat = 80
+        // 🎯 修复：基于实际视频内容区域宽度计算，确保填满整个时间轴
+        let videoContentWidth = getActualVideoWidth()
         
-        // 基于内容宽度计算缩略图数量
-        let basedOnWidth = Int(currentContentWidth / idealThumbnailWidth)
+        // 🎯 每个缩略图的理想宽度（像素）- 根据缩放级别动态调整
+        // 随着缩放增加，理想宽度逐渐减小，让缩略图数量增加更平滑
+        let idealThumbnailWidth: CGFloat = {
+            if zoomScale >= 4.0 {
+                return 55  // 高缩放（4x+）：密集显示，精准定位
+            } else if zoomScale >= 2.0 {
+                // 2-4x：线性插值 80 → 55
+                let factor = (zoomScale - 2.0) / 2.0  // 0.0 → 1.0
+                return 80 - factor * 25  // 80 → 55
+            } else if zoomScale >= 1.0 {
+                // 1-2x：线性插值 90 → 80
+                let factor = (zoomScale - 1.0) / 1.0  // 0.0 → 1.0
+                return 90 - factor * 10  // 90 → 80
+            } else {
+                return 90  // 低缩放（<1x）：稀疏显示，宽大清晰
+            }
+        }()
         
-        // 基于视频时长计算缩略图数量（避免太密集）
-        let maxThumbnailsPerSecond = max(1.0, zoomScale * 0.5)
-        let basedOnDuration = Int(duration * maxThumbnailsPerSecond)
+        // 🎯 核心算法：基于视频内容宽度和理想缩略图宽度，直接计算数量
+        // 随着缩放增加，videoContentWidth增大，缩略图数量自然增加
+        // 同时保持每个缩略图的宽度在理想范围内，确保比例正常
+        let optimalCount = Int(ceil(videoContentWidth / idealThumbnailWidth))
         
-        // 取两者中较小值，并限制在合理范围内
-        let optimalCount = min(basedOnWidth, basedOnDuration)
-        let clampedCount = max(5, min(50, optimalCount))
+        // 🎯 智能上限：根据视频时长动态调整最大数量
+        let dynamicMaxCount: Int = {
+            if duration < 30 {
+                return 800  // 30秒内：超高密度
+            } else if duration < 60 {
+                return 600  // 1分钟内：高密度
+            } else if duration < 120 {
+                return 500  // 2分钟内：中高密度
+            } else if duration < 300 {
+                return 400  // 5分钟内：中等密度
+            } else {
+                return 300  // 长视频：基础密度
+            }
+        }()
         
-        print("🖼️ 缩略图计算: 宽度基准=\(basedOnWidth), 时长基准=\(basedOnDuration), 最终=\(clampedCount)")
+        let clampedCount = max(5, min(dynamicMaxCount, optimalCount))
+        let actualThumbnailWidth = videoContentWidth / CGFloat(clampedCount)
+        
+        print("🖼️ 缩略图计算: 时长=\(duration)s, 视频宽度=\(videoContentWidth)px, 缩放=\(String(format: "%.2f", zoomScale))x, 理想宽度=\(idealThumbnailWidth)px, 计算数量=\(optimalCount), 最终数量=\(clampedCount), 实际宽度=\(String(format: "%.1f", actualThumbnailWidth))px")
         return clampedCount
     }
     
@@ -1077,8 +1114,9 @@ class TimelineView: UIView {
         
         // 配置高质量图像生成器
         imageGenerator.appliesPreferredTrackTransform = true
-        imageGenerator.requestedTimeToleranceAfter = CMTime(seconds: 0.1, preferredTimescale: 600)
-        imageGenerator.requestedTimeToleranceBefore = CMTime(seconds: 0.1, preferredTimescale: 600)
+        // 🎯 修复问题3：设置零时间容差，确保缩略图与视频帧精确对应
+        imageGenerator.requestedTimeToleranceAfter = .zero
+        imageGenerator.requestedTimeToleranceBefore = .zero
         imageGenerator.maximumSize = targetThumbnailSize
         
         print("🖼️ 缩略图生成配置: 显示尺寸=\(thumbnailWidth)x\(thumbnailHeight), 生成尺寸=\(targetThumbnailSize)")
@@ -1110,9 +1148,16 @@ class TimelineView: UIView {
                 height: 60  // 40 → 60px
             )
             
-            // 异步生成缩略图
+            // 🎯 修复问题3：将缩略图时间对齐到视频帧边界，确保精确对应
             let timePercent = Double(i) / Double(max(1, count - 1))
-            let time = CMTime(seconds: duration * timePercent, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+            let targetTime = duration * timePercent
+            
+            // 对齐到最近的视频帧边界
+            let frameDuration = 1.0 / frameRate
+            let frameNumber = round(targetTime / frameDuration)
+            let alignedTime = frameNumber * frameDuration
+            
+            let time = CMTime(seconds: alignedTime, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
             
             generateThumbnail(at: time, for: imageView, using: imageGenerator)
         }
@@ -1397,8 +1442,9 @@ class TimelineView: UIView {
     private func updateThumbnailLayout() {
         guard currentThumbnailCount > 0, bounds.width > 0 else { return }
         
-        // 🎯 缩略图容器与TimelineView同宽
-        let containerWidth = bounds.width
+        // 🎯 关键修复：缩略图容器宽度应该与视频内容区域宽度一致，而不是TimelineView宽度
+        // 这样缩略图数量增加时，它们会平铺在更宽的区域上，通过滚动查看
+        let containerWidth = getActualVideoWidth()  // 使用视频内容区域宽度
         let thumbnailWidth = containerWidth / CGFloat(currentThumbnailCount)
         
         for (index, imageView) in thumbnailImageViews.enumerated() {
