@@ -1155,7 +1155,13 @@ class TimelineView: UIView {
             // 对齐到最近的视频帧边界
             let frameDuration = 1.0 / frameRate
             let frameNumber = round(targetTime / frameDuration)
-            let alignedTime = frameNumber * frameDuration
+            var alignedTime = frameNumber * frameDuration
+            
+            // 🔑 关键修复：确保对齐后的时间不超出视频时长（避免最后一帧生成失败）
+            // 为安全起见，最后一帧提前一个帧的时间
+            if alignedTime >= duration {
+                alignedTime = max(0, duration - frameDuration)
+            }
             
             let time = CMTime(seconds: alignedTime, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
             
