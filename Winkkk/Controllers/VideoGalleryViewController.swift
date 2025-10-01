@@ -1382,7 +1382,7 @@ class VideoGalleryViewController: UIViewController {
             
             // 更新进度
             DispatchQueue.main.async {
-                progressAlert.message = "正在删除视频 (\(completedCount)/\(videos.count))\n\(video.fileName)"
+                progressAlert.message = "正在删除视频 (\(completedCount)/\(videos.count))"
             }
             
             videoManager.deleteVideo(video) { [weak self] result in

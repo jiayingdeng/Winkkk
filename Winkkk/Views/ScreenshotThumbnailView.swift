@@ -52,6 +52,9 @@ class ScreenshotThumbnailView: UIView {
         // 不再设置固定的宽高约束，让父视图决定尺寸
         translatesAutoresizingMaskIntoConstraints = false
         
+        // 🎯 关键修复：不裁剪子视图，让删除按钮可以超出边界显示
+        clipsToBounds = false
+        
         // 图片视图
         setupImageView()
         
@@ -108,6 +111,9 @@ class ScreenshotThumbnailView: UIView {
         deleteButton.layer.shadowOffset = CGSize(width: 0, height: 1)
         deleteButton.layer.shadowRadius = 2
         deleteButton.layer.shadowOpacity = 0.3
+        
+        // 🎯 确保删除按钮始终在最上层，不会被其他元素遮挡
+        deleteButton.layer.zPosition = 100
         
         deleteButton.addTarget(self, action: #selector(deleteButtonTapped), for: .touchUpInside)
     }

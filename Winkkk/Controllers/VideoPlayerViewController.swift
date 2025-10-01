@@ -325,7 +325,7 @@ class VideoPlayerViewController: UIViewController {
             gradientBackgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             gradientBackgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
-            // 🎯 三分屏布局：视频区域 (53.3% - 默认值，可通过applyAdaptiveTriplePanelLayout()修改)
+            // 🎯 三分屏布局：视频区域 (42% - 默认值，通过applyAdaptiveTriplePanelLayout()应用)
             playerContainerView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
             playerContainerView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 16),
             playerContainerView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
@@ -347,7 +347,7 @@ class VideoPlayerViewController: UIViewController {
             controlPanelBlurView.leadingAnchor.constraint(equalTo: unifiedControlPanelView.leadingAnchor),
             controlPanelBlurView.trailingAnchor.constraint(equalTo: unifiedControlPanelView.trailingAnchor),
             controlPanelBlurView.bottomAnchor.constraint(equalTo: unifiedControlPanelView.bottomAnchor),  // 🎯 直接贴底部
-            controlPanelBlurView.heightAnchor.constraint(greaterThanOrEqualToConstant: 400),  // 🎯 优化高度约束以适配压缩后的布局
+            controlPanelBlurView.heightAnchor.constraint(greaterThanOrEqualToConstant: 330),  // 🎯 优化高度约束以适配小屏设备（iPhone SE 3）
             
             // 🎯 时间轴 - 允许视觉溢出屏幕边界 (Wink风格)
             timelineView.topAnchor.constraint(equalTo: captureModeSwitcher.bottomAnchor, constant: 6),  // 🎯 压缩：8pt → 6pt
@@ -358,6 +358,7 @@ class VideoPlayerViewController: UIViewController {
             timeInfoLabel.topAnchor.constraint(equalTo: timelineView.bottomAnchor, constant: 4),  // 🎯 压缩：6pt → 4pt
             timeInfoLabel.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
             timeInfoLabel.widthAnchor.constraint(greaterThanOrEqualToConstant: 100),  // 最小宽度，支持自动扩展
+            timeInfoLabel.heightAnchor.constraint(equalToConstant: 20),  // 🎯 固定高度，防止大字体模式下高度变化导致布局异常
             
             // 🎯 修复：播放和截图按钮与时间轴在同一水平区域，但固定在屏幕边界内
             // 播放按钮 - 位于屏幕左侧，与时间轴同一水平线
@@ -374,10 +375,10 @@ class VideoPlayerViewController: UIViewController {
         ])
         
         // 🎯 初始化动态约束 - 三分屏布局
-        // 默认视频区域高度：45% (优化以适配小屏设备)
+        // 默认视频区域高度：42% (优化以确保截图预览栏展开时不遮挡时间标签)
         playerContainerHeightConstraint = playerContainerView.heightAnchor.constraint(
             equalTo: view.safeAreaLayoutGuide.heightAnchor,
-            multiplier: 0.45
+            multiplier: 0.42
         )
         playerContainerHeightConstraint?.isActive = true
         

@@ -125,11 +125,17 @@ class ScreenshotPreviewBar: UIView {
         scrollView.alwaysBounceHorizontal = true
         scrollView.decelerationRate = .fast
         
+        // 🎯 关键修复：不裁剪子视图，让删除按钮可以超出滚动区域显示
+        scrollView.clipsToBounds = false
+        
         // 配置堆叠视图 - 🎯 修改为支持不同尺寸的缩略图
         stackView.axis = .horizontal
         stackView.spacing = 8
         stackView.alignment = .center
         stackView.distribution = .fill  // 改为fill以支持不同宽度的子视图
+        
+        // 🎯 关键修复：不裁剪子视图，让删除按钮可以超出边界显示
+        stackView.clipsToBounds = false
         
         scrollView.addSubview(stackView)
         
