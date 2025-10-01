@@ -136,6 +136,42 @@ class CollageViewController: UIViewController {
     private let backToProcessingButton = UIButton() // 返回截图中心按钮
     private let enhanceButton = UIButton() // 画质修复按钮
     
+    // MARK: - 编辑模式相关（🆕 新增）
+    
+    // 状态
+    private var isEditingModeActive = false
+    private var editingImageIndex: Int?
+    private var editingSnapshot: EditingSnapshot?
+    
+    // UI 容器
+    private let editingContainerView = UIView()
+    
+    // 背景层
+    private let dimmedBackgroundView = UIView()
+    private let referenceImageView = UIImageView()
+    
+    // 可编辑图片视图
+    private let activeImageView = UIImageView()
+    private var activeImageFrameInCollage: CGRect = .zero
+    
+    // 顶部工具栏
+    private let editingTopBar = UIView()
+    private let editCancelButton = UIButton()
+    private let editTitleLabel = UILabel()
+    private let editDoneButton = UIButton()
+    
+    // 底部编辑工具
+    private let editingBottomBar = UIView()
+    private var resetToolButton = UIButton()
+    private var fitToolButton = UIButton()
+    private var rotateToolButton = UIButton()
+    private var flipToolButton = UIButton()
+    
+    // 手势状态
+    private var gestureBeginTranslation: CGPoint = .zero
+    private var gestureBeginScale: CGFloat = 1.0
+    private var gestureBeginRotation: CGFloat = 0
+    
     // MARK: - Initialization
     init(images: [UIImage]) {
         self.originalImages = images
@@ -185,6 +221,14 @@ class CollageViewController: UIViewController {
         let longPressGesture = UILongPressGestureRecognizer(target: self, action: #selector(handleCollageImageLongPress(_:)))
         longPressGesture.minimumPressDuration = 0.5  // 0.5秒触发长按
         previewImageView.addGestureRecognizer(longPressGesture)
+        
+        // 🆕 添加双击手势进入编辑模式
+        let doubleTapGesture = UITapGestureRecognizer(target: self, action: #selector(handlePreviewDoubleTap(_:)))
+        doubleTapGesture.numberOfTapsRequired = 2
+        previewImageView.addGestureRecognizer(doubleTapGesture)
+        
+        // 设置手势优先级：双击优先于单击
+        tapGesture.require(toFail: doubleTapGesture)
         
         // 确保选择的模板可用
         validateSelectedTemplate()
@@ -1260,6 +1304,34 @@ class CollageViewController: UIViewController {
         }
     }
     
+    /// 🆕 处理双击手势 - 进入编辑模式
+    @objc private func handlePreviewDoubleTap(_ gesture: UITapGestureRecognizer) {
+        print("🎨 双击手势触发")
+        
+        // 确保有拼图生成
+        guard collageImage != nil else { return }
+        
+        // 获取双击位置
+        let tapLocation = gesture.location(in: previewImageView)
+        
+        // 判断双击的是哪张图片
+        if let tappedIndex = hitTestCollageImage(point: tapLocation) {
+            print("🎯 双击选中图片索引: \(tappedIndex)")
+            
+            // 选中该图片
+            selectedImageIndex = tappedIndex
+            updateCollageSelectionBorder()
+            updateEditingButtonsState()
+            imageSelectionCollectionView.reloadData()
+            
+            // 触觉反馈
+            HapticFeedbackManager.shared.mediumImpact()
+            
+            // 直接进入编辑模式
+            enterEditingMode(for: tappedIndex)
+        }
+    }
+    
     // MARK: - 浮动编辑工具栏
     
     /// 显示浮动编辑工具栏
@@ -2085,6 +2157,57 @@ class CollageImageItem {
             originalImage.draw(in: drawRect)
         }
     }
+    
+    // MARK: - 手势编辑方法（🆕 新增）
+    
+    /// 应用手势平移（实时）
+    func updateTranslation(_ offset: CGPoint) {
+        self.translation.x = max(min(offset.x, 200), -200)
+        self.translation.y = max(min(offset.y, 200), -200)
+        markNeedsUpdate()
+    }
+    
+    /// 应用手势缩放（实时）
+    func updateScale(_ newScale: CGFloat) {
+        self.scale = max(min(newScale, 3.0), 0.5)
+        markNeedsUpdate()
+    }
+    
+    /// 应用手势旋转（实时，可选）
+    func updateRotation(_ angleDegrees: CGFloat) {
+        self.rotationAngle = angleDegrees.truncatingRemainder(dividingBy: 360)
+        markNeedsUpdate()
+    }
+    
+    /// 保存编辑快照（用于取消时恢复）
+    func createSnapshot() -> EditingSnapshot {
+        return EditingSnapshot(
+            translation: translation,
+            scale: scale,
+            rotation: rotationAngle,
+            flippedH: isFlippedHorizontally,
+            flippedV: isFlippedVertically
+        )
+    }
+    
+    /// 恢复快照
+    func restore(from snapshot: EditingSnapshot) {
+        translation = snapshot.translation
+        scale = snapshot.scale
+        rotationAngle = snapshot.rotation
+        isFlippedHorizontally = snapshot.flippedH
+        isFlippedVertically = snapshot.flippedV
+        markNeedsUpdate()
+    }
+}
+
+// MARK: - 编辑快照结构体（🆕 新增）
+struct EditingSnapshot {
+    let translation: CGPoint
+    let scale: CGFloat
+    let rotation: CGFloat
+    let flippedH: Bool
+    let flippedV: Bool
 }
 
 // MARK: - EditingImageCollectionViewCell
@@ -2396,5 +2519,448 @@ extension CollageViewController: UICollectionViewDataSource, UICollectionViewDel
         } else {
             return CGSize(width: 60, height: 60)
         }
+    }
+}
+
+// MARK: - 🆕 编辑模式核心功能
+extension CollageViewController {
+    
+    /// 进入编辑模式
+    func enterEditingMode(for imageIndex: Int) {
+        guard imageIndex >= 0 && imageIndex < imageItems.count else { return }
+        
+        print("🎨 进入编辑模式：图片 \(imageIndex)")
+        
+        isEditingModeActive = true
+        editingImageIndex = imageIndex
+        
+        // 1. 保存快照（用于取消时恢复）
+        editingSnapshot = imageItems[imageIndex].createSnapshot()
+        
+        // 2. 计算该图片在拼图中的位置
+        activeImageFrameInCollage = calculateImageFrameInCollage(at: imageIndex)
+        
+        // 3. 创建编辑模式UI
+        buildEditingModeUI()
+        
+        // 4. 添加手势
+        addEditingGestures()
+        
+        // 5. 动画显示
+        animateEnterEditingMode()
+    }
+    
+    /// 计算某个图片在拼图中的位置（相对于 previewImageView）
+    private func calculateImageFrameInCollage(at index: Int) -> CGRect {
+        guard collageImage != nil else { return .zero }
+        
+        let actualImageRect = getImageDisplayRect()
+        let imageSize = actualImageRect.size
+        
+        var relativeBorderRect: CGRect = .zero
+        
+        // 根据布局模板计算该图片的相对位置
+        if selectedLayoutTemplate is HorizontalLayoutTemplate {
+            let imageCount = imageItems.count
+            let sectionWidth = imageSize.width / CGFloat(imageCount)
+            relativeBorderRect = CGRect(
+                x: CGFloat(index) * sectionWidth,
+                y: 0,
+                width: sectionWidth,
+                height: imageSize.height
+            )
+        } else if selectedLayoutTemplate is VerticalLayoutTemplate {
+            let imageCount = imageItems.count
+            let sectionHeight = imageSize.height / CGFloat(imageCount)
+            relativeBorderRect = CGRect(
+                x: 0,
+                y: CGFloat(index) * sectionHeight,
+                width: imageSize.width,
+                height: sectionHeight
+            )
+        } else if selectedLayoutTemplate is GridLayoutTemplate {
+            let imageCount = imageItems.count
+            let gridSize = calculateGridSizeForHitTest(for: imageCount)
+            let cellWidth = imageSize.width / CGFloat(gridSize.cols)
+            let cellHeight = imageSize.height / CGFloat(gridSize.rows)
+            
+            let row = index / gridSize.cols
+            let col = index % gridSize.cols
+            relativeBorderRect = CGRect(
+                x: CGFloat(col) * cellWidth,
+                y: CGFloat(row) * cellHeight,
+                width: cellWidth,
+                height: cellHeight
+            )
+        }
+        
+        // 转换为绝对坐标
+        return CGRect(
+            x: actualImageRect.origin.x + relativeBorderRect.origin.x,
+            y: actualImageRect.origin.y + relativeBorderRect.origin.y,
+            width: relativeBorderRect.width,
+            height: relativeBorderRect.height
+        )
+    }
+    
+    /// 构建编辑模式UI
+    private func buildEditingModeUI() {
+        guard let editingIndex = editingImageIndex else { return }
+        
+        // === 容器 ===
+        editingContainerView.frame = view.bounds
+        editingContainerView.backgroundColor = .clear
+        
+        // === 半透明背景 ===
+        dimmedBackgroundView.frame = view.bounds
+        dimmedBackgroundView.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+        dimmedBackgroundView.alpha = 0
+        editingContainerView.addSubview(dimmedBackgroundView)
+        
+        // === 参考图片（完整拼图，半透明） ===
+        referenceImageView.image = collageImage
+        referenceImageView.contentMode = .scaleAspectFit
+        referenceImageView.frame = getImageDisplayRect()
+        referenceImageView.alpha = 0
+        editingContainerView.addSubview(referenceImageView)
+        
+        // === 可编辑的图片视图 ===
+        activeImageView.image = imageItems[editingIndex].processedImage
+        activeImageView.contentMode = .scaleAspectFill
+        activeImageView.clipsToBounds = true
+        activeImageView.frame = activeImageFrameInCollage
+        activeImageView.isUserInteractionEnabled = true
+        activeImageView.alpha = 0
+        editingContainerView.addSubview(activeImageView)
+        
+        // === 顶部工具栏 ===
+        let safeTop = view.safeAreaInsets.top
+        editingTopBar.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: safeTop + 50)
+        editingTopBar.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        
+        // 取消按钮
+        editCancelButton.setTitle("取消", for: .normal)
+        editCancelButton.setTitleColor(.white, for: .normal)
+        editCancelButton.titleLabel?.font = .systemFont(ofSize: 16)
+        editCancelButton.frame = CGRect(x: 16, y: safeTop + 10, width: 60, height: 30)
+        editCancelButton.addTarget(self, action: #selector(cancelEditing), for: .touchUpInside)
+        editingTopBar.addSubview(editCancelButton)
+        
+        // 标题
+        editTitleLabel.text = "编辑图片"
+        editTitleLabel.textColor = .white
+        editTitleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
+        editTitleLabel.textAlignment = .center
+        editTitleLabel.frame = CGRect(
+            x: 90,
+            y: safeTop + 10,
+            width: view.bounds.width - 180,
+            height: 30
+        )
+        editingTopBar.addSubview(editTitleLabel)
+        
+        // 完成按钮
+        editDoneButton.setTitle("完成", for: .normal)
+        editDoneButton.setTitleColor(ThemeManager.buttonPrimary, for: .normal)
+        editDoneButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
+        editDoneButton.frame = CGRect(
+            x: view.bounds.width - 76,
+            y: safeTop + 10,
+            width: 60,
+            height: 30
+        )
+        editDoneButton.addTarget(self, action: #selector(finishEditing), for: .touchUpInside)
+        editingTopBar.addSubview(editDoneButton)
+        
+        editingTopBar.alpha = 0
+        editingContainerView.addSubview(editingTopBar)
+        
+        // === 底部编辑工具 ===
+        let safeBottom = view.safeAreaInsets.bottom
+        let toolbarHeight: CGFloat = 80
+        editingBottomBar.frame = CGRect(
+            x: 0,
+            y: view.bounds.height - toolbarHeight - safeBottom,
+            width: view.bounds.width,
+            height: toolbarHeight + safeBottom
+        )
+        editingBottomBar.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        
+        let buttonSpacing = (view.bounds.width - 60 * 4) / 5
+        
+        // 重置按钮
+        resetToolButton = createEditToolButton(title: "重置", icon: "↺", action: #selector(resetEditingTool))
+        resetToolButton.frame = CGRect(x: buttonSpacing, y: 15, width: 60, height: 60)
+        editingBottomBar.addSubview(resetToolButton)
+        
+        // 适应框按钮
+        fitToolButton = createEditToolButton(title: "适应框", icon: "⬜", action: #selector(fitToFrameTool))
+        fitToolButton.frame = CGRect(x: buttonSpacing * 2 + 60, y: 15, width: 60, height: 60)
+        editingBottomBar.addSubview(fitToolButton)
+        
+        // 旋转按钮
+        rotateToolButton = createEditToolButton(title: "旋转", icon: "↻", action: #selector(rotateTool))
+        rotateToolButton.frame = CGRect(x: buttonSpacing * 3 + 120, y: 15, width: 60, height: 60)
+        editingBottomBar.addSubview(rotateToolButton)
+        
+        // 翻转按钮
+        flipToolButton = createEditToolButton(title: "翻转", icon: "↔", action: #selector(flipTool))
+        flipToolButton.frame = CGRect(x: buttonSpacing * 4 + 180, y: 15, width: 60, height: 60)
+        editingBottomBar.addSubview(flipToolButton)
+        
+        editingBottomBar.alpha = 0
+        editingContainerView.addSubview(editingBottomBar)
+        
+        // 添加到主视图
+        view.addSubview(editingContainerView)
+    }
+    
+    /// 创建编辑工具按钮
+    private func createEditToolButton(title: String, icon: String, action: Selector) -> UIButton {
+        let button = UIButton(type: .custom)
+        button.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        button.layer.cornerRadius = 8
+        
+        // 图标标签
+        let iconLabel = UILabel()
+        iconLabel.text = icon
+        iconLabel.font = .systemFont(ofSize: 28)
+        iconLabel.textColor = .white
+        iconLabel.textAlignment = .center
+        iconLabel.frame = CGRect(x: 0, y: 5, width: 60, height: 35)
+        button.addSubview(iconLabel)
+        
+        // 标题标签
+        let titleLabel = UILabel()
+        titleLabel.text = title
+        titleLabel.font = .systemFont(ofSize: 11)
+        titleLabel.textColor = UIColor.white.withAlphaComponent(0.8)
+        titleLabel.textAlignment = .center
+        titleLabel.frame = CGRect(x: 0, y: 40, width: 60, height: 15)
+        button.addSubview(titleLabel)
+        
+        button.addTarget(self, action: action, for: .touchUpInside)
+        
+        return button
+    }
+    
+    /// 添加编辑手势
+    private func addEditingGestures() {
+        // 清除旧手势
+        activeImageView.gestureRecognizers?.forEach { activeImageView.removeGestureRecognizer($0) }
+        
+        // 单指平移
+        let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handleEditingPan(_:)))
+        activeImageView.addGestureRecognizer(panGesture)
+        
+        // 双指缩放
+        let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handleEditingPinch(_:)))
+        activeImageView.addGestureRecognizer(pinchGesture)
+        
+        // 双指旋转（可选）
+        let rotationGesture = UIRotationGestureRecognizer(target: self, action: #selector(handleEditingRotation(_:)))
+        activeImageView.addGestureRecognizer(rotationGesture)
+    }
+    
+    /// 处理平移手势
+    @objc private func handleEditingPan(_ gesture: UIPanGestureRecognizer) {
+        guard let editingIndex = editingImageIndex else { return }
+        
+        switch gesture.state {
+        case .began:
+            gestureBeginTranslation = imageItems[editingIndex].translation
+            
+        case .changed:
+            let translation = gesture.translation(in: activeImageView.superview)
+            let newTranslation = CGPoint(
+                x: gestureBeginTranslation.x + translation.x * 0.3,
+                y: gestureBeginTranslation.y + translation.y * 0.3
+            )
+            imageItems[editingIndex].updateTranslation(newTranslation)
+            activeImageView.image = imageItems[editingIndex].processedImage
+            
+        case .ended, .cancelled:
+            break
+            
+        default:
+            break
+        }
+    }
+    
+    /// 处理缩放手势
+    @objc private func handleEditingPinch(_ gesture: UIPinchGestureRecognizer) {
+        guard let editingIndex = editingImageIndex else { return }
+        
+        switch gesture.state {
+        case .began:
+            gestureBeginScale = imageItems[editingIndex].scale
+            
+        case .changed:
+            let newScale = gestureBeginScale * gesture.scale
+            imageItems[editingIndex].updateScale(newScale)
+            activeImageView.image = imageItems[editingIndex].processedImage
+            
+            if newScale >= 3.0 || newScale <= 0.5 {
+                HapticFeedbackManager.shared.lightImpact()
+            }
+            
+        case .ended, .cancelled:
+            break
+            
+        default:
+            break
+        }
+    }
+    
+    /// 处理旋转手势
+    @objc private func handleEditingRotation(_ gesture: UIRotationGestureRecognizer) {
+        guard let editingIndex = editingImageIndex else { return }
+        
+        switch gesture.state {
+        case .began:
+            gestureBeginRotation = imageItems[editingIndex].rotationAngle
+            
+        case .changed:
+            let newRotation = gestureBeginRotation + gesture.rotation * 180 / .pi
+            imageItems[editingIndex].updateRotation(newRotation)
+            activeImageView.image = imageItems[editingIndex].processedImage
+            
+        case .ended, .cancelled:
+            break
+            
+        default:
+            break
+        }
+    }
+    
+    /// 重置编辑
+    @objc private func resetEditingTool() {
+        guard let editingIndex = editingImageIndex else { return }
+        
+        HapticFeedbackManager.shared.buttonTap()
+        
+        imageItems[editingIndex].resetEditing()
+        activeImageView.image = imageItems[editingIndex].processedImage
+        
+        gestureBeginTranslation = .zero
+        gestureBeginScale = 1.0
+        
+        print("♻️ 图片已重置")
+    }
+    
+    /// 适应框
+    @objc private func fitToFrameTool() {
+        guard let editingIndex = editingImageIndex else { return }
+        
+        HapticFeedbackManager.shared.buttonTap()
+        
+        imageItems[editingIndex].updateTranslation(.zero)
+        imageItems[editingIndex].updateScale(1.0)
+        activeImageView.image = imageItems[editingIndex].processedImage
+        
+        gestureBeginTranslation = .zero
+        gestureBeginScale = 1.0
+        
+        print("⬜ 图片已适应框")
+    }
+    
+    /// 旋转90度
+    @objc private func rotateTool() {
+        guard let editingIndex = editingImageIndex else { return }
+        
+        HapticFeedbackManager.shared.buttonTap()
+        
+        imageItems[editingIndex].rotateClockwise()
+        activeImageView.image = imageItems[editingIndex].processedImage
+        
+        print("↻ 图片已旋转90°")
+    }
+    
+    /// 翻转（水平）
+    @objc private func flipTool() {
+        guard let editingIndex = editingImageIndex else { return }
+        
+        HapticFeedbackManager.shared.buttonTap()
+        
+        imageItems[editingIndex].flipHorizontally()
+        activeImageView.image = imageItems[editingIndex].processedImage
+        
+        print("↔ 图片已翻转")
+    }
+    
+    /// 完成编辑（保存）
+    @objc private func finishEditing() {
+        print("✅ 完成编辑，保存更改")
+        
+        HapticFeedbackManager.shared.notificationSuccess()
+        
+        // 重新生成拼图
+        updatePreview()
+        
+        // 更新底部缩略图
+        if let editingIndex = editingImageIndex {
+            imageSelectionCollectionView.reloadItems(at: [IndexPath(item: editingIndex, section: 0)])
+        }
+        
+        // 退出编辑模式
+        exitEditingMode()
+    }
+    
+    /// 取消编辑（不保存）
+    @objc private func cancelEditing() {
+        print("❌ 取消编辑，恢复原状")
+        
+        guard let editingIndex = editingImageIndex,
+              let snapshot = editingSnapshot else {
+            exitEditingMode()
+            return
+        }
+        
+        HapticFeedbackManager.shared.lightImpact()
+        
+        // 恢复快照
+        imageItems[editingIndex].restore(from: snapshot)
+        
+        // 更新底部缩略图
+        imageSelectionCollectionView.reloadItems(at: [IndexPath(item: editingIndex, section: 0)])
+        
+        // 退出编辑模式
+        exitEditingMode()
+    }
+    
+    /// 退出编辑模式
+    private func exitEditingMode() {
+        animateExitEditingMode {
+            self.isEditingModeActive = false
+            self.editingImageIndex = nil
+            self.editingSnapshot = nil
+            self.editingContainerView.removeFromSuperview()
+            
+            print("🎨 已退出编辑模式")
+        }
+    }
+    
+    /// 进入编辑模式动画
+    private func animateEnterEditingMode() {
+        UIView.animate(withDuration: 0.3, delay: 0, options: .curveEaseOut) {
+            self.dimmedBackgroundView.alpha = 1
+            self.referenceImageView.alpha = 0.3
+            self.activeImageView.alpha = 1
+            self.editingTopBar.alpha = 1
+            self.editingBottomBar.alpha = 1
+        }
+    }
+    
+    /// 退出编辑模式动画
+    private func animateExitEditingMode(completion: @escaping () -> Void) {
+        UIView.animate(withDuration: 0.25, delay: 0, options: .curveEaseIn, animations: {
+            self.dimmedBackgroundView.alpha = 0
+            self.referenceImageView.alpha = 0
+            self.activeImageView.alpha = 0
+            self.editingTopBar.alpha = 0
+            self.editingBottomBar.alpha = 0
+        }, completion: { _ in
+            completion()
+        })
     }
 }
