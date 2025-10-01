@@ -645,20 +645,58 @@ class VideoPlayerViewController: UIViewController {
     }
     
     // 🎯 更新流动位置 (双轨同步：时间轴 + 视频播放)
+    private var flowPositionUpdateCount = 0  // 🔍 DEBUG: 计数器
+    private var lastFlowLogTime: TimeInterval = 0  // 🔍 DEBUG: 上次打印时间
+    
+    // 🎯 末尾动画节流：限制末尾滚动动画的触发频率，避免视觉上的"突然加速"
+    private var lastEndingAnimationTime: TimeInterval = 0
+    private let endingAnimationThrottle: TimeInterval = 0.1  // 末尾每 0.1 秒才触发一次动画（3 帧节流为 1 帧）
+    
     private func updateFlowPosition(speed: CGFloat) {
         // 🎯 关键修复：基于视频播放进度更新时间轴，而不是基于滚动速度
         guard let currentPlayerTime = player?.currentTime() else { return }
         
         let currentVideoProgress = currentPlayerTime.seconds / videoDuration.seconds
         
-        // 🎯 检查是否播放完毕
-        if currentVideoProgress >= 1.0 {
-            // 播放到末尾，停止双轨同步
-            timelineView.setProgress(1.0)
-            stopFlowing()  // 自动停止时间轴滚动和视频播放
+        // 🔍 DEBUG: 每秒打印一次播放进度，验证播放速度
+        flowPositionUpdateCount += 1
+        let currentTime = Date().timeIntervalSince1970
+        if currentTime - lastFlowLogTime >= 1.0 {
+            print("🔍 播放进度: \(String(format: "%.2f", currentPlayerTime.seconds))s / \(String(format: "%.2f", videoDuration.seconds))s (\(String(format: "%.1f", currentVideoProgress * 100))%) - 更新频率: \(flowPositionUpdateCount) 次/秒")
+            flowPositionUpdateCount = 0
+            lastFlowLogTime = currentTime
+        }
+        
+        // 🔍 DEBUG: 在接近末尾时打印详细信息
+        if currentVideoProgress >= 0.85 {
+            print("🔍 接近末尾: progress=\(String(format: "%.4f", currentVideoProgress)), time=\(String(format: "%.3f", currentPlayerTime.seconds))s / \(String(format: "%.3f", videoDuration.seconds))s")
+        }
+        
+        // 🎯 关键修复：移除手动检测播放完成的逻辑
+        // 不再在这里检查 progress >= 0.98，而是完全依赖 AVPlayerItemDidPlayToEndTime 通知
+        // 这样可以避免提前 0.1-0.2 秒停止，确保播放到真正的末尾
+        
+        // 🎯 末尾动画节流：在接近末尾时，限制动画触发频率
+        // 策略：前 95% 保持 30fps 更新，后 5% 节流到 10fps（每 0.1 秒才更新一次）
+        // 原理：避免末尾 0.3 秒内触发 9 次连续动画，每次动画相互中断导致视觉上的"快速闪动"
+        let isNearEnd = currentVideoProgress >= 0.95
+        let now = Date().timeIntervalSince1970
+        let shouldUpdate: Bool
+        
+        if isNearEnd {
+            // 末尾节流：每 0.1 秒才触发一次动画（10fps）
+            let timeSinceLastAnimation = now - lastEndingAnimationTime
+            shouldUpdate = timeSinceLastAnimation >= endingAnimationThrottle || currentVideoProgress >= 1.0
+            if shouldUpdate {
+                lastEndingAnimationTime = now
+            }
         } else {
-            // 🎯 修复：直接基于视频播放进度更新时间轴
-            timelineView.setProgress(currentVideoProgress)
+            // 正常播放：每帧更新（30fps）
+            shouldUpdate = true
+        }
+        
+        if shouldUpdate {
+            timelineView.setProgress(currentVideoProgress, animated: true)
         }
         
         // 🎯 移除原有的反向同步逻辑，避免强制跳转
@@ -1434,9 +1472,21 @@ class VideoPlayerViewController: UIViewController {
     }
     
     @objc private func playerDidFinishPlaying() {
-        // 🎯 流动结束，重置到开始位置
-        timelineView.timelineScrollView.setContentOffset(.zero, animated: true)
-        isFlowing = false
+        // 🎯 关键修复：AVPlayer 通知播放真正结束时才停止流动
+        // 这样可以确保播放到视频的真正末尾，不会提前 0.1-0.2 秒停止
+        
+        print("🎬 AVPlayer 通知：视频播放完成")
+        
+        guard isFlowing else {
+            // 已经停止了，直接返回（理论上不应该发生）
+            print("⚠️ 播放已停止，忽略重复的播放完成通知")
+            return
+        }
+        
+        // 🎯 只需要停止流动，不需要再次 setProgress(1.0)
+        // 因为 updateFlowPosition() 已经把进度更新到 1.0 了
+        stopFlowing()  // 停止播放，设置 isPlaying = false
+        print("✅ 已停止双轨同步，时间轴停留在当前位置（应该是 100%）")
     }
     
     // MARK: - Cleanup

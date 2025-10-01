@@ -687,7 +687,7 @@ class TimelineView: UIView {
     }
     
     /// 🎯 同步滚动到指定截取时间
-    func scrollToCaptureTime(_ time: Double) {
+    func scrollToCaptureTime(_ time: Double, animated: Bool = true) {
         // 🎯 使用更新后的坐标转换（已考虑padding）
         let targetX = timeToCoordinate(time)
         let centerX = bounds.width / 2  // 🎯 修复：基于TimelineView宽度计算中心位置
@@ -699,7 +699,20 @@ class TimelineView: UIView {
         let scrollRange = getValidScrollRange()
         let clampedOffset = max(scrollRange.min, min(scrollRange.max, scrollOffsetX))
         
-        scrollView.setContentOffset(CGPoint(x: clampedOffset, y: 0), animated: true)
+        // 🎯 使用自定义时长的平滑动画（0.5秒，Apple风格的easeInOut曲线）
+        if animated {
+            UIView.animate(
+                withDuration: 0.5,  // 🎯 从 0.25-0.3s 增加到 0.5s，更丝滑
+                delay: 0,
+                options: [.curveEaseInOut, .allowUserInteraction],  // 🎯 easeInOut 曲线最自然
+                animations: {
+                    self.scrollView.setContentOffset(CGPoint(x: clampedOffset, y: 0), animated: false)
+                },
+                completion: nil
+            )
+        } else {
+            scrollView.setContentOffset(CGPoint(x: clampedOffset, y: 0), animated: false)
+        }
         
         // 🎯 滚动后更新Live Photo范围指示器
         if isLivePhotoMode {
@@ -753,7 +766,7 @@ class TimelineView: UIView {
         }
     }
     
-    func setProgress(_ progress: Double) {
+    func setProgress(_ progress: Double, animated: Bool = true) {
         // 🎯 修复：播放时允许进度更新，但区分播放和手动操作
         currentProgress = progress
         let targetTime = progress * duration
@@ -763,7 +776,7 @@ class TimelineView: UIView {
         
         // 🎯 播放状态下，同步时间轴滚动位置到播放进度
         if isPlaying {
-            scrollToCaptureTime(targetTime)
+            scrollToCaptureTime(targetTime, animated: animated)
             
             // 🎯 播放时更新Live Photo范围指示器
             if isLivePhotoMode {
@@ -771,7 +784,10 @@ class TimelineView: UIView {
             }
         }
         
-        isPlaybackProgressUpdate = false
+        // 🎯 修复：延迟重置标志，让滚动动画完成后的回调也能识别为播放进度更新
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {  // 🎯 更新为 0.5s，匹配新动画时长
+            self.isPlaybackProgressUpdate = false
+        }
     }
     
     // 🎯 新增：播放状态控制方法
@@ -1515,19 +1531,6 @@ extension TimelineView: UIScrollViewDelegate {
         // 🎯 Wink编辑器模式：只处理截图时间变化通知
         // ❌ 不再更新传统播放器的进度条和滑块
         
-        // 🎯 滚动时实时通知截取时间变化（基于固定白色竖线）
-        if !isDragging && !isZooming {  // 仅在非交互状态时回调
-            let captureTime = getCurrentCaptureTime()
-            let progress = duration > 0 ? captureTime / duration : 0
-            
-            // 🎯 区分播放中的进度更新和用户手动跳转
-            if isPlaybackProgressUpdate {
-                delegate?.timelineView(self, didUpdateProgressDuringPlayback: progress)
-            } else {
-                delegate?.timelineView(self, didSeekToProgress: progress)
-            }
-        }
-        
         // 🎯 滚动时更新Live Photo范围指示器
         if isLivePhotoMode {
             updateLivePhotoRangePosition()
@@ -1535,6 +1538,9 @@ extension TimelineView: UIScrollViewDelegate {
         
         // 🎯 新增：滚动时刷新时间刻度
         generateTimeScale()
+        
+        // 🎯 注意：不在这里触发 didSeekToProgress 回调，避免过于频繁
+        // 回调已移至：手势结束、滚动减速结束等明确的用户操作完成时机
     }
     
     func scrollViewWillBeginDragging(_ scrollView: UIScrollView) {
@@ -1562,8 +1568,10 @@ extension TimelineView: UIScrollViewDelegate {
     }
     
     func scrollViewDidEndScrollingAnimation(_ scrollView: UIScrollView) {
-        // 自动滚动动画结束
-        print("✅ 自动跟踪滚动完成")
+        // 自动滚动动画结束（播放时的自动跟踪滚动）
+        // 🎯 注意：不在这里触发 didSeekToProgress，因为：
+        // 1. 播放时的滚动是由 setProgress() 驱动的，不需要反向通知
+        // 2. 避免播放结束时触发 performVideoSeek() 的连锁反应
     }
     
     // MARK: - Visible Thumbnails Optimization (Placeholder for Task 10)

@@ -305,50 +305,72 @@ class VideoManager: NSObject {
         let thumbnailPath = videoItem.thumbnailPath
         let fileName = videoItem.fileName
         
-        print("🗑️ 开始删除视频: \(fileName)")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🗑️ [VideoManager] 开始删除视频流程")
+        print("   - 视频名称: \(fileName)")
         print("   - Object ID: \(objectID)")
+        print("   - 文件路径: \(filePath.path)")
+        print("   - 缩略图路径: \(thumbnailPath?.path ?? "无")")
         print("   - 来源Context: \(videoItem.managedObjectContext == PersistenceController.shared.container.viewContext ? "主Context" : "其他Context")")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         
         backgroundContext.perform { [weak self] in
             guard let self = self else { return }
             
+            print("⚙️ [VideoManager] 在后台线程执行删除操作")
+            
             do {
                 // 🎯 关键修复：在backgroundContext中重新获取VideoItem对象
+                print("🔍 [VideoManager] 尝试在后台Context中获取VideoItem对象...")
                 guard let videoItemInBackgroundContext = try? self.backgroundContext.existingObject(with: objectID) as? VideoItem else {
-                    print("⚠️ 无法在后台Context中找到VideoItem对象，可能已被删除")
+                    print("⚠️ [VideoManager] 无法在后台Context中找到VideoItem对象，可能已被删除")
                     DispatchQueue.main.async {
                         completion(.success(())) // 对象已不存在，视为删除成功
                     }
                     return
                 }
                 
-                print("✅ 在后台Context中成功获取VideoItem对象")
+                print("✅ [VideoManager] 在后台Context中成功获取VideoItem对象")
                 
                 // 删除视频文件
+                print("🗂️ [VideoManager] 开始删除视频文件...")
                 if self.fileManager.fileExists(atPath: filePath.path) {
                     try self.fileManager.removeItem(at: filePath)
-                    print("✅ 视频文件删除成功: \(filePath.path)")
+                    print("✅ [VideoManager] 视频文件删除成功: \(filePath.path)")
+                } else {
+                    print("⚠️ [VideoManager] 视频文件不存在: \(filePath.path)")
                 }
                 
                 // 删除缩略图文件
+                print("🖼️ [VideoManager] 开始删除缩略图文件...")
                 if let thumbnailPath = thumbnailPath,
                    self.fileManager.fileExists(atPath: thumbnailPath.path) {
                     try self.fileManager.removeItem(at: thumbnailPath)
-                    print("✅ 缩略图文件删除成功: \(thumbnailPath.path)")
+                    print("✅ [VideoManager] 缩略图文件删除成功: \(thumbnailPath.path)")
+                } else {
+                    print("⚠️ [VideoManager] 缩略图文件不存在或路径为空")
                 }
                 
                 // 🎯 现在安全删除数据库记录 - 使用正确的Context对象
+                print("💾 [VideoManager] 开始删除Core Data记录...")
                 self.backgroundContext.delete(videoItemInBackgroundContext)
                 try self.backgroundContext.save()
+                print("✅ [VideoManager] Core Data记录删除成功")
                 
-                print("✅ 视频删除完成: \(fileName)")
+                print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                print("✅ [VideoManager] 视频删除完成: \(fileName)")
+                print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                 
                 DispatchQueue.main.async {
                     completion(.success(()))
                 }
                 
             } catch {
-                print("❌ 视频删除失败: \(fileName) - \(error.localizedDescription)")
+                print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                print("❌ [VideoManager] 视频删除失败: \(fileName)")
+                print("   - 错误类型: \(type(of: error))")
+                print("   - 错误描述: \(error.localizedDescription)")
+                print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
                 DispatchQueue.main.async {
                     completion(.failure(error))
                 }

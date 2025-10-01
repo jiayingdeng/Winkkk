@@ -822,23 +822,13 @@ class VideoGalleryViewController: UIViewController {
     }
     
     private func showVideoDetailPopup(for video: VideoItem) {
-        print("🎬 开始显示视频详情弹窗")
+        print("🎬 显示视频详情弹窗: \(video.fileName)")
         
         let detailPopup = VideoDetailPopupView()
         detailPopup.configure(with: video)
         
-        print("✅ 弹窗配置完成，文件名: \(video.fileName)")
-        
-        detailPopup.onExport = { [weak self] video in
-            self?.exportVideoToPhotoLibrary(video)
-        }
-        
-        detailPopup.onDelete = { [weak self] video in
-            self?.confirmDeleteVideo(video)
-        }
-        
         detailPopup.onClose = {
-            print("❌ 关闭弹窗")
+            print("❌ 关闭视频详情弹窗")
         }
         
         // 添加到视图并显示动画
@@ -851,30 +841,39 @@ class VideoGalleryViewController: UIViewController {
             detailPopup.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         
-        print("🎨 弹窗已添加到视图层级，开始显示动画")
         detailPopup.showWithAnimation()
-        print("✨ 显示动画已触发")
     }
     
     
     private func exportVideoToPhotoLibrary(_ video: VideoItem) {
-        print("🔄 开始导出视频到相册: \(video.fileName)")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🔄 [导出] 开始导出流程")
+        print("   - 视频名称: \(video.fileName)")
+        print("   - 文件路径: \(video.filePath.path)")
+        print("   - 文件大小: \(video.formattedFileSize)")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         
         // 显示导出进度指示器
         let loadingAlert = UIAlertController(title: "导出中", message: "正在导出视频到相册...", preferredStyle: .alert)
         present(loadingAlert, animated: true)
+        print("📱 [导出] 显示加载提示")
         
         // 使用 VideoManager 统一的导出方法
         videoManager.exportToPhotoLibrary(video: video) { [weak self] result in
             DispatchQueue.main.async {
+                print("📥 [导出] 收到导出结果回调")
+                
                 // 关闭进度指示器
                 loadingAlert.dismiss(animated: true) {
                     switch result {
                     case .success:
-                        print("✅ 视频成功导出到相册")
+                        print("✅ [导出] 视频成功导出到相册")
+                        print("💡 [导出] 准备显示成功消息")
                         self?.showVideoExportSuccessAlert()
                     case .failure(let error):
-                        print("❌ 视频导出失败: \(error.localizedDescription)")
+                        print("❌ [导出] 视频导出失败")
+                        print("   - 错误类型: \(type(of: error))")
+                        print("   - 错误描述: \(error.localizedDescription)")
                         self?.showError(error)
                     }
                 }
@@ -939,6 +938,14 @@ class VideoGalleryViewController: UIViewController {
     }
     
     private func deleteVideo(_ video: VideoItem) {
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🗑️ [删除] 开始删除流程")
+        print("   - 视频名称: \(video.fileName)")
+        print("   - 视频ID: \(video.id)")
+        print("   - 文件路径: \(video.filePath.path)")
+        print("   - 文件大小: \(video.formattedFileSize)")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        
         // 显示删除进度提示
         let progressAlert = UIAlertController(
             title: "删除中",
@@ -946,38 +953,50 @@ class VideoGalleryViewController: UIViewController {
             preferredStyle: .alert
         )
         present(progressAlert, animated: true)
+        print("📱 [删除] 显示删除进度提示")
         
         // 🔧 修复：先从本地数据源移除，避免UI闪烁
         let videoID = video.id
         
         videoManager.deleteVideo(video) { [weak self] result in
             self?.executeOnMainThread {
+                print("📥 [删除] 收到删除结果回调")
+                
                 // 关闭进度提示
                 progressAlert.dismiss(animated: true) {
                     switch result {
                     case .success:
-                        print("✅ 视频删除成功: \(video.fileName)")
+                        print("✅ [删除] 视频删除成功: \(video.fileName)")
+                        print("🔄 [删除] 开始更新本地数据源")
                         
                         // 🎯 关键修复：先从本地数据源中移除已删除的视频
                         self?.videos.removeAll { $0.id == videoID }
+                        print("   - 从videos数组移除完成，剩余: \(self?.videos.count ?? 0) 个视频")
+                        
                         self?.applyCurrentFilters()
+                        print("   - 应用过滤器完成，显示: \(self?.filteredVideos.count ?? 0) 个视频")
                         
                         // 🎯 延迟刷新，等待Core Data同步完成
                         DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                            print("🔄 [删除] 刷新数据源")
                             // 刷新数据源
                             self?.refreshDataImmediately()
                             
                             // 立即更新UI
                             self?.updateUI()
+                            print("🎨 [删除] UI更新完成")
                             
                             // 延迟显示成功提示
                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                print("💡 [删除] 显示删除成功消息")
                                 self?.showAlert(title: "删除完成", message: "成功删除 1 个视频")
                             }
                         }
                         
                     case .failure(let error):
-                        print("❌ 视频删除失败: \(error)")
+                        print("❌ [删除] 视频删除失败")
+                        print("   - 错误类型: \(type(of: error))")
+                        print("   - 错误描述: \(error.localizedDescription)")
                         self?.showError(error)
                     }
                 }
@@ -1977,6 +1996,9 @@ extension VideoGalleryViewController: UICollectionViewDelegate {
         }
     }
     
+    // 🚫 已禁用原生上下文菜单，改用自定义详情弹窗
+    // 如需恢复原生菜单，请取消注释以下代码并注释掉 setupLongPressGesture()
+    /*
     func collectionView(_ collectionView: UICollectionView, contextMenuConfigurationForItemAt indexPath: IndexPath, point: CGPoint) -> UIContextMenuConfiguration? {
         guard let video = safeVideoItem(at: indexPath.item) else { return nil }
         
@@ -1996,6 +2018,7 @@ extension VideoGalleryViewController: UICollectionViewDelegate {
             return UIMenu(title: "", children: [editAction, exportAction, deleteAction])
         }
     }
+    */
     
     private func openVideoEditor(with video: VideoItem) {
         // 🆕 使用时间序列模式管理器统一处理视频选择

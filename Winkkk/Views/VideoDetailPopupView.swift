@@ -48,34 +48,6 @@ class VideoDetailPopupView: UIView {
         return stackView
     }()
     
-    private let actionButtonsStackView: UIStackView = {
-        let stackView = UIStackView()
-        stackView.axis = .horizontal
-        stackView.spacing = 12
-        stackView.distribution = .fillEqually
-        return stackView
-    }()
-    
-    private let exportButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.setTitle("导出", for: .normal)
-        button.setTitleColor(.white, for: .normal)
-        button.backgroundColor = ThemeManager.buttonPrimary
-        button.layer.cornerRadius = 8
-        button.titleLabel?.font = ThemeManager.buttonFont
-        return button
-    }()
-    
-    private let deleteButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.setTitle("删除", for: .normal)
-        button.setTitleColor(.white, for: .normal)
-        button.backgroundColor = ThemeManager.destructive
-        button.layer.cornerRadius = 8
-        button.titleLabel?.font = ThemeManager.buttonFont
-        return button
-    }()
-    
     private let closeButton: UIButton = {
         let button = UIButton(type: .system)
         let config = UIImage.SymbolConfiguration(pointSize: 18, weight: .medium)
@@ -86,8 +58,6 @@ class VideoDetailPopupView: UIView {
     
     // MARK: - Properties
     private var videoItem: VideoItem?
-    var onExport: ((VideoItem) -> Void)?
-    var onDelete: ((VideoItem) -> Void)?
     var onClose: (() -> Void)?
     
     // MARK: - Initialization
@@ -113,11 +83,7 @@ class VideoDetailPopupView: UIView {
         containerView.addSubview(titleLabel)
         containerView.addSubview(thumbnailImageView)
         containerView.addSubview(infoStackView)
-        containerView.addSubview(actionButtonsStackView)
         containerView.addSubview(closeButton)
-        
-        actionButtonsStackView.addArrangedSubview(exportButton)
-        actionButtonsStackView.addArrangedSubview(deleteButton)
         
         // 添加手势关闭
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(backgroundTapped))
@@ -125,16 +91,16 @@ class VideoDetailPopupView: UIView {
     }
     
     private func setupConstraints() {
-        [containerView, titleLabel, thumbnailImageView, infoStackView, actionButtonsStackView, closeButton].forEach {
+        [containerView, titleLabel, thumbnailImageView, infoStackView, closeButton].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
         }
         
         NSLayoutConstraint.activate([
-            // 容器视图
+            // 容器视图 - 调整高度，移除按钮后更紧凑
             containerView.centerXAnchor.constraint(equalTo: centerXAnchor),
             containerView.centerYAnchor.constraint(equalTo: centerYAnchor),
             containerView.widthAnchor.constraint(equalToConstant: 320),
-            containerView.heightAnchor.constraint(equalToConstant: 450),
+            containerView.heightAnchor.constraint(equalToConstant: 380),
             
             // 关闭按钮
             closeButton.topAnchor.constraint(equalTo: containerView.topAnchor, constant: 16),
@@ -153,36 +119,19 @@ class VideoDetailPopupView: UIView {
             thumbnailImageView.widthAnchor.constraint(equalToConstant: 120),
             thumbnailImageView.heightAnchor.constraint(equalToConstant: 80),
             
-            // 信息堆栈
+            // 信息堆栈 - 移除按钮后，底部约束改为相对于容器
             infoStackView.topAnchor.constraint(equalTo: thumbnailImageView.bottomAnchor, constant: 20),
             infoStackView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
             infoStackView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
-            
-            // 操作按钮
-            actionButtonsStackView.topAnchor.constraint(equalTo: infoStackView.bottomAnchor, constant: 24),
-            actionButtonsStackView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 20),
-            actionButtonsStackView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor, constant: -20),
-            actionButtonsStackView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -20),
-            actionButtonsStackView.heightAnchor.constraint(equalToConstant: 44)
+            infoStackView.bottomAnchor.constraint(lessThanOrEqualTo: containerView.bottomAnchor, constant: -20)
         ])
     }
     
     private func setupActions() {
-        exportButton.addTarget(self, action: #selector(exportButtonTapped), for: .touchUpInside)
-        deleteButton.addTarget(self, action: #selector(deleteButtonTapped), for: .touchUpInside)
         closeButton.addTarget(self, action: #selector(closeButtonTapped), for: .touchUpInside)
     }
     
     // MARK: - Actions
-    @objc private func exportButtonTapped() {
-        guard let videoItem = videoItem else { return }
-        onExport?(videoItem)
-    }
-    
-    @objc private func deleteButtonTapped() {
-        guard let videoItem = videoItem else { return }
-        onDelete?(videoItem)
-    }
     
     @objc private func closeButtonTapped() {
         hideWithAnimation()
