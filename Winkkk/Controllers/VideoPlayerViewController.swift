@@ -300,7 +300,7 @@ class VideoPlayerViewController: UIViewController {
     private func setupTimeLabels() {
         // 🎯 合并时间标签：显示 "当前时间 / 总时长"
         timeInfoLabel.text = "00:00 / 00:00"
-        timeInfoLabel.textColor = .white
+        timeInfoLabel.textColor = UIColor(red: 0.4, green: 0.2, blue: 0.6, alpha: 1.0)  // 🎯 深紫色 #6633AA
         timeInfoLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 14, weight: .medium)
         timeInfoLabel.textAlignment = .center
         timeInfoLabel.numberOfLines = 1
@@ -375,10 +375,10 @@ class VideoPlayerViewController: UIViewController {
         ])
         
         // 🎯 初始化动态约束 - 三分屏布局
-        // 默认视频区域高度：42% (优化以确保截图预览栏展开时不遮挡时间标签)
+        // 默认视频区域高度：48% (经过精确计算，所有设备都在安全范围内)
         playerContainerHeightConstraint = playerContainerView.heightAnchor.constraint(
             equalTo: view.safeAreaLayoutGuide.heightAnchor,
-            multiplier: 0.42
+            multiplier: 0.48
         )
         playerContainerHeightConstraint?.isActive = true
         
@@ -412,7 +412,7 @@ class VideoPlayerViewController: UIViewController {
             // 🎯 控制面板内：模式切换器 - 位于顶部
             captureModeSwitcher.topAnchor.constraint(equalTo: controlPanelBlurView.topAnchor, constant: 6),  // 🎯 压缩：8pt → 6pt
             captureModeSwitcher.centerXAnchor.constraint(equalTo: controlPanelBlurView.centerXAnchor),
-            captureModeSwitcher.heightAnchor.constraint(equalToConstant: 44),
+            captureModeSwitcher.heightAnchor.constraint(equalToConstant: 38),  // 🎯 优化：44pt → 38pt，为视频区域腾出空间
             captureModeSwitcher.widthAnchor.constraint(equalToConstant: 280)
         ])
         
@@ -771,12 +771,15 @@ class VideoPlayerViewController: UIViewController {
         // 🔧 创建带样式的文本：当前时间 + 小字标签 / 总时长 + 小字标签
         let attributedString = NSMutableAttributedString()
         
+        // 🎯 深紫色 #6633AA
+        let purpleColor = UIColor(red: 0.4, green: 0.2, blue: 0.6, alpha: 1.0)
+        
         // 当前时间（正常大小）
         attributedString.append(NSAttributedString(
             string: currentStr,
             attributes: [
                 .font: UIFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium),
-                .foregroundColor: ThemeManager.overlayTextWhite
+                .foregroundColor: purpleColor
             ]
         ))
         
@@ -785,7 +788,7 @@ class VideoPlayerViewController: UIViewController {
             string: " 当前",
             attributes: [
                 .font: UIFont.systemFont(ofSize: 10, weight: .regular),
-                .foregroundColor: ThemeManager.overlaySecondaryText
+                .foregroundColor: purpleColor.withAlphaComponent(0.7)
             ]
         ))
         
@@ -794,7 +797,7 @@ class VideoPlayerViewController: UIViewController {
             string: " / ",
             attributes: [
                 .font: UIFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium),
-                .foregroundColor: ThemeManager.overlayTextWhite
+                .foregroundColor: purpleColor
             ]
         ))
         
@@ -803,7 +806,7 @@ class VideoPlayerViewController: UIViewController {
             string: cachedDurationString,
             attributes: [
                 .font: UIFont.monospacedDigitSystemFont(ofSize: 13, weight: .medium),
-                .foregroundColor: ThemeManager.overlayTextWhite
+                .foregroundColor: purpleColor
             ]
         ))
         
@@ -812,7 +815,7 @@ class VideoPlayerViewController: UIViewController {
             string: " 总时长",
             attributes: [
                 .font: UIFont.systemFont(ofSize: 10, weight: .regular),
-                .foregroundColor: ThemeManager.overlaySecondaryText
+                .foregroundColor: purpleColor.withAlphaComponent(0.7)
             ]
         ))
         

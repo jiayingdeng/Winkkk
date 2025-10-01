@@ -128,29 +128,29 @@ class AdaptiveTriplePanelLayoutManager {
         switch category {
         case .compact:
             // 小屏设备（iPhone SE 520pt）
-            // 统一42%视频区域，确保截图预览栏展开时不遮挡时间标签
+            // 优化48%视频区域，经过精确计算不会超出安全区
             return (
-                video: 0.42,    // ~218pt - 为控制区域留出更多空间
-                control: 0.46,  // ~239pt - 充足空间容纳截图预览栏
-                preview: 0.12   // ~62pt  - 基本预览功能
+                video: 0.48,    // ~250pt - 视频区域增大14%
+                control: 0.44,  // ~229pt - 优化组件高度后空间充足
+                preview: 0.08   // ~42pt  - 基本预览功能
             )
             
         case .regular:
             // 标准设备（iPhone 15 690pt）
-            // 统一42%视频区域，平衡布局
+            // 优化48%视频区域，视觉体验更佳
             return (
-                video: 0.42,    // ~290pt - 舒适的视频观看
-                control: 0.46,  // ~317pt - 充足的操作空间
-                preview: 0.12   // ~83pt  - 适中的预览体验
+                video: 0.48,    // ~331pt - 视频区域增大14%
+                control: 0.44,  // ~304pt - 充足的操作空间
+                preview: 0.08   // ~55pt  - 适中的预览体验
             )
             
         case .expanded:
             // 大屏设备（iPhone 15 Pro Max 852pt）
-            // 统一42%视频区域，充分利用大屏空间
+            // 优化48%视频区域，充分利用大屏空间
             return (
-                video: 0.42,    // ~358pt - 宽敞的视频观看
-                control: 0.46,  // ~392pt - 舒适的操作体验
-                preview: 0.12   // ~102pt - 丰富的预览体验
+                video: 0.48,    // ~409pt - 视频区域增大14%
+                control: 0.44,  // ~375pt - 舒适的操作体验
+                preview: 0.08   // ~68pt  - 丰富的预览体验
             )
         }
     }

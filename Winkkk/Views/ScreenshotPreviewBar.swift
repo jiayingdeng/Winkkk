@@ -264,6 +264,10 @@ class ScreenshotPreviewBar: UIView {
     }
     
     private func updateScreenshots() {
+        // 记录更新前的截图数量，用于判断是否有新增
+        let previousCount = stackView.arrangedSubviews.count
+        let currentCount = screenshotManager.screenshots.count
+        
         // 清空现有视图
         stackView.arrangedSubviews.forEach { view in
             stackView.removeArrangedSubview(view)
@@ -274,10 +278,16 @@ class ScreenshotPreviewBar: UIView {
         for (index, screenshot) in screenshotManager.screenshots.enumerated() {
             let thumbnailView = createScreenshotThumbnailView(for: screenshot, at: index)
             stackView.addArrangedSubview(thumbnailView)
+            
+            // ✅ 关键：只给真正新增的那一张添加弹跳动画
+            let isNewlyAdded = (index == currentCount - 1) && (currentCount > previousCount)
+            if isNewlyAdded {
+                addBounceAnimation(to: thumbnailView)
+            }
         }
         
-        // 自动滚动到最新截图
-        if !screenshotManager.screenshots.isEmpty {
+        // 自动滚动到最新截图（只在新增时滚动，避免刷新时强制滚动）
+        if !screenshotManager.screenshots.isEmpty && currentCount > previousCount {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 self.scrollToRight(animated: true)
             }
@@ -356,6 +366,25 @@ class ScreenshotPreviewBar: UIView {
     private func scrollToRight(animated: Bool) {
         let rightOffset = max(0, scrollView.contentSize.width - scrollView.bounds.width)
         scrollView.setContentOffset(CGPoint(x: rightOffset, y: 0), animated: animated)
+    }
+    
+    // MARK: - Animation
+    /// 为新增的缩略图添加弹跳动画
+    private func addBounceAnimation(to view: UIView) {
+        view.transform = CGAffineTransform(scaleX: 0.3, y: 0.3)
+        view.alpha = 0
+        
+        UIView.animate(
+            withDuration: 0.5,
+            delay: 0,
+            usingSpringWithDamping: 0.6,
+            initialSpringVelocity: 0.8,
+            options: [.curveEaseOut],
+            animations: {
+                view.transform = .identity
+                view.alpha = 1.0
+            }
+        )
     }
     
     // MARK: - Actions

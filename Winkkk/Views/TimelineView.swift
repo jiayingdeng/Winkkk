@@ -304,7 +304,7 @@ class TimelineView: UIView {
         // 添加文字标签
         let label = UILabel()
         label.text = "3s"
-        label.textColor = .white
+        label.textColor = UIColor(red: 0.4, green: 0.2, blue: 0.6, alpha: 1.0)  // 🎯 深紫色 #6633AA
         label.font = UIFont.systemFont(ofSize: 10, weight: .bold)
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -928,9 +928,9 @@ class TimelineView: UIView {
             tickLayer.backgroundColor = ThemeManager.timelineTickColor.cgColor
             tickLayer.frame = CGRect(
                 x: tickX,
-                y: timeScaleView.bounds.height - (isMainTick ? 12 : 8),
+                y: timeScaleView.bounds.height - (isMainTick ? 9 : 6),
                 width: 1,
-                height: isMainTick ? 12 : 8
+                height: isMainTick ? 9 : 6
             )
             timeScaleView.layer.addSublayer(tickLayer)
         }

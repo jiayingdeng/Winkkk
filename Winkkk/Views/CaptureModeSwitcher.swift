@@ -82,22 +82,16 @@ class CaptureModeSwitcher: UIView {
     
     private func setupStillImageButton() {
         stillImageButton.setTitle("普通截图", for: .normal)
-        stillImageButton.setImage(UIImage(systemName: "camera.fill"), for: .normal)  // 🌟 使用填充版图标，更突出
-        stillImageButton.titleLabel?.font = ThemeManager.buttonFont.withSize(ThemeManager.buttonFont.pointSize + 1)  // 🌟 稍大字体
+        stillImageButton.setImage(UIImage(systemName: "camera.fill"), for: .normal)
+        stillImageButton.titleLabel?.font = ThemeManager.buttonFont.withSize(14)
         stillImageButton.contentHorizontalAlignment = .center
         stillImageButton.semanticContentAttribute = .forceLeftToRight
         stillImageButton.imageEdgeInsets = UIEdgeInsets(top: 0, left: -8, bottom: 0, right: 8)
         stillImageButton.titleEdgeInsets = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: -8)
         
-        // 🌟 增强视觉效果 - 主要功能按钮
+        // 极简样式
         stillImageButton.layer.cornerRadius = ThemeManager.smallCornerRadius
-        stillImageButton.clipsToBounds = false  // 🌟 允许阴影显示
-        
-        // 🌟 预设阴影属性（选中时才激活）
-        stillImageButton.layer.shadowColor = UIColor.white.cgColor  // 🌟 使用白色阴影
-        stillImageButton.layer.shadowOffset = CGSize(width: 0, height: 0)  // 🌟 发光效果不需要偏移
-        stillImageButton.layer.shadowOpacity = 0  // 🌟 初始状态不显示
-        stillImageButton.layer.shadowRadius = 8   // 🌟 预设发光范围
+        stillImageButton.clipsToBounds = true
         
         stillImageButton.addTarget(self, action: #selector(stillImageButtonTapped), for: .touchUpInside)
     }
@@ -105,29 +99,21 @@ class CaptureModeSwitcher: UIView {
     private func setupLivePhotoButton() {
         livePhotoButton.setTitle("实况照片", for: .normal)
         livePhotoButton.setImage(UIImage(systemName: "livephoto"), for: .normal)
-        livePhotoButton.titleLabel?.font = ThemeManager.buttonFont
+        livePhotoButton.titleLabel?.font = ThemeManager.buttonFont.withSize(14)
         livePhotoButton.contentHorizontalAlignment = .center
         livePhotoButton.semanticContentAttribute = .forceLeftToRight
         livePhotoButton.imageEdgeInsets = UIEdgeInsets(top: 0, left: -8, bottom: 0, right: 8)
         livePhotoButton.titleEdgeInsets = UIEdgeInsets(top: 0, left: 8, bottom: 0, right: -8)
         
-        // 设置样式
+        // 极简样式
         livePhotoButton.layer.cornerRadius = ThemeManager.smallCornerRadius
-        livePhotoButton.clipsToBounds = false  // 🌟 允许阴影显示
-        
-        // 🌟 预设阴影属性（选中时才激活）
-        livePhotoButton.layer.shadowColor = UIColor.white.cgColor  // 🌟 使用白色阴影
-        livePhotoButton.layer.shadowOffset = CGSize(width: 0, height: 0)  // 🌟 发光效果不需要偏移
-        livePhotoButton.layer.shadowOpacity = 0  // 🌟 初始状态不显示
-        livePhotoButton.layer.shadowRadius = 8   // 🌟 预设发光范围
-        livePhotoButton.layer.borderWidth = 0
-        livePhotoButton.layer.borderColor = UIColor.clear.cgColor
+        livePhotoButton.clipsToBounds = true
         
         livePhotoButton.addTarget(self, action: #selector(livePhotoButtonTapped), for: .touchUpInside)
     }
     
     private func setupSeparator() {
-        separatorView.backgroundColor = UIColor.white.withAlphaComponent(0.3)
+        separatorView.backgroundColor = UIColor.white.withAlphaComponent(0.15)
     }
     
     private func setupConstraints() {
@@ -201,50 +187,23 @@ class CaptureModeSwitcher: UIView {
         // 更新选中状态
         updateButtonAppearance(stillImageButton, isSelected: currentMode == .stillImage)
         updateButtonAppearance(livePhotoButton, isSelected: currentMode == .livePhoto)
-        
-        // 🌟 为选中的按钮添加微妙的呼吸动画
-        if currentMode == .stillImage {
-            addBreathingAnimation(to: stillImageButton)
-            removeBreathingAnimation(from: livePhotoButton)  // 🌟 移除另一个按钮的动画
-        } else if currentMode == .livePhoto {
-            addBreathingAnimation(to: livePhotoButton)
-            removeBreathingAnimation(from: stillImageButton)  // 🌟 移除另一个按钮的动画
-        }
     }
     
     private func updateButtonAppearance(_ button: UIButton, isSelected: Bool) {
         UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5) {
             if isSelected {
-                // 🌟 两个按钮都应用相同的发光效果
-                button.backgroundColor = UIColor.captureModeSelected.withAlphaComponent(0.8)
-                
-                // 🌟 发光效果：强烈的白色阴影发光
-                button.layer.shadowOpacity = 0.8  // 🌟 增强发光阴影
-                button.layer.shadowRadius = 8     // 🌟 增大发光范围
-                button.layer.shadowColor = UIColor.white.cgColor  // 🌟 白色发光更明显
-                
-                // 🌟 边框高亮：2px白色边框，60%透明度
-                button.layer.borderWidth = 2.0
-                button.layer.borderColor = UIColor.white.withAlphaComponent(0.6).cgColor
-                
+                // 极简选中状态：深紫色背景 + 白色文字
+                button.backgroundColor = UIColor(red: 102/255, green: 51/255, blue: 153/255, alpha: 1.0) // #663399 深紫
                 button.setTitleColor(.white, for: .normal)
                 button.tintColor = .white
-                button.transform = CGAffineTransform(scaleX: 1.05, y: 1.05)
-                
-            } else {
-                // 🌟 未选中状态：完全恢复原有样式
-                button.backgroundColor = UIColor.captureModeUnselected.withAlphaComponent(0.3)
-                button.setTitleColor(UIColor.white.withAlphaComponent(0.7), for: .normal)
-                button.tintColor = UIColor.white.withAlphaComponent(0.7)
                 button.transform = .identity
                 
-                // 🌟 完全移除所有特殊效果
-                button.layer.shadowOpacity = 0
-                button.layer.borderWidth = 0
-                button.layer.borderColor = UIColor.clear.cgColor
-                
-                // 🌟 确保移除所有动画效果
-                self.removeBreathingAnimation(from: button)
+            } else {
+                // 极简未选中状态：透明背景 + 半透明白色文字
+                button.backgroundColor = .clear
+                button.setTitleColor(UIColor.white.withAlphaComponent(0.6), for: .normal)
+                button.tintColor = UIColor.white.withAlphaComponent(0.6)
+                button.transform = .identity
             }
         }
     }
@@ -259,40 +218,6 @@ class CaptureModeSwitcher: UIView {
         }
     }
     
-    // 🌟 呼吸动画效果 - 让主要功能更突出
-    private func addBreathingAnimation(to button: UIButton) {
-        // 移除现有动画
-        button.layer.removeAnimation(forKey: "breathing")
-        button.layer.removeAnimation(forKey: "glowPulse")
-        
-        // 创建更明显的发光脉冲动画
-        let glowAnimation = CABasicAnimation(keyPath: "shadowOpacity")
-        glowAnimation.fromValue = 0.3
-        glowAnimation.toValue = 1.0  // 🌟 更强的发光效果
-        glowAnimation.duration = 1.5  // 🌟 稍快的节奏
-        glowAnimation.autoreverses = true
-        glowAnimation.repeatCount = .infinity
-        glowAnimation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        
-        // 创建边框闪烁动画
-        let borderAnimation = CABasicAnimation(keyPath: "borderColor")
-        borderAnimation.fromValue = UIColor.white.withAlphaComponent(0.3).cgColor
-        borderAnimation.toValue = UIColor.white.withAlphaComponent(0.9).cgColor  // 🌟 更明显的边框变化
-        borderAnimation.duration = 1.5
-        borderAnimation.autoreverses = true
-        borderAnimation.repeatCount = .infinity
-        borderAnimation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        
-        // 同时添加两个动画
-        button.layer.add(glowAnimation, forKey: "glowPulse")
-        button.layer.add(borderAnimation, forKey: "borderPulse")
-    }
-    
-    private func removeBreathingAnimation(from button: UIButton) {
-        button.layer.removeAnimation(forKey: "breathing")
-        button.layer.removeAnimation(forKey: "glowPulse")
-        button.layer.removeAnimation(forKey: "borderPulse")
-    }
     
     private func requestModeSwitch(to newMode: CaptureMode) {
         // 检查是否需要确认
@@ -398,13 +323,7 @@ class CaptureModeSwitcher: UIView {
     
     @objc private func buttonReleased(_ button: UIButton) {
         UIView.animate(withDuration: 0.2, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5) {
-            // 恢复到选中状态的缩放
-            if (button == self.stillImageButton && self.currentMode == .stillImage) ||
-               (button == self.livePhotoButton && self.currentMode == .livePhoto) {
-                button.transform = CGAffineTransform(scaleX: 1.05, y: 1.05)
-            } else {
-                button.transform = .identity
-            }
+            button.transform = .identity
         }
     }
 }
