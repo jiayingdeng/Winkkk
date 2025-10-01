@@ -118,8 +118,8 @@ class OnboardingViewController: UIViewController {
         // 页面指示器
         pageControl.numberOfPages = onboardingData.count
         pageControl.currentPage = 0
-        pageControl.pageIndicatorTintColor = UIColor.white.withAlphaComponent(0.3)
-        pageControl.currentPageIndicatorTintColor = .white
+        pageControl.pageIndicatorTintColor = ThemeManager.overlayTextWhite.withAlphaComponent(0.3)
+        pageControl.currentPageIndicatorTintColor = ThemeManager.overlayTextWhite
         pageControl.addTarget(self, action: #selector(pageControlChanged(_:)), for: .valueChanged)
         view.addSubview(pageControl)
         
@@ -130,7 +130,7 @@ class OnboardingViewController: UIViewController {
         
         // 跳过按钮
         skipButton.setTitle("跳过", for: .normal)
-        skipButton.setTitleColor(UIColor.white.withAlphaComponent(0.7), for: .normal)
+        skipButton.setTitleColor(ThemeManager.overlaySecondaryText, for: .normal)
         skipButton.titleLabel?.font = ThemeManager.bodyFont
         skipButton.addTarget(self, action: #selector(skipButtonTapped), for: .touchUpInside)
         view.addSubview(skipButton)
@@ -402,21 +402,21 @@ class OnboardingPageView: UIView {
         
         // 标题
         titleLabel.textAlignment = .center
-        titleLabel.textColor = .white
+        titleLabel.textColor = ThemeManager.overlayTextWhite
         titleLabel.font = ThemeManager.titleFont
         titleLabel.numberOfLines = 0
         addSubview(titleLabel)
         
         // 副标题
         subtitleLabel.textAlignment = .center
-        subtitleLabel.textColor = UIColor.white.withAlphaComponent(0.8)
+        subtitleLabel.textColor = ThemeManager.overlaySecondaryText
         subtitleLabel.font = ThemeManager.subheadlineFont
         subtitleLabel.numberOfLines = 0
         addSubview(subtitleLabel)
         
         // 描述
         descriptionLabel.textAlignment = .center
-        descriptionLabel.textColor = UIColor.white.withAlphaComponent(0.7)
+        descriptionLabel.textColor = ThemeManager.overlaySecondaryText
         descriptionLabel.font = ThemeManager.bodyFont
         descriptionLabel.numberOfLines = 0
         addSubview(descriptionLabel)

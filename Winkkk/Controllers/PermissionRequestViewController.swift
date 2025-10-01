@@ -88,7 +88,7 @@ class PermissionRequestViewController: UIViewController {
         
         // 标题
         titleLabel.text = "应用需要以下权限"
-        titleLabel.textColor = .white
+        titleLabel.textColor = ThemeManager.overlayTextWhite
         titleLabel.font = ThemeManager.titleFont
         titleLabel.textAlignment = .center
         titleLabel.numberOfLines = 0
@@ -96,7 +96,7 @@ class PermissionRequestViewController: UIViewController {
         
         // 副标题
         subtitleLabel.text = "为了给您提供最佳体验，\n请允许以下权限"
-        subtitleLabel.textColor = UIColor.white.withAlphaComponent(0.8)
+        subtitleLabel.textColor = ThemeManager.overlaySecondaryText
         subtitleLabel.font = ThemeManager.bodyFont
         subtitleLabel.textAlignment = .center
         subtitleLabel.numberOfLines = 0
@@ -367,12 +367,12 @@ class PermissionCard: UIView {
         containerView.addSubview(iconView)
         
         // 标题
-        titleLabel.textColor = .white
+        titleLabel.textColor = ThemeManager.overlayTextWhite
         titleLabel.font = ThemeManager.subheadlineFont
         containerView.addSubview(titleLabel)
         
         // 描述
-        descriptionLabel.textColor = UIColor.white.withAlphaComponent(0.7)
+        descriptionLabel.textColor = ThemeManager.overlaySecondaryText
         descriptionLabel.font = ThemeManager.captionFont
         descriptionLabel.numberOfLines = 2
         containerView.addSubview(descriptionLabel)
@@ -382,7 +382,7 @@ class PermissionCard: UIView {
         containerView.addSubview(statusView)
         
         // 状态标签
-        statusLabel.textColor = .white
+        statusLabel.textColor = ThemeManager.overlayTextWhite
         statusLabel.font = UIFont.systemFont(ofSize: 12, weight: .medium)
         statusLabel.textAlignment = .center
         statusView.addSubview(statusLabel)

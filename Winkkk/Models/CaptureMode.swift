@@ -35,7 +35,7 @@ enum CaptureMode: String, CaseIterable {
     
     /// 每种模式的最大截图数量
     var maxCount: Int {
-        return 20  // 两种模式都支持最多20个
+        return 16  // 两种模式都支持最多16个
     }
     
     /// 图标名称

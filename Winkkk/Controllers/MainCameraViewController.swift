@@ -189,13 +189,13 @@ class MainCameraViewController: UIViewController {
     }
     
     private func setupRecordingIndicator() {
-        recordingIndicatorView.backgroundColor = UIColor.red
+        recordingIndicatorView.backgroundColor = ThemeManager.recordingIndicator
         recordingIndicatorView.layer.cornerRadius = 6
         recordingIndicatorView.isHidden = true
         view.addSubview(recordingIndicatorView)
         
         recordingTimeLabel.text = "00:00"
-        recordingTimeLabel.textColor = .white
+        recordingTimeLabel.textColor = ThemeManager.overlayTextWhite
         recordingTimeLabel.font = UIFont.monospacedDigitSystemFont(ofSize: 16, weight: .medium)
         recordingTimeLabel.isHidden = true
         view.addSubview(recordingTimeLabel)
@@ -252,7 +252,7 @@ class MainCameraViewController: UIViewController {
         
         // 内部圆形指示器
         let innerCircle = UIView()
-        innerCircle.backgroundColor = .white
+        innerCircle.backgroundColor = ThemeManager.buttonTextOnPrimary
         innerCircle.layer.cornerRadius = 25
         innerCircle.translatesAutoresizingMaskIntoConstraints = false
         // 禁用内部视图的交互，确保点击事件传递到父按钮
@@ -296,7 +296,7 @@ class MainCameraViewController: UIViewController {
     
     private func setupModeSwitcher() {
         // 配置主容器按钮
-        modeSwitcherButton.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.8)
+        modeSwitcherButton.backgroundColor = ThemeManager.normalRecordModeBackground
         modeSwitcherButton.layer.cornerRadius = 18
         modeSwitcherButton.isUserInteractionEnabled = true
         
@@ -310,14 +310,14 @@ class MainCameraViewController: UIViewController {
         // 配置主标签（大字）
         modeSwitcherMainLabel.text = "普通录像"
         modeSwitcherMainLabel.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
-        modeSwitcherMainLabel.textColor = .white
+        modeSwitcherMainLabel.textColor = ThemeManager.overlayTextWhite
         modeSwitcherMainLabel.textAlignment = .center
         modeSwitcherMainLabel.isUserInteractionEnabled = false
         
         // 配置副标签（小字）
         modeSwitcherSubLabel.text = "点击切换时间序列模式"
         modeSwitcherSubLabel.font = UIFont.systemFont(ofSize: 12, weight: .regular)
-        modeSwitcherSubLabel.textColor = UIColor.white.withAlphaComponent(0.9)
+        modeSwitcherSubLabel.textColor = ThemeManager.overlaySecondaryText
         modeSwitcherSubLabel.textAlignment = .center
         modeSwitcherSubLabel.isUserInteractionEnabled = false
         
@@ -980,7 +980,7 @@ extension MainCameraViewController {
                 // 变为方形停止按钮
                 if let innerCircle = self.recordButton.subviews.first {
                     innerCircle.layer.cornerRadius = 8
-                    innerCircle.backgroundColor = UIColor.red
+                    innerCircle.backgroundColor = ThemeManager.recordingButtonBackground
                 }
                 
                 // 添加红色边框闪烁
@@ -1489,12 +1489,12 @@ extension MainCameraViewController {
                 // 时间序列模式
                 self.modeSwitcherMainLabel.text = "⏰ 时间序列"
                 self.modeSwitcherSubLabel.text = "点击切换普通录像"
-                self.modeSwitcherButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
+                self.modeSwitcherButton.backgroundColor = ThemeManager.timeSequenceModeBackground
             } else {
                 // 普通录像模式
                 self.modeSwitcherMainLabel.text = "📹 普通录像"
                 self.modeSwitcherSubLabel.text = "点击切换时间序列模式"
-                self.modeSwitcherButton.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.8)
+                self.modeSwitcherButton.backgroundColor = ThemeManager.normalRecordModeBackground
             }
         }
     }

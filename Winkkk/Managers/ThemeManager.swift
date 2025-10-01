@@ -307,6 +307,68 @@ class ThemeManager: ObservableObject {
             return UIColor(red: 52/255, green: 199/255, blue: 89/255, alpha: 0.15) // 系统绿色半透明背景
         }
     }
+    
+    // MARK: - 录像页面专属颜色
+    
+    /// 录制指示器颜色（红色）
+    static var recordingIndicator: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 255/255, green: 107/255, blue: 129/255, alpha: 1.0) // #FF6B81 温柔的粉红
+        case .lightMinimal:
+            return UIColor(red: 255/255, green: 59/255, blue: 48/255, alpha: 1.0) // #FF3B30 iOS系统红
+        }
+    }
+    
+    /// 录制中按钮背景色（红色）
+    static var recordingButtonBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 255/255, green: 107/255, blue: 129/255, alpha: 1.0) // #FF6B81 温柔的粉红
+        case .lightMinimal:
+            return UIColor(red: 255/255, green: 59/255, blue: 48/255, alpha: 1.0) // #FF3B30 iOS系统红
+        }
+    }
+    
+    /// 时间序列模式背景色
+    static var timeSequenceModeBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 178/255, green: 156/255, blue: 250/255, alpha: 0.8) // #B29CFA 梦幻紫色
+        case .lightMinimal:
+            return UIColor.systemBlue.withAlphaComponent(0.8) // iOS系统蓝
+        }
+    }
+    
+    /// 普通录像模式背景色
+    static var normalRecordModeBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 144/255, green: 238/255, blue: 144/255, alpha: 0.8) // #90EE90 温柔绿
+        case .lightMinimal:
+            return UIColor.systemGreen.withAlphaComponent(0.8) // iOS系统绿
+        }
+    }
+    
+    /// 半透明遮罩背景（用于loading等）
+    static var overlayMaskBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 102/255, green: 51/255, blue: 153/255, alpha: 0.8) // #663399 深紫色半透明
+        case .lightMinimal:
+            return UIColor.black.withAlphaComponent(0.7) // 黑色半透明
+        }
+    }
+    
+    /// 预览容器背景（暗色背景）
+    static var previewBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor.black.withAlphaComponent(0.3) // 浅黑色半透明
+        case .lightMinimal:
+            return UIColor.black.withAlphaComponent(0.3) // 浅黑色半透明
+        }
+    }
 }
 
 // MARK: - SwiftUI Color扩展

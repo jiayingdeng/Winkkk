@@ -566,7 +566,21 @@ class TimelineView: UIView {
         if duration > 0 {
             let actualVideoWidth = getActualVideoWidth()
             timeToPixelRatio = Double(actualVideoWidth) / duration
-            // 内容更新调试日志已优化
+            
+            // 🔍 详细调试：时间到像素比例计算
+            print("📏 [时间轴尺寸调试] updateContentSize:")
+            print("   duration = \(duration) 秒")
+            print("   bounds.width = \(bounds.width)")
+            print("   baseContentWidth = \(baseContentWidth)")
+            print("   zoomScale = \(zoomScale)")
+            print("   actualVideoWidth = \(actualVideoWidth)")
+            print("   leftPadding = \(leftPadding)")
+            print("   rightPadding = \(rightPadding)")
+            print("   currentContentWidth = \(currentContentWidth)")
+            print("   timeToPixelRatio = \(timeToPixelRatio) (px/秒)")
+            print("   验证：0秒位置 = \(timeToCoordinate(0))")
+            print("   验证：duration秒位置 = \(timeToCoordinate(duration))")
+            print("   验证：duration理论位置 = \(leftPadding + actualVideoWidth)")
         }
         
         // 🔑 关键修复：动态更新缩略图和时间刻度的约束，使其与视频内容区域对齐
@@ -597,7 +611,40 @@ class TimelineView: UIView {
         timeScaleLeadingConstraint.constant = videoContentStartX
         timeScaleWidthConstraint.constant = videoContentWidth
         
-        print("🔧 视频内容区域约束更新: startX=\(videoContentStartX), width=\(videoContentWidth), leftPadding=\(leftPadding)")
+        // 🎨 视觉调试：添加彩色边框
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            // 缩略图容器 - 红色边框
+            self.thumbnailContainerView.layer.borderWidth = 2
+            self.thumbnailContainerView.layer.borderColor = UIColor.red.cgColor
+            // 时间刻度 - 蓝色边框
+            self.timeScaleView.layer.borderWidth = 2
+            self.timeScaleView.layer.borderColor = UIColor.blue.cgColor
+        }
+        
+        // 🔍 详细调试：容器约束更新
+        print("🔧 [容器约束调试] updateVideoContentAreaConstraints:")
+        print("   videoContentStartX = \(videoContentStartX)")
+        print("   videoContentWidth = \(videoContentWidth)")
+        print("   leftPadding = \(leftPadding)")
+        print("   thumbnailContainer: leading=\(videoContentStartX), width=\(videoContentWidth)")
+        print("   timeScaleView: leading=\(videoContentStartX), width=\(videoContentWidth)")
+        
+        // 🔍 延迟检查实际frame（等待约束生效）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let self = self else { return }
+            print("🔍 [实际Frame验证]:")
+            print("   thumbnailContainer.frame = \(self.thumbnailContainerView.frame)")
+            print("   timeScaleView.frame = \(self.timeScaleView.frame)")
+            print("   contentView.frame = \(self.contentView.frame)")
+            print("   📜 ScrollView状态:")
+            print("      contentOffset.x = \(self.scrollView.contentOffset.x)")
+            print("      contentSize.width = \(self.scrollView.contentSize.width)")
+            print("      bounds.width = \(self.scrollView.bounds.width)")
+            print("      可滚动范围 = 0 到 \(self.scrollView.contentSize.width - self.scrollView.bounds.width)")
+            print("   📐 TimelineView自身:")
+            print("      frame.width = \(self.frame.width)")
+        }
     }
     
     /// 时间坐标转换为像素坐标（考虑leftPadding偏移）
@@ -878,6 +925,12 @@ class TimelineView: UIView {
         // 🔑 关键修复：时间刻度坐标转换为相对于时间刻度视图的坐标
         // 0秒在视频内容区域的起始位置，对应时间刻度视图的x=0位置
         let zeroTimeScaleX = timeToVideoContentCoordinate(0)
+        
+        // 🔍 详细调试：刻度位置计算
+        print("📐 [刻度位置调试] generateTimeScale:")
+        print("   timeScaleView.bounds.width = \(timeScaleView.bounds.width)")
+        print("   0秒刻度位置 = \(zeroTimeScaleX)")
+        
         if zeroTimeScaleX >= -10 && zeroTimeScaleX <= timeScaleView.bounds.width + 10 {
             drawTickMark(at: zeroTimeScaleX, for: 0, interval: interval)
             tickCount += 1
@@ -885,6 +938,10 @@ class TimelineView: UIView {
         
         // 结尾刻度：duration对应视频内容区域的结尾位置
         let endTimeScaleX = timeToVideoContentCoordinate(duration)
+        print("   duration(\(duration)秒)刻度位置 = \(endTimeScaleX)")
+        print("   刻度位置与容器宽度比较：\(endTimeScaleX) vs \(timeScaleView.bounds.width)")
+        print("   差值 = \(endTimeScaleX - timeScaleView.bounds.width)")
+        
         if endTimeScaleX >= -10 && endTimeScaleX <= timeScaleView.bounds.width + 10 {
             drawTickMark(at: endTimeScaleX, for: duration, interval: interval)
             tickCount += 1
@@ -1128,6 +1185,17 @@ class TimelineView: UIView {
         let thumbnailWidth = containerWidth / CGFloat(count)
         let thumbnailHeight: CGFloat = 60  // 40 → 60px，与约束保持一致
         
+        // 🔍 详细调试：缩略图布局计算
+        print("🖼️ [缩略图布局调试] generateThumbnailsWithCount:")
+        print("   缩略图数量 = \(count)")
+        print("   containerWidth (计算得到的视频内容宽度) = \(containerWidth)")
+        print("   thumbnailContainerView.frame.width (容器实际宽度) = \(thumbnailContainerView.frame.width)")
+        print("   thumbnailWidth = \(thumbnailWidth)")
+        print("   总宽度验证 = \(CGFloat(count) * thumbnailWidth)")
+        print("   最后一个缩略图起始X = \(CGFloat(count - 1) * thumbnailWidth)")
+        print("   最后一个缩略图结束X = \(CGFloat(count) * thumbnailWidth)")
+        print("   ⚠️ 宽度差异 = \(containerWidth - thumbnailContainerView.frame.width)")
+        
         // 🎯 关键修复：动态计算高质量缩略图分辨率
         let targetThumbnailSize = calculateOptimalThumbnailSize(
             displayWidth: thumbnailWidth, 
@@ -1163,12 +1231,22 @@ class TimelineView: UIView {
             thumbnailImageViews.append(imageView)
             
             // 🎯 使用 frame 布局 - 缩略图容器已居中，从0开始布局
+            let thumbnailX = CGFloat(i) * thumbnailWidth
             imageView.frame = CGRect(
-                x: CGFloat(i) * thumbnailWidth,
+                x: thumbnailX,
                 y: 0,
                 width: thumbnailWidth,
                 height: 60  // 40 → 60px
             )
+            
+            // 🎨 视觉调试：给每个缩略图加边框
+            imageView.layer.borderWidth = 1
+            imageView.layer.borderColor = UIColor.green.cgColor
+            
+            // 🔍 调试前两个和后两个缩略图的位置
+            if i < 2 || i >= count - 2 {
+                print("   📍 缩略图[\(i)] frame: x=\(thumbnailX), width=\(thumbnailWidth), 结束x=\(thumbnailX + thumbnailWidth)")
+            }
             
             // 🎯 修复问题3：将缩略图时间对齐到视频帧边界，确保精确对应
             let timePercent = Double(i) / Double(max(1, count - 1))
@@ -1183,6 +1261,11 @@ class TimelineView: UIView {
             // 为安全起见，最后一帧提前一个帧的时间
             if alignedTime >= duration {
                 alignedTime = max(0, duration - frameDuration)
+            }
+            
+            // 🔍 详细调试：第一个和最后一个缩略图的时间采样
+            if i == 0 || i == count - 1 {
+                print("   缩略图[\(i)]: timePercent=\(timePercent), targetTime=\(targetTime)s, alignedTime=\(alignedTime)s, position=\(CGFloat(i) * thumbnailWidth)")
             }
             
             let time = CMTime(seconds: alignedTime, preferredTimescale: CMTimeScale(NSEC_PER_SEC))

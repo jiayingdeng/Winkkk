@@ -113,7 +113,7 @@ class CaptureModeSwitcher: UIView {
     }
     
     private func setupSeparator() {
-        separatorView.backgroundColor = UIColor.white.withAlphaComponent(0.15)
+        separatorView.backgroundColor = ThemeManager.overlaySecondaryText.withAlphaComponent(0.2)
     }
     
     private func setupConstraints() {
@@ -192,17 +192,17 @@ class CaptureModeSwitcher: UIView {
     private func updateButtonAppearance(_ button: UIButton, isSelected: Bool) {
         UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.8, initialSpringVelocity: 0.5) {
             if isSelected {
-                // 极简选中状态：深紫色背景 + 白色文字
-                button.backgroundColor = UIColor(red: 102/255, green: 51/255, blue: 153/255, alpha: 1.0) // #663399 深紫
-                button.setTitleColor(.white, for: .normal)
-                button.tintColor = .white
+                // 极简选中状态：主题色背景 + 白色文字
+                button.backgroundColor = ThemeManager.buttonPrimary
+                button.setTitleColor(ThemeManager.buttonTextOnPrimary, for: .normal)
+                button.tintColor = ThemeManager.buttonTextOnPrimary
                 button.transform = .identity
                 
             } else {
-                // 极简未选中状态：透明背景 + 半透明白色文字
+                // 极简未选中状态：透明背景 + 主题文字颜色
                 button.backgroundColor = .clear
-                button.setTitleColor(UIColor.white.withAlphaComponent(0.6), for: .normal)
-                button.tintColor = UIColor.white.withAlphaComponent(0.6)
+                button.setTitleColor(ThemeManager.overlaySecondaryText, for: .normal)
+                button.tintColor = ThemeManager.overlaySecondaryText
                 button.transform = .identity
             }
         }

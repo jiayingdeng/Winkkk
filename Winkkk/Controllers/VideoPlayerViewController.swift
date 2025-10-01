@@ -181,7 +181,7 @@ class VideoPlayerViewController: UIViewController {
     
     private func setupNavigationBar() {
         title = "视频编辑"
-        navigationController?.navigationBar.tintColor = .white
+        navigationController?.navigationBar.tintColor = ThemeManager.overlayTextWhite
         navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: ThemeManager.overlayTextWhite]
         
         navigationItem.leftBarButtonItem = UIBarButtonItem(
@@ -195,7 +195,7 @@ class VideoPlayerViewController: UIViewController {
         let saveButton = UIButton(type: .system)
         saveButton.setTitle("保存", for: .normal)
         saveButton.titleLabel?.font = UIFont.systemFont(ofSize: 17, weight: .semibold)
-        saveButton.setTitleColor(.white, for: .normal)
+        saveButton.setTitleColor(ThemeManager.buttonTextOnPrimary, for: .normal)
         saveButton.backgroundColor = ThemeManager.buttonPrimary
         saveButton.layer.cornerRadius = 8
         saveButton.contentEdgeInsets = UIEdgeInsets(top: 8, left: 16, bottom: 8, right: 16)
@@ -251,7 +251,7 @@ class VideoPlayerViewController: UIViewController {
     
     private func setupPlayPauseButton() {
         playPauseButton.setImage(UIImage(systemName: "play.fill"), for: .normal)
-        playPauseButton.tintColor = .white
+        playPauseButton.tintColor = ThemeManager.buttonTextOnPrimary
         playPauseButton.backgroundColor = ThemeManager.buttonPrimary.withAlphaComponent(0.8)
         playPauseButton.layer.cornerRadius = 25
         
@@ -263,7 +263,7 @@ class VideoPlayerViewController: UIViewController {
     private func setupScreenshotButton() {
         screenshotButton.setImage(UIImage(systemName: "camera.fill"), for: .normal)
         screenshotButton.setTitle("截取当前画面", for: .normal)
-        screenshotButton.tintColor = .white
+        screenshotButton.tintColor = ThemeManager.buttonTextOnPrimary
         screenshotButton.backgroundColor = ThemeManager.success  // 🌟 移除透明度，更加鲜艳
         screenshotButton.layer.cornerRadius = ThemeManager.largeCornerRadius  // 🌟 更大圆角
         screenshotButton.titleLabel?.font = ThemeManager.buttonFont  // 🌟 更突出的字体
@@ -274,7 +274,7 @@ class VideoPlayerViewController: UIViewController {
         screenshotButton.layer.shadowOpacity = 0.3
         screenshotButton.layer.shadowRadius = 8
         screenshotButton.layer.borderWidth = 2
-        screenshotButton.layer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
+        screenshotButton.layer.borderColor = ThemeManager.buttonTextOnPrimary.withAlphaComponent(0.3).cgColor
         
         // 🔧 确保按钮可交互
         screenshotButton.isUserInteractionEnabled = true
@@ -1034,7 +1034,7 @@ class VideoPlayerViewController: UIViewController {
     private func showMaxLimitAlert() {
         let alert = UIAlertController(
             title: "截图数量已达上限",
-            message: "最多只能截取20张图片。请先删除一些截图或切换到预览界面。",
+            message: "最多只能截取16张图片。请先删除一些截图或切换到预览界面。",
             preferredStyle: .alert
         )
         
@@ -1823,19 +1823,19 @@ extension VideoPlayerViewController {
     private func showLivePhotoCreationProgress() {
         // 创建进度提示视图
         let progressView = UIView()
-        progressView.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+        progressView.backgroundColor = ThemeManager.overlayMaskBackground
         progressView.layer.cornerRadius = 12
         progressView.translatesAutoresizingMaskIntoConstraints = false
         progressView.tag = 999 // 用于后续移除
         
         let activityIndicator = UIActivityIndicatorView(style: .large)
-        activityIndicator.color = .white
+        activityIndicator.color = ThemeManager.overlayTextWhite
         activityIndicator.startAnimating()
         activityIndicator.translatesAutoresizingMaskIntoConstraints = false
         
         let label = UILabel()
         label.text = "正在创建Live Photo..."
-        label.textColor = .white
+        label.textColor = ThemeManager.overlayTextWhite
         label.font = .systemFont(ofSize: 16, weight: .medium)
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false

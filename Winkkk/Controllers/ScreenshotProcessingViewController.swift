@@ -146,14 +146,14 @@ class ScreenshotProcessingViewController: UIViewController {
         
         // 隐藏标题 - 避免与导航栏重复
         titleLabel.font = ThemeManager.titleFont
-        titleLabel.textColor = .white
+        titleLabel.textColor = ThemeManager.overlayTextWhite
         titleLabel.textAlignment = .center
         titleLabel.isHidden = true // 隐藏大标题
         headerView.addSubview(titleLabel)
         
         // 数量标签
         countLabel.font = ThemeManager.captionFont
-        countLabel.textColor = UIColor.white.withAlphaComponent(0.8)
+        countLabel.textColor = ThemeManager.overlaySecondaryText
         countLabel.textAlignment = .center
         headerView.addSubview(countLabel)
         
@@ -169,7 +169,7 @@ class ScreenshotProcessingViewController: UIViewController {
     }
     
     private func setupPreviewArea() {
-        previewContainerView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
+        previewContainerView.backgroundColor = ThemeManager.previewBackground
         previewContainerView.layer.cornerRadius = ThemeManager.standardCornerRadius
         previewContainerView.clipsToBounds = true
         
@@ -394,8 +394,8 @@ class ScreenshotProcessingViewController: UIViewController {
     
     private func configureNavigationBar() {
         title = "截图处理中心"
-        navigationController?.navigationBar.tintColor = .white
-        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: UIColor.white]
+        navigationController?.navigationBar.tintColor = ThemeManager.overlayTextWhite
+        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: ThemeManager.overlayTextWhite]
         
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             title: "取消",
@@ -409,7 +409,7 @@ class ScreenshotProcessingViewController: UIViewController {
     private func setupInteractionHint() {
         interactionHintLabel.text = "轻点图片查看详情"
         interactionHintLabel.font = .systemFont(ofSize: 12, weight: .regular)
-        interactionHintLabel.textColor = UIColor.white.withAlphaComponent(0.6)
+        interactionHintLabel.textColor = ThemeManager.overlaySecondaryText
         interactionHintLabel.textAlignment = .center
         interactionHintLabel.translatesAutoresizingMaskIntoConstraints = false
     }
@@ -910,12 +910,12 @@ extension ScreenshotProcessingViewController {
     private func showReturnLoadingState() {
         // 在视图上方显示一个简单的加载指示器
         let loadingView = UIView()
-        loadingView.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        loadingView.backgroundColor = ThemeManager.overlayMaskBackground
         loadingView.layer.cornerRadius = 8
         
         let loadingLabel = UILabel()
         loadingLabel.text = "正在返回录制页面..."
-        loadingLabel.textColor = .white
+        loadingLabel.textColor = ThemeManager.overlayTextWhite
         loadingLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
         loadingLabel.textAlignment = .center
         
@@ -1045,17 +1045,17 @@ class ProcessingOptionCell: UITableViewCell {
         
         // 标题
         titleLabel.font = ThemeManager.buttonFont
-        titleLabel.textColor = .white
+        titleLabel.textColor = ThemeManager.overlayTextWhite
         contentView.addSubview(titleLabel)
         
         // 描述
         descriptionLabel.font = ThemeManager.captionFont
-        descriptionLabel.textColor = UIColor.white.withAlphaComponent(0.7)
+        descriptionLabel.textColor = ThemeManager.overlaySecondaryText
         contentView.addSubview(descriptionLabel)
         
         // 箭头
         arrowImageView.image = UIImage(systemName: "chevron.right")
-        arrowImageView.tintColor = UIColor.white.withAlphaComponent(0.5)
+        arrowImageView.tintColor = ThemeManager.overlaySecondaryText
         arrowImageView.contentMode = .scaleAspectFit
         contentView.addSubview(arrowImageView)
     }
@@ -1105,8 +1105,8 @@ class ProcessingOptionCell: UITableViewCell {
         // 设置默认图标和文字颜色
         iconImageView.tintColor = UIColor(red: 220/255, green: 140/255, blue: 160/255, alpha: 1.0) // 中等深度的玫瑰色，平衡对比度与视觉柔和度
         titleLabel.font = ThemeManager.buttonFont
-        titleLabel.textColor = .white
-        descriptionLabel.textColor = UIColor.white.withAlphaComponent(0.7)
+        titleLabel.textColor = ThemeManager.overlayTextWhite
+        descriptionLabel.textColor = ThemeManager.overlaySecondaryText
     }
 }
 
@@ -1140,7 +1140,7 @@ class ProcessingThumbnailCell: UICollectionViewCell {
         imageView.layer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
         
         // 🎯 为了美观，给图片视图添加背景色
-        imageView.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+        imageView.backgroundColor = ThemeManager.overlayMaskBackground
         
         // 添加轻微阴影效果
         imageView.layer.shadowColor = UIColor.black.cgColor
@@ -1152,7 +1152,7 @@ class ProcessingThumbnailCell: UICollectionViewCell {
         contentView.addSubview(imageView)
         
         // 覆盖层（可用于选择状态等）
-        overlayView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
+        overlayView.backgroundColor = ThemeManager.previewBackground
         overlayView.layer.cornerRadius = 8
         overlayView.isHidden = true
         contentView.addSubview(overlayView)

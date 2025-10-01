@@ -89,7 +89,7 @@ class ScreenshotPreviewBar: UIView {
         
         // 提示标签
         hintLabel.font = ThemeManager.captionFont
-        hintLabel.textColor = UIColor.white.withAlphaComponent(0.8)
+        hintLabel.textColor = ThemeManager.overlaySecondaryText
         hintLabel.textAlignment = .left
         hintLabel.numberOfLines = 1
         headerView.addSubview(hintLabel)
@@ -259,7 +259,7 @@ class ScreenshotPreviewBar: UIView {
         if count >= maxCount - 2 {
             hintLabel.textColor = UIColor.systemOrange
         } else {
-            hintLabel.textColor = UIColor.white.withAlphaComponent(0.8)
+            hintLabel.textColor = ThemeManager.overlaySecondaryText
         }
     }
     
