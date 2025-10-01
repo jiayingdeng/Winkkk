@@ -369,6 +369,16 @@ class ThemeManager: ObservableObject {
             return UIColor.black.withAlphaComponent(0.3) // 浅黑色半透明
         }
     }
+    
+    /// 功能图标色调（用于选项列表等处的图标）
+    static var iconTint: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 220/255, green: 140/255, blue: 160/255, alpha: 1.0) // 中等深度的玫瑰色
+        case .lightMinimal:
+            return UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0) // 深灰黑色（与主文本色一致）
+        }
+    }
 }
 
 // MARK: - SwiftUI Color扩展

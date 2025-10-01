@@ -612,15 +612,7 @@ class TimelineView: UIView {
         timeScaleWidthConstraint.constant = videoContentWidth
         
         // 🎨 视觉调试：添加彩色边框
-        DispatchQueue.main.async { [weak self] in
-            guard let self = self else { return }
-            // 缩略图容器 - 红色边框
-            self.thumbnailContainerView.layer.borderWidth = 2
-            self.thumbnailContainerView.layer.borderColor = UIColor.red.cgColor
-            // 时间刻度 - 蓝色边框
-            self.timeScaleView.layer.borderWidth = 2
-            self.timeScaleView.layer.borderColor = UIColor.blue.cgColor
-        }
+        // 调试边框已移除
         
         // 🔍 详细调试：容器约束更新
         print("🔧 [容器约束调试] updateVideoContentAreaConstraints:")
@@ -1180,6 +1172,24 @@ class TimelineView: UIView {
         let asset = AVAsset(url: videoURL)
         let imageGenerator = AVAssetImageGenerator(asset: asset)
         
+        // 🎯 关键修复：验证视频实际可用时长，避免采样超出范围
+        // 某些视频文件的元数据 duration 可能比实际可播放内容长一点
+        let videoTrack = asset.tracks(withMediaType: .video).first
+        let actualDuration: Double
+        if let track = videoTrack {
+            // 使用 timeRange.end 作为实际可用时长，这比 asset.duration 更准确
+            let trackDuration = CMTimeGetSeconds(track.timeRange.duration)
+            actualDuration = min(duration, trackDuration)
+            if trackDuration < duration {
+                print("⚠️ 视频元数据 duration (\(String(format: "%.6f", duration))s) 大于实际轨道时长 (\(String(format: "%.6f", trackDuration))s)，使用轨道时长")
+            }
+        } else {
+            actualDuration = duration
+        }
+        
+        // 使用实际可用时长生成缩略图
+        let effectiveDuration = actualDuration
+        
         // 🔑 关键修复：缩略图基于视频内容区域宽度，不再基于TimelineView宽度
         let containerWidth = getActualVideoWidth()  // 使用视频内容宽度
         let thumbnailWidth = containerWidth / CGFloat(count)
@@ -1210,6 +1220,9 @@ class TimelineView: UIView {
         imageGenerator.maximumSize = targetThumbnailSize
         
         print("🖼️ 缩略图生成配置: 显示尺寸=\(thumbnailWidth)x\(thumbnailHeight), 生成尺寸=\(targetThumbnailSize)")
+        print("📊 视频时长=\(String(format: "%.6f", duration))秒, 实际可用=\(String(format: "%.6f", effectiveDuration))秒, 帧率=\(frameRate)fps, 缩略图数量=\(count)")
+        print("📏 时间轴: containerWidth=\(String(format: "%.2f", containerWidth))px, 每个缩略图=\(String(format: "%.2f", thumbnailWidth))px")
+        print("⏱️  每个缩略图代表时间段长度=\(String(format: "%.6f", effectiveDuration / Double(count)))秒\n")
         
         for i in 0..<count {
             let imageView = UIImageView()
@@ -1239,33 +1252,33 @@ class TimelineView: UIView {
                 height: 60  // 40 → 60px
             )
             
-            // 🎨 视觉调试：给每个缩略图加边框
-            imageView.layer.borderWidth = 1
-            imageView.layer.borderColor = UIColor.green.cgColor
+            // 调试边框已移除
             
             // 🔍 调试前两个和后两个缩略图的位置
             if i < 2 || i >= count - 2 {
                 print("   📍 缩略图[\(i)] frame: x=\(thumbnailX), width=\(thumbnailWidth), 结束x=\(thumbnailX + thumbnailWidth)")
             }
             
-            // 🎯 修复问题3：将缩略图时间对齐到视频帧边界，确保精确对应
-            let timePercent = Double(i) / Double(max(1, count - 1))
-            let targetTime = duration * timePercent
+            // 🎯 核心修复：缩略图代表时间段，采样时间段的中间点
+            // 参考 Wink 的设计：缩略图无缝拼接，填满整个时间轴
+            let segmentDuration = effectiveDuration / Double(count)  // 每个时间段的长度
+            let segmentStartTime = Double(i) * segmentDuration  // 时间段起始
+            let segmentMidTime = segmentStartTime + segmentDuration / 2.0  // 时间段中间点
             
-            // 对齐到最近的视频帧边界
+            // 对齐到最近的视频帧边界，确保精确采样
             let frameDuration = 1.0 / frameRate
-            let frameNumber = round(targetTime / frameDuration)
+            let frameNumber = round(segmentMidTime / frameDuration)
             var alignedTime = frameNumber * frameDuration
             
-            // 🔑 关键修复：确保对齐后的时间不超出视频时长（避免最后一帧生成失败）
-            // 为安全起见，最后一帧提前一个帧的时间
-            if alignedTime >= duration {
-                alignedTime = max(0, duration - frameDuration)
+            // 🔑 安全保护：确保对齐后的时间不超出实际可用时长
+            if alignedTime >= effectiveDuration {
+                alignedTime = max(0, effectiveDuration - frameDuration)
             }
             
-            // 🔍 详细调试：第一个和最后一个缩略图的时间采样
-            if i == 0 || i == count - 1 {
-                print("   缩略图[\(i)]: timePercent=\(timePercent), targetTime=\(targetTime)s, alignedTime=\(alignedTime)s, position=\(CGFloat(i) * thumbnailWidth)")
+            // 🔍 详细调试：显示时间段和采样信息
+            if i < 2 || i >= count - 2 {
+                let segmentEndTime = segmentStartTime + segmentDuration
+                print("   缩略图[\(i)]: 时间段[\(String(format: "%.6f", segmentStartTime))-\(String(format: "%.6f", segmentEndTime))]秒, 采样中点=\(String(format: "%.6f", segmentMidTime))s, 对齐后=\(String(format: "%.6f", alignedTime))s")
             }
             
             let time = CMTime(seconds: alignedTime, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
@@ -1273,15 +1286,22 @@ class TimelineView: UIView {
             generateThumbnail(at: time, for: imageView, using: imageGenerator)
         }
         
-        print("🖼️ 生成 \(count) 个缩略图, 每个宽度: \(thumbnailWidth), 容器宽度: \(containerWidth)")
+        print("\n✅ 缩略图生成完成！应该覆盖整个时间轴 [0px → \(String(format: "%.2f", containerWidth))px]")
     }
     
     private func generateThumbnail(at time: CMTime, for imageView: UIImageView, using imageGenerator: AVAssetImageGenerator) {
-        imageGenerator.generateCGImagesAsynchronously(forTimes: [NSValue(time: time)]) { [weak imageView] _, cgImage, _, result, error in
+        let requestedTimeSeconds = CMTimeGetSeconds(time)
+        
+        imageGenerator.generateCGImagesAsynchronously(forTimes: [NSValue(time: time)]) { [weak imageView] requestedTime, cgImage, actualTime, result, error in
             DispatchQueue.main.async {
+                let actualTimeSeconds = CMTimeGetSeconds(actualTime)
+                
                 guard let imageView = imageView, let cgImage = cgImage else { 
                     if let error = error {
-                        print("⚠️ 缩略图生成失败: \(error.localizedDescription)")
+                        print("❌ 缩略图生成失败 at \(String(format: "%.6f", requestedTimeSeconds))s: \(error.localizedDescription)")
+                        print("   Result: \(result)")
+                    } else {
+                        print("❌ 缩略图生成返回nil，但无错误信息 at \(String(format: "%.6f", requestedTimeSeconds))s")
                     }
                     return 
                 }
@@ -1294,7 +1314,13 @@ class TimelineView: UIView {
                 imageView.layer.shouldRasterize = false  // 避免栅格化降低质量
                 imageView.layer.allowsEdgeAntialiasing = true  // 边缘抗锯齿
                 
-                print("✅ 高质量缩略图加载完成: \(cgImage.width)x\(cgImage.height)")
+                // 🔍 检查请求时间和实际返回时间的差异
+                let timeDiff = abs(actualTimeSeconds - requestedTimeSeconds)
+                if timeDiff > 0.1 {
+                    print("⚠️ 缩略图时间漂移: 请求=\(String(format: "%.6f", requestedTimeSeconds))s, 实际=\(String(format: "%.6f", actualTimeSeconds))s, 差异=\(String(format: "%.6f", timeDiff))s")
+                }
+                
+                print("✅ 高质量缩略图加载完成: \(cgImage.width)x\(cgImage.height) at \(String(format: "%.3f", actualTimeSeconds))s")
             }
         }
     }

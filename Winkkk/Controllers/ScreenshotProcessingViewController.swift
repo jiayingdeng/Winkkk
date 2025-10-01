@@ -552,35 +552,16 @@ extension ScreenshotProcessingViewController: UICollectionViewDelegateFlowLayout
         // 计算长宽比例，防止除零错误
         let aspectRatio = imageHeight > 0 ? imageWidth / imageHeight : 1.0
         
-        // 定义基准高度和尺寸范围
-        let baseHeight: CGFloat = itemCount == 1 ? 80 : 60
+        // 🎯 强制统一高度，确保纯横向单行布局
+        let unifiedHeight: CGFloat = 80  // 所有item使用相同高度
         let minWidth: CGFloat = 40
         let maxWidth: CGFloat = itemCount == 1 ? 120 : 100
-        let minHeight: CGFloat = 40
-        let maxHeight: CGFloat = 80
         
-        // 🎯 根据长宽比例计算动态尺寸
-        var dynamicWidth: CGFloat
-        var dynamicHeight: CGFloat
+        // 🎯 根据长宽比例计算宽度，但高度固定
+        var dynamicWidth: CGFloat = unifiedHeight * aspectRatio
         
-        if aspectRatio > 1.5 {
-            // 横向长图 (宽度 > 1.5倍高度)
-            dynamicWidth = min(maxWidth, baseHeight * aspectRatio)
-            dynamicHeight = dynamicWidth / aspectRatio
-        } else if aspectRatio < 0.7 {
-            // 竖向长图 (高度 > 1.4倍宽度)  
-            dynamicHeight = min(maxHeight, baseHeight)
-            dynamicWidth = dynamicHeight * aspectRatio
-        } else {
-            // 接近正方形的图片
-            let size = min(baseHeight, maxWidth)
-            dynamicWidth = size
-            dynamicHeight = size
-        }
-        
-        // 限制最小尺寸
-        dynamicWidth = max(minWidth, dynamicWidth)
-        dynamicHeight = max(minHeight, dynamicHeight)
+        // 限制宽度范围
+        dynamicWidth = max(minWidth, min(maxWidth, dynamicWidth))
         
         // 🔧 多张图片时需要考虑总宽度限制
         if itemCount > 1 {
@@ -588,16 +569,13 @@ extension ScreenshotProcessingViewController: UICollectionViewDelegateFlowLayout
             let maxAllowedWidth = (availableWidth - totalSpacing) / CGFloat(itemCount)
             
             if dynamicWidth > maxAllowedWidth {
-                // 如果宽度超出限制，按比例缩小
-                let scale = maxAllowedWidth / dynamicWidth
                 dynamicWidth = maxAllowedWidth
-                dynamicHeight = max(minHeight, dynamicHeight * scale)
             }
         }
         
-        let finalSize = CGSize(width: dynamicWidth, height: dynamicHeight)
+        let finalSize = CGSize(width: dynamicWidth, height: unifiedHeight)
         
-        print("🔍 Dynamic Preview Debug: screenshot[\(indexPath.item)] ratio=\(String(format: "%.2f", aspectRatio)), size=\(Int(finalSize.width))×\(Int(finalSize.height))")
+        print("🔍 Horizontal Layout Debug: screenshot[\(indexPath.item)] ratio=\(String(format: "%.2f", aspectRatio)), size=\(Int(finalSize.width))×\(Int(finalSize.height))")
         
         return finalSize
     }
@@ -1026,21 +1004,27 @@ class ProcessingOptionCell: UITableViewCell {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         setupUI()
         setupConstraints()
+        setupThemeObserver()
     }
     
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         setupUI()
         setupConstraints()
+        setupThemeObserver()
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     private func setupUI() {
         backgroundColor = .clear
         selectionStyle = .none
         
-        // 图标 - 使用更深的颜色以提高对比度
+        // 图标 - 使用主题色
         iconImageView.contentMode = .scaleAspectFit
-        iconImageView.tintColor = UIColor(red: 220/255, green: 140/255, blue: 160/255, alpha: 1.0) // 中等深度的玫瑰色，平衡对比度与视觉柔和度
+        iconImageView.tintColor = ThemeManager.iconTint
         contentView.addSubview(iconImageView)
         
         // 标题
@@ -1091,6 +1075,28 @@ class ProcessingOptionCell: UITableViewCell {
         ])
     }
     
+    private func setupThemeObserver() {
+        // 监听主题切换通知
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleThemeChange),
+            name: .themeDidChange,
+            object: nil
+        )
+    }
+    
+    @objc private func handleThemeChange() {
+        // 更新颜色以响应主题变化
+        updateColors()
+    }
+    
+    private func updateColors() {
+        iconImageView.tintColor = ThemeManager.iconTint
+        titleLabel.textColor = ThemeManager.overlayTextWhite
+        descriptionLabel.textColor = ThemeManager.overlaySecondaryText
+        arrowImageView.tintColor = ThemeManager.overlaySecondaryText
+    }
+    
     func configure(with option: ProcessingOption) {
         iconImageView.image = UIImage(systemName: option.icon)
         titleLabel.text = option.title
@@ -1102,11 +1108,8 @@ class ProcessingOptionCell: UITableViewCell {
         layer.borderWidth = 0
         layer.shadowOpacity = 0
         
-        // 设置默认图标和文字颜色
-        iconImageView.tintColor = UIColor(red: 220/255, green: 140/255, blue: 160/255, alpha: 1.0) // 中等深度的玫瑰色，平衡对比度与视觉柔和度
-        titleLabel.font = ThemeManager.buttonFont
-        titleLabel.textColor = ThemeManager.overlayTextWhite
-        descriptionLabel.textColor = ThemeManager.overlaySecondaryText
+        // 设置默认图标和文字颜色 - 使用主题色
+        updateColors()
     }
 }
 
@@ -1134,8 +1137,8 @@ class ProcessingThumbnailCell: UICollectionViewCell {
         
         // 图片视图 - 🎯 修改为scaleAspectFit以完整显示图片内容
         imageView.contentMode = .scaleAspectFit
-        imageView.clipsToBounds = true
-        imageView.layer.cornerRadius = 8
+        imageView.clipsToBounds = false  // ✅ 不裁剪图片内容
+        imageView.layer.cornerRadius = 0  // ✅ 移除圆角，避免裁剪图片四角
         imageView.layer.borderWidth = 1
         imageView.layer.borderColor = UIColor.white.withAlphaComponent(0.3).cgColor
         

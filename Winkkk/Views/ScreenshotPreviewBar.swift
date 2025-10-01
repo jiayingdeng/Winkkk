@@ -397,22 +397,9 @@ class ScreenshotPreviewBar: UIView {
     @objc private func clearButtonTapped() {
         HapticFeedbackManager.shared.lightImpact()
         
-        let alert = UIAlertController(
-            title: "清空确认",
-            message: "确定要清空所有\(screenshotManager.currentMode.displayName)吗？",
-            preferredStyle: .alert
-        )
-        
-        alert.addAction(UIAlertAction(title: "确定", style: .destructive) { [weak self] _ in
-            guard let self = self else { return }
-            self.delegate?.screenshotPreviewBar(self, didRequestClearAll: self.screenshotManager.currentMode)
-            self.screenshotManager.clearAllScreenshots()
-            HapticFeedbackManager.shared.notificationSuccess()
-        })
-        
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        
-        findParentViewController()?.present(alert, animated: true)
+        // 🎯 修复：直接通过delegate通知，避免重复删除
+        // 让VideoPlayerViewController统一管理删除逻辑和确认弹窗
+        delegate?.screenshotPreviewBar(self, didRequestClearAll: screenshotManager.currentMode)
     }
     
     // 📝 buttonPressed/buttonReleased 已移除
