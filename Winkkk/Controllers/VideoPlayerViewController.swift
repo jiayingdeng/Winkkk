@@ -488,7 +488,7 @@ class VideoPlayerViewController: UIViewController {
                 
                 if let duration = player.currentItem?.asset.duration {
                     self.videoDuration = duration
-                    self.cachedDurationString = duration.formattedString  // 🔧 缓存总时长字符串
+                    self.cachedDurationString = duration.preciseFormattedString  // 🎯 显示精确时长（包含毫秒），避免用户误解
                     self.updateTimeInfoLabel()  // 🎯 使用合并标签更新
                     
                     // 设置时间轴
