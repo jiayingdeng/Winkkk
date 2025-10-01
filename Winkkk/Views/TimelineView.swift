@@ -653,29 +653,44 @@ class TimelineView: UIView {
     }
     
     /// 🎯 计算基于视频时间范围的有效滚动边界
+    /// 
+    /// 设计目标：
+    /// - 让视频开头（0秒）能滚动到屏幕中心白色竖线位置
+    /// - 让视频结尾（duration）能滚动到屏幕中心白色竖线位置
+    /// - 防止滚动到视频内容区域之外的空白区域
+    ///
+    /// 坐标系统说明：
+    /// - contentView 总宽度 = leftPadding + 视频内容宽度 + rightPadding
+    /// - leftPadding = bounds.width / 2  （让视频开头能到达中心）
+    /// - rightPadding = bounds.width / 2 （让视频结尾能到达中心）
+    /// - 视频内容宽度 = baseContentWidth × zoomScale
     private func getValidScrollRange() -> (min: CGFloat, max: CGFloat) {
         guard duration > 0, bounds.width > 0 else {
             print("🔍 DEBUG-P4: getValidScrollRange early return - duration=\(duration), bounds.width=\(bounds.width)")
             return (min: 0, max: 0)
         }
         
-        let centerX = bounds.width / 2  // 🎯 修复：基于TimelineView宽度计算中心位置
+        let centerX = bounds.width / 2  // 屏幕中心位置（白色竖线固定在此）
         
-        // 让视频开头（时间0）能够到达中心竖线的滚动位置
-        let timeZeroCoordinate = timeToCoordinate(0)
-        let minScrollOffset = timeZeroCoordinate - centerX
+        // ✅ 修复：让视频开头能到达中心
+        // timeToCoordinate(0) 返回 leftPadding，即视频内容的起始位置
+        let videoStartX = timeToCoordinate(0)
+        let minScrollOffset = videoStartX - centerX
         
-        // 让视频结尾（时间duration）能够到达中心竖线的滚动位置
-        let timeDurationCoordinate = timeToCoordinate(duration)
-        let maxScrollOffset = timeDurationCoordinate - centerX
+        // ✅ 修复：基于真实视频内容宽度计算结束位置
+        // 之前的问题：timeToCoordinate(duration) 计算可能不够精确
+        // 现在直接使用：leftPadding + 实际视频内容宽度
+        let videoEndX = leftPadding + getActualVideoWidth()
+        let maxScrollOffset = videoEndX - centerX
         
-        // 🎯 修复：移除错误的minScrollOffset限制，允许负偏移以支持视频开头到达中心
-        let validMin = minScrollOffset  // 允许负偏移，确保视频开头能到达中心竖线
-        let validMax = max(validMin, maxScrollOffset)
+        // 🔍 DEBUG: 边界计算调试
+        print("🔍 getValidScrollRange() - duration=\(String(format: "%.2f", duration))s")
+        print("   videoStartX=\(String(format: "%.1f", videoStartX)), videoEndX=\(String(format: "%.1f", videoEndX))")
+        print("   centerX=\(String(format: "%.1f", centerX))")
+        print("   scrollRange: [\(String(format: "%.1f", minScrollOffset)), \(String(format: "%.1f", maxScrollOffset))]")
+        print("   actualVideoWidth=\(String(format: "%.1f", getActualVideoWidth()))")
         
-        // 滚动边界调试日志已优化
-        
-        return (min: validMin, max: validMax)
+        return (min: minScrollOffset, max: maxScrollOffset)
     }
     
     /// 🎯 同步滚动到指定截取时间
@@ -691,7 +706,13 @@ class TimelineView: UIView {
         let scrollRange = getValidScrollRange()
         let clampedOffset = max(scrollRange.min, min(scrollRange.max, scrollOffsetX))
         
-        // 滚动定位调试日志已优化
+        // 🔍 DEBUG: 滚动边界调试
+        if time > duration * 0.6 {  // 只在后半段打印
+            print("🔍 scrollToCaptureTime(\(String(format: "%.2f", time))s) - duration=\(String(format: "%.2f", duration))s")
+            print("   targetX=\(String(format: "%.1f", targetX)), scrollOffsetX=\(String(format: "%.1f", scrollOffsetX))")
+            print("   scrollRange: [\(String(format: "%.1f", scrollRange.min)), \(String(format: "%.1f", scrollRange.max))]")
+            print("   clampedOffset=\(String(format: "%.1f", clampedOffset)) (clamped=\(scrollOffsetX != clampedOffset))")
+        }
         
         scrollView.setContentOffset(CGPoint(x: clampedOffset, y: 0), animated: true)
         

@@ -790,19 +790,44 @@ class VideoGalleryViewController: UIViewController {
     }
     
     @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
-        guard gesture.state == .began else { return }
+        print("🔍 长按手势触发，状态: \(gesture.state.rawValue)")
+        
+        guard gesture.state == .began else { 
+            print("⚠️ 长按手势状态不是 began，忽略")
+            return 
+        }
         
         let location = gesture.location(in: collectionView)
-        guard let indexPath = collectionView.indexPathForItem(at: location),
-              !isSelectionMode else { return }
+        print("📍 长按位置: \(location)")
         
-        guard let video = safeVideoItem(at: indexPath.item) else { return }
+        guard let indexPath = collectionView.indexPathForItem(at: location) else {
+            print("⚠️ 未找到对应的 indexPath")
+            return
+        }
+        
+        print("📌 找到 indexPath: \(indexPath), 选择模式: \(isSelectionMode)")
+        
+        guard !isSelectionMode else { 
+            print("⚠️ 当前在选择模式，不显示详情")
+            return 
+        }
+        
+        guard let video = safeVideoItem(at: indexPath.item) else { 
+            print("⚠️ 未找到对应的视频")
+            return 
+        }
+        
+        print("✅ 显示视频详情: \(video.fileName)")
         showVideoDetailPopup(for: video)
     }
     
     private func showVideoDetailPopup(for video: VideoItem) {
+        print("🎬 开始显示视频详情弹窗")
+        
         let detailPopup = VideoDetailPopupView()
         detailPopup.configure(with: video)
+        
+        print("✅ 弹窗配置完成，文件名: \(video.fileName)")
         
         detailPopup.onExport = { [weak self] video in
             self?.exportVideoToPhotoLibrary(video)
@@ -813,7 +838,7 @@ class VideoGalleryViewController: UIViewController {
         }
         
         detailPopup.onClose = {
-            // 弹窗会自动移除
+            print("❌ 关闭弹窗")
         }
         
         // 添加到视图并显示动画
@@ -826,7 +851,9 @@ class VideoGalleryViewController: UIViewController {
             detailPopup.bottomAnchor.constraint(equalTo: view.bottomAnchor)
         ])
         
+        print("🎨 弹窗已添加到视图层级，开始显示动画")
         detailPopup.showWithAnimation()
+        print("✨ 显示动画已触发")
     }
     
     
