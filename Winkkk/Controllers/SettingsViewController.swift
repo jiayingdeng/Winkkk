@@ -92,19 +92,19 @@ class SettingsViewController: UIViewController {
                 ]
             ),
             
-            // 外观 - 暂时隐藏
-            // SettingsSection(
-            //     title: "外观",
-            //     items: [
-            //         SettingsItem(
-            //             type: .selection,
-            //             title: "主题",
-            //             subtitle: ThemeManager.shared.currentTheme.displayName,
-            //             icon: "paintbrush.fill",
-            //             action: { [weak self] in self?.showThemeSettings() }
-            //         )
-            //     ]
-            // ),
+            // 外观
+            SettingsSection(
+                title: "外观",
+                items: [
+                    SettingsItem(
+                        type: .selection,
+                        title: "主题",
+                        subtitle: ThemeManager.shared.currentTheme.displayName,
+                        icon: "paintbrush.fill",
+                        action: { [weak self] in self?.showThemeSettings() }
+                    )
+                ]
+            ),
             
             // 存储管理
             SettingsSection(
@@ -647,7 +647,7 @@ class SettingsCell: UITableViewCell {
         
         // 标题
         titleLabel.font = ThemeManager.subheadlineFont
-        titleLabel.textColor = .white
+        titleLabel.textColor = ThemeManager.overlayTextWhite
         containerView.addSubview(titleLabel)
         
         // 副标题
@@ -741,7 +741,7 @@ class SettingsSwitchCell: UITableViewCell {
         
         // 标题
         titleLabel.font = ThemeManager.subheadlineFont
-        titleLabel.textColor = .white
+        titleLabel.textColor = ThemeManager.overlayTextWhite
         containerView.addSubview(titleLabel)
         
         // 副标题
@@ -833,7 +833,7 @@ class SettingsDetailCell: UITableViewCell {
         
         // 标题
         titleLabel.font = ThemeManager.subheadlineFont
-        titleLabel.textColor = .white
+        titleLabel.textColor = ThemeManager.overlayTextWhite
         containerView.addSubview(titleLabel)
         
         // 副标题
@@ -1105,7 +1105,7 @@ extension StorageDetailViewController: UITableViewDataSource, UITableViewDelegat
         
         cell.imageView?.image = UIImage(systemName: item.icon)
         cell.imageView?.tintColor = ThemeManager.buttonPrimary
-        cell.textLabel?.textColor = .white
+        cell.textLabel?.textColor = ThemeManager.overlayTextWhite
         cell.detailTextLabel?.textColor = ThemeManager.overlaySecondaryText
         
         // 可清理的项目显示不同的样式

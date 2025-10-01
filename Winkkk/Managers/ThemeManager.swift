@@ -228,13 +228,13 @@ class ThemeManager: ObservableObject {
     
     // MARK: - 梦幻主题专属颜色（记录现有的硬编码颜色）
     
-    /// FilterBar 背景色（协调的粉紫色）
+    /// FilterBar 背景色（透明，不遮挡渐变背景）
     static var filterBarBackground: UIColor {
         switch shared.currentTheme {
         case .dreamyGirl:
-            return UIColor(red: 242/255, green: 194/255, blue: 237/255, alpha: 0.85) // #F2C2ED 粉紫色
+            return UIColor.clear // 透明，显示浅紫色渐变背景
         case .lightMinimal:
-            return UIColor(red: 249/255, green: 249/255, blue: 249/255, alpha: 0.95) // #F9F9F9 浅灰白
+            return UIColor.clear // 透明，显示浅色渐变背景
         }
     }
     
