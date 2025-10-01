@@ -683,13 +683,6 @@ class TimelineView: UIView {
         let videoEndX = leftPadding + getActualVideoWidth()
         let maxScrollOffset = videoEndX - centerX
         
-        // 🔍 DEBUG: 边界计算调试
-        print("🔍 getValidScrollRange() - duration=\(String(format: "%.2f", duration))s")
-        print("   videoStartX=\(String(format: "%.1f", videoStartX)), videoEndX=\(String(format: "%.1f", videoEndX))")
-        print("   centerX=\(String(format: "%.1f", centerX))")
-        print("   scrollRange: [\(String(format: "%.1f", minScrollOffset)), \(String(format: "%.1f", maxScrollOffset))]")
-        print("   actualVideoWidth=\(String(format: "%.1f", getActualVideoWidth()))")
-        
         return (min: minScrollOffset, max: maxScrollOffset)
     }
     
@@ -705,14 +698,6 @@ class TimelineView: UIView {
         // 🎯 使用基于时间的滚动边界约束
         let scrollRange = getValidScrollRange()
         let clampedOffset = max(scrollRange.min, min(scrollRange.max, scrollOffsetX))
-        
-        // 🔍 DEBUG: 滚动边界调试
-        if time > duration * 0.6 {  // 只在后半段打印
-            print("🔍 scrollToCaptureTime(\(String(format: "%.2f", time))s) - duration=\(String(format: "%.2f", duration))s")
-            print("   targetX=\(String(format: "%.1f", targetX)), scrollOffsetX=\(String(format: "%.1f", scrollOffsetX))")
-            print("   scrollRange: [\(String(format: "%.1f", scrollRange.min)), \(String(format: "%.1f", scrollRange.max))]")
-            print("   clampedOffset=\(String(format: "%.1f", clampedOffset)) (clamped=\(scrollOffsetX != clampedOffset))")
-        }
         
         scrollView.setContentOffset(CGPoint(x: clampedOffset, y: 0), animated: true)
         
