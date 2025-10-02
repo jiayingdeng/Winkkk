@@ -448,6 +448,14 @@ class MainCameraViewController: UIViewController {
             name: .shouldOpenCamera,
             object: nil
         )
+        
+        // 🎨 监听主题切换通知
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleThemeChange),
+            name: .themeDidChange,
+            object: nil
+        )
     }
     
     @objc private func handleTimeSequenceProcessingCompleted(_ notification: Notification) {
@@ -481,6 +489,43 @@ class MainCameraViewController: UIViewController {
     }
     
     /// 🎯 处理打开相机通知
+    @objc private func handleThemeChange() {
+        print("🎨 MainCameraViewController: 主题已切换，更新UI颜色")
+        
+        UIView.animate(withDuration: 0.3) {
+            // 更新录制按钮渐变
+            if let gradientLayer = self.recordButton.layer.sublayers?.first as? CAGradientLayer {
+                let newGradient = ThemeManager.buttonGradient
+                gradientLayer.colors = newGradient.colors
+            }
+            
+            // 更新录制按钮背景色
+            self.recordButton.backgroundColor = ThemeManager.buttonPrimary
+            
+            // 更新内部圆圈颜色
+            if let innerCircle = self.recordButton.subviews.first {
+                innerCircle.backgroundColor = ThemeManager.buttonTextOnPrimary
+            }
+            
+            // 更新其他按钮颜色
+            self.galleryButton.backgroundColor = ThemeManager.cameraControlButtonBackground
+            self.galleryButton.tintColor = ThemeManager.primaryText
+            self.settingsButton.backgroundColor = ThemeManager.cameraControlButtonBackground
+            self.settingsButton.tintColor = ThemeManager.primaryText
+            
+            // 更新模式切换器颜色
+            self.modeSwitcherButton.backgroundColor = self.isTimeSequenceMode 
+                ? ThemeManager.timeSequenceModeBackground 
+                : ThemeManager.normalRecordModeBackground
+            self.modeSwitcherMainLabel.textColor = ThemeManager.overlayTextWhite
+            self.modeSwitcherSubLabel.textColor = ThemeManager.overlaySecondaryText
+            
+            // 更新录制指示器颜色
+            self.recordingIndicatorView.backgroundColor = ThemeManager.recordingIndicator
+            self.recordingTimeLabel.textColor = ThemeManager.overlayTextWhite
+        }
+    }
+    
     @objc private func handleShouldOpenCamera(_ notification: Notification) {
         print("📱 收到打开相机通知，准备展示录像页面")
         

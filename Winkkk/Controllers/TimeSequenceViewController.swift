@@ -508,6 +508,39 @@ class TimeSequenceViewController: UIViewController {
             name: .shouldOpenCamera,
             object: nil
         )
+        
+        // 🎨 监听主题切换通知
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleThemeChange),
+            name: .themeDidChange,
+            object: nil
+        )
+    }
+    
+    @objc private func handleThemeChange() {
+        print("🎨 TimeSequenceViewController: 主题已切换，更新UI颜色")
+        
+        UIView.animate(withDuration: 0.3) {
+            // 更新标题颜色
+            self.titleLabel.textColor = .white
+            self.subtitleLabel.textColor = ThemeManager.secondaryText
+            
+            // 更新按钮颜色
+            self.selectVideoButton.backgroundColor = ThemeManager.buttonPrimary
+            self.processButton.backgroundColor = ThemeManager.buttonPrimary
+            self.saveButton.backgroundColor = ThemeManager.success
+            self.shareButton.backgroundColor = ThemeManager.buttonPrimary
+            self.returnToRecordingButton.backgroundColor = ThemeManager.buttonDeepPurple
+            
+            // 更新标签颜色
+            self.previewTitleLabel.textColor = ThemeManager.primaryText
+            self.frameCountLabel.textColor = ThemeManager.primaryText
+            self.statusLabel.textColor = ThemeManager.secondaryText
+            
+            // 更新滑块颜色
+            self.frameCountSlider.tintColor = ThemeManager.buttonPrimary
+        }
     }
     
     /// 🎯 处理打开相机通知 - TimeSequenceViewController版本

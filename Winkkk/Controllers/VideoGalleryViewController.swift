@@ -771,6 +771,43 @@ class VideoGalleryViewController: UIViewController {
             name: .shouldOpenCamera,
             object: nil
         )
+        
+        // 🎨 监听主题切换通知
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleThemeChange),
+            name: .themeDidChange,
+            object: nil
+        )
+    }
+    
+    @objc private func handleThemeChange() {
+        print("🎨 VideoGalleryViewController: 主题已切换，更新UI颜色")
+        
+        UIView.animate(withDuration: 0.3) {
+            // 更新标题颜色
+            self.titleLabel.textColor = ThemeManager.primaryText
+            
+            // 更新按钮颜色
+            self.importButton.backgroundColor = ThemeManager.buttonDeepPurple
+            self.selectButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+            self.closeButton.tintColor = ThemeManager.primaryText
+            self.cancelButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+            
+            // 更新底部工具栏
+            self.bottomToolbar.backgroundColor = ThemeManager.cardBackground
+            self.selectAllButton.backgroundColor = ThemeManager.buttonDeepPurple
+            self.deleteButton.backgroundColor = ThemeManager.buttonPinkGray
+            self.exportButton.backgroundColor = ThemeManager.buttonDeepPurple
+            
+            // 更新副标题
+            if let label = self.subtitleView.subviews.first as? UILabel {
+                label.textColor = ThemeManager.secondaryText
+            }
+        }
+        
+        // 刷新 CollectionView
+        self.collectionView.reloadData()
     }
     
     /// 🎯 处理打开相机通知 - VideoGalleryViewController版本

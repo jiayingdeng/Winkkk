@@ -625,10 +625,15 @@ class SettingsCell: UITableViewCell {
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         setupUI()
+        setupThemeObserver()
     }
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     private func setupUI() {
@@ -662,6 +667,22 @@ class SettingsCell: UITableViewCell {
         containerView.addSubview(accessoryImageView)
         
         setupConstraints()
+    }
+    
+    private func setupThemeObserver() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(updateThemeColors),
+            name: .themeDidChange,
+            object: nil
+        )
+    }
+    
+    @objc private func updateThemeColors() {
+        iconImageView.tintColor = ThemeManager.buttonPrimary
+        titleLabel.textColor = ThemeManager.overlayTextWhite
+        subtitleLabel.textColor = ThemeManager.overlaySecondaryText
+        accessoryImageView.tintColor = ThemeManager.overlaySecondaryText.withAlphaComponent(0.7)
     }
     
     private func setupConstraints() {
@@ -719,10 +740,15 @@ class SettingsSwitchCell: UITableViewCell {
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         setupUI()
+        setupThemeObserver()
     }
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     private func setupUI() {
@@ -755,6 +781,22 @@ class SettingsSwitchCell: UITableViewCell {
         containerView.addSubview(switchControl)
         
         setupConstraints()
+    }
+    
+    private func setupThemeObserver() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(updateThemeColors),
+            name: .themeDidChange,
+            object: nil
+        )
+    }
+    
+    @objc private func updateThemeColors() {
+        iconImageView.tintColor = ThemeManager.success
+        titleLabel.textColor = ThemeManager.overlayTextWhite
+        subtitleLabel.textColor = ThemeManager.overlaySecondaryText
+        switchControl.onTintColor = ThemeManager.buttonPrimary
     }
     
     private func setupConstraints() {
@@ -811,10 +853,15 @@ class SettingsDetailCell: UITableViewCell {
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         setupUI()
+        setupThemeObserver()
     }
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     private func setupUI() {
@@ -843,6 +890,21 @@ class SettingsDetailCell: UITableViewCell {
         containerView.addSubview(subtitleLabel)
         
         setupConstraints()
+    }
+    
+    private func setupThemeObserver() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(updateThemeColors),
+            name: .themeDidChange,
+            object: nil
+        )
+    }
+    
+    @objc private func updateThemeColors() {
+        iconImageView.tintColor = ThemeManager.warning
+        titleLabel.textColor = ThemeManager.overlayTextWhite
+        subtitleLabel.textColor = ThemeManager.overlaySecondaryText
     }
     
     private func setupConstraints() {
@@ -1093,6 +1155,20 @@ extension StorageDetailViewController: UITableViewDataSource, UITableViewDelegat
         let cell = tableView.dequeueReusableCell(withIdentifier: "StorageCell", for: indexPath)
         
         let item = storageItems[indexPath.row]
+        
+        // 移除旧的主题观察者，添加新的
+        NotificationCenter.default.removeObserver(cell, name: .themeDidChange, object: nil)
+        NotificationCenter.default.addObserver(
+            forName: .themeDidChange,
+            object: nil,
+            queue: .main
+        ) { [weak cell] _ in
+            cell?.backgroundColor = ThemeManager.overlayTextWhite.withAlphaComponent(0.1)
+            cell?.imageView?.tintColor = ThemeManager.buttonPrimary
+            cell?.textLabel?.textColor = ThemeManager.overlayTextWhite
+            cell?.detailTextLabel?.textColor = ThemeManager.overlaySecondaryText
+        }
+        
         cell.backgroundColor = ThemeManager.overlayTextWhite.withAlphaComponent(0.1)
         cell.textLabel?.text = item.title
         

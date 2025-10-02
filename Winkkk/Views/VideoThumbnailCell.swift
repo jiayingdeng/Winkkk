@@ -184,6 +184,13 @@ class VideoThumbnailCell: UICollectionViewCell {
             name: .videoQualityDidChange,
             object: nil
         )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleThemeChange),
+            name: .themeDidChange,
+            object: nil
+        )
     }
     
     @objc private func handleVideoQualityChange(_ notification: Notification) {
@@ -192,6 +199,25 @@ class VideoThumbnailCell: UICollectionViewCell {
         // 重新配置缩略图和UI
         DispatchQueue.main.async { [weak self] in
             self?.configure(with: videoItem)
+        }
+    }
+    
+    @objc private func handleThemeChange() {
+        UIView.animate(withDuration: 0.3) {
+            self.thumbnailImageView.backgroundColor = ThemeManager.cardBackground
+            self.contentView.backgroundColor = ThemeManager.cardBackground
+            self.durationLabel.backgroundColor = ThemeManager.labelOverlayBackground
+            self.playIconView.backgroundColor = ThemeManager.playIconBackground
+            self.statusLabel.backgroundColor = ThemeManager.labelOverlayBackground
+            self.selectionOverlayView.backgroundColor = ThemeManager.selectionOverlayBackground
+            
+            // 更新渐变层颜色
+            if let gradientLayer = self.overlayGradientView.layer.sublayers?.first as? CAGradientLayer {
+                gradientLayer.colors = [
+                    UIColor.clear.cgColor,
+                    ThemeManager.gradientOverlayEnd.cgColor
+                ]
+            }
         }
     }
     
@@ -541,12 +567,35 @@ class EmptyStateView: UIView {
         super.init(frame: frame)
         setupUI()
         setupConstraints()
+        setupNotifications()
     }
     
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         setupUI()
         setupConstraints()
+        setupNotifications()
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    private func setupNotifications() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleThemeChange),
+            name: .themeDidChange,
+            object: nil
+        )
+    }
+    
+    @objc private func handleThemeChange() {
+        UIView.animate(withDuration: 0.3) {
+            self.iconView.tintColor = ThemeManager.secondaryText
+            self.titleLabel.textColor = ThemeManager.primaryText
+            self.messageLabel.textColor = ThemeManager.secondaryText
+        }
     }
     
     // MARK: - UI Setup
