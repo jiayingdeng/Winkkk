@@ -2230,9 +2230,9 @@ extension CollageViewController: UIGestureRecognizerDelegate {
     private func scheduleGestureUpdate() {
         needsGestureUpdate = true
         
-        // 如果定时器不存在，创建一个
+        // 如果定时器不存在，创建一个（60ms = 16fps，平衡流畅度和性能）
         if gestureUpdateTimer == nil {
-            gestureUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.033, repeats: true) { [weak self] _ in
+            gestureUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.06, repeats: true) { [weak self] _ in
                 guard let self = self else { return }
                 if self.needsGestureUpdate {
                     self.regenerateCollageIfNeeded()
