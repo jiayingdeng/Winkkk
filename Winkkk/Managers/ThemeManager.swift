@@ -412,6 +412,16 @@ class ThemeManager: ObservableObject {
         }
     }
     
+    /// 工具栏按钮图标色（与背景形成对比）
+    static var toolbarButtonIcon: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor.white // 白色图标（在粉紫色背景上）
+        case .lightMinimal:
+            return UIColor.black.withAlphaComponent(0.85) // 深色图标（在白色背景上）
+        }
+    }
+    
     /// 手势反馈浮层背景色（用于显示拖动/旋转/缩放提示）
     static var gestureFeedbackBackground: UIColor {
         switch shared.currentTheme {

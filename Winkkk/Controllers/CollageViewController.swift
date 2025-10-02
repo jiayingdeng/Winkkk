@@ -250,8 +250,8 @@ class CollageViewController: UIViewController {
         let toolbarButtons = [toolbarRotateLeftButton, toolbarRotateRightButton, 
                               toolbarFlipHButton, toolbarFlipVButton, toolbarResetButton]
         for button in toolbarButtons {
-            button.tintColor = ThemeManager.buttonTextOnPrimary
-            button.backgroundColor = ThemeManager.backgroundSecondary.withAlphaComponent(0.7)
+            button.tintColor = ThemeManager.toolbarButtonIcon
+            button.backgroundColor = ThemeManager.toolbarButtonBackground
         }
         
         // 更新底部按钮颜色
@@ -556,7 +556,7 @@ class CollageViewController: UIViewController {
                 let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
                 button.setImage(UIImage(systemName: iconName, withConfiguration: config), for: .normal)
             }
-            button.tintColor = ThemeManager.buttonTextOnPrimary
+            button.tintColor = ThemeManager.toolbarButtonIcon
             button.backgroundColor = ThemeManager.toolbarButtonBackground
             button.layer.cornerRadius = 22
             button.clipsToBounds = true
@@ -2246,6 +2246,9 @@ extension CollageViewController: UIGestureRecognizerDelegate {
             return
         }
         
+        // 🆕 先隐藏底层拼图中对应位置的图片（生成临时拼图）
+        hideImageInCollage(at: selectedIndex)
+        
         // 获取选中图片在拼图中的frame
         guard let imageFrame = getImageFrameInCollage(at: selectedIndex) else { return }
         
@@ -2277,10 +2280,71 @@ extension CollageViewController: UIGestureRecognizerDelegate {
         gesturePreviewImageView?.removeFromSuperview()
         gesturePreviewImageView = nil
         
+        // 🆕 恢复底层拼图（重新生成完整拼图）
+        restoreCollageImage()
+        
         // 重置手势累积状态
         currentGestureTranslation = .zero
         currentGestureScale = 1.0
         currentGestureRotation = 0
+    }
+    
+    /// 隐藏拼图中指定索引的图片（临时生成不包含该图片的拼图）
+    private func hideImageInCollage(at hideIndex: Int) {
+        guard hideIndex < imageItems.count else { return }
+        
+        let collageSize = selectedAspectRatio.size
+        let renderer = UIGraphicsImageRenderer(size: collageSize)
+        
+        let tempImage = renderer.image { context in
+            // 设置白色背景
+            UIColor.white.setFill()
+            context.fill(CGRect(origin: .zero, size: collageSize))
+            
+            let bounds = CGRect(origin: .zero, size: collageSize)
+            let frames = selectedLayoutTemplate.calculateFrames(for: imageItems.count, in: bounds)
+            
+            for (index, imageItem) in imageItems.enumerated() {
+                // 🔑 跳过需要隐藏的图片
+                if index == hideIndex {
+                    continue
+                }
+                
+                if index < frames.count {
+                    let frame = frames[index]
+                    let image = imageItem.processedImage
+                    
+                    context.cgContext.saveGState()
+                    context.cgContext.clip(to: frame)
+                    
+                    // 计算绘制区域（AspectFill）
+                    let imageAspectRatio = image.size.width / image.size.height
+                    let frameAspectRatio = frame.width / frame.height
+                    
+                    var drawRect = frame
+                    if imageAspectRatio > frameAspectRatio {
+                        let newWidth = frame.height * imageAspectRatio
+                        drawRect = CGRect(x: frame.midX - newWidth/2, y: frame.minY, width: newWidth, height: frame.height)
+                    } else {
+                        let newHeight = frame.width / imageAspectRatio
+                        drawRect = CGRect(x: frame.minX, y: frame.midY - newHeight/2, width: frame.width, height: newHeight)
+                    }
+                    
+                    image.draw(in: drawRect)
+                    context.cgContext.restoreGState()
+                }
+            }
+        }
+        
+        // 更新预览图
+        self.previewImageView.image = tempImage
+    }
+    
+    /// 恢复完整拼图图像
+    private func restoreCollageImage() {
+        if let originalImage = collageImage {
+            self.previewImageView.image = originalImage
+        }
     }
     
     /// 获取指定索引的图片在拼图中的显示frame
@@ -2484,8 +2548,44 @@ extension CollageViewController: UIGestureRecognizerDelegate {
         }
     }
     
-    // 允许多个手势同时识别
+    // 🆕 优化手势识别逻辑，避免与 ScrollView 冲突
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+        // 如果是与 ScrollView 的 pan 手势冲突，只有在有选中图片时才同时识别
+        if let scrollView = otherGestureRecognizer.view as? UIScrollView {
+            // 只有当用户明确在编辑图片时（已选中图片），才允许同时识别
+            return selectedImageIndex != nil
+        }
+        
+        // 其他手势（缩放、旋转等）可以同时识别
+        return true
+    }
+    
+    // 🆕 控制手势是否应该开始（避免误触）
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        // Pan 手势需要更严格的判断
+        if gestureRecognizer == panGesture {
+            // 必须有选中的图片
+            guard selectedImageIndex != nil else { return false }
+            
+            // 检查拖动方向 - 如果主要是垂直方向，可能是想滚动而非拖动图片
+            if let panGesture = gestureRecognizer as? UIPanGestureRecognizer {
+                let velocity = panGesture.velocity(in: previewImageView)
+                let isVerticalScroll = abs(velocity.y) > abs(velocity.x) * 1.5
+                
+                // 如果是明显的垂直滚动，不启动手势（让 ScrollView 处理）
+                if isVerticalScroll {
+                    return false
+                }
+            }
+            
+            return true
+        }
+        
+        // 缩放和旋转手势：只有选中图片时才启动
+        if gestureRecognizer == pinchGesture || gestureRecognizer == rotationGesture {
+            return selectedImageIndex != nil
+        }
+        
         return true
     }
 }
