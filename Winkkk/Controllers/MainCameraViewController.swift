@@ -21,7 +21,8 @@ class MainCameraViewController: UIViewController {
     private let controlPanelBlurView = BlurEffectView(style: .regular, intensity: 0.9)
     private let recordButton = UIButton()
     private let galleryButton = UIButton()
-    private let settingsButton = UIButton()
+    private let flipCameraButton = UIButton()  // 🆕 切换摄像头按钮
+    private let settingsButton = UIButton()     // 现在在顶部
     
     // 时间序列模式切换按钮
     private let modeSwitcherButton = UIButton(type: .system)
@@ -217,12 +218,13 @@ class MainCameraViewController: UIViewController {
         // 首先设置按钮样式
         setupGalleryButton()
         setupRecordButton()
+        setupFlipCameraButton()  // 🆕 切换摄像头按钮
         setupSettingsButton()
         
-        // 添加按钮到控制面板
+        // 添加按钮到控制面板（底部三个按钮）
         controlPanelBlurView.contentView.addSubview(galleryButton)
         controlPanelBlurView.contentView.addSubview(recordButton)
-        controlPanelBlurView.contentView.addSubview(settingsButton)
+        controlPanelBlurView.contentView.addSubview(flipCameraButton)  // 🆕
         
         // 最后设置模式切换器（此时所有按钮都已添加到视图层次结构中）
         setupModeSwitcher()
@@ -285,15 +287,69 @@ class MainCameraViewController: UIViewController {
         recordButton.layer.shadowOpacity = 1.0
     }
     
+    private func setupFlipCameraButton() {
+        // 🆕 切换摄像头按钮
+        flipCameraButton.translatesAutoresizingMaskIntoConstraints = false
+        
+        // 使用更通用的切换摄像头图标（兼容更多iOS版本）
+        let cameraIcon = UIImage(systemName: "camera.rotate") ?? UIImage(systemName: "arrow.2.circlepath.circle")
+        flipCameraButton.setImage(cameraIcon, for: .normal)
+        flipCameraButton.tintColor = ThemeManager.primaryText
+        flipCameraButton.backgroundColor = ThemeManager.cameraControlButtonBackground
+        flipCameraButton.layer.cornerRadius = 25
+        
+        // 设置图标配置（确保图标大小合适）
+        flipCameraButton.imageView?.contentMode = .scaleAspectFit
+        flipCameraButton.contentHorizontalAlignment = .fill
+        flipCameraButton.contentVerticalAlignment = .fill
+        flipCameraButton.imageEdgeInsets = UIEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
+        
+        flipCameraButton.addTarget(self, action: #selector(flipCameraButtonTapped), for: .touchUpInside)
+        flipCameraButton.addTarget(self, action: #selector(buttonPressed(_:)), for: .touchDown)
+        flipCameraButton.addTarget(self, action: #selector(buttonReleased(_:)), for: [.touchUpInside, .touchUpOutside])
+    }
+    
     private func setupSettingsButton() {
-        settingsButton.backgroundColor = ThemeManager.cameraControlButtonBackground
-        settingsButton.layer.cornerRadius = 25
-        settingsButton.setImage(UIImage(systemName: "gearshape"), for: .normal)
-        settingsButton.tintColor = ThemeManager.primaryText
+        // 🆕 顶部设置按钮 - 毛玻璃效果
+        settingsButton.translatesAutoresizingMaskIntoConstraints = false
+        
+        // 添加毛玻璃背景容器
+        let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
+        blurView.isUserInteractionEnabled = false
+        blurView.layer.cornerRadius = 22
+        blurView.clipsToBounds = true
+        blurView.translatesAutoresizingMaskIntoConstraints = false
+        settingsButton.insertSubview(blurView, at: 0)
+        
+        // 设置图标（确保在毛玻璃之上）
+        let gearIcon = UIImage(systemName: "gearshape.fill")
+        settingsButton.setImage(gearIcon, for: .normal)
+        settingsButton.tintColor = .white
+        
+        // 图标配置（确保图标大小和位置正确）
+        settingsButton.imageView?.contentMode = .scaleAspectFit
+        settingsButton.contentHorizontalAlignment = .fill
+        settingsButton.contentVerticalAlignment = .fill
+        settingsButton.imageEdgeInsets = UIEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
+        
+        // 确保图标在最上层
+        if let imageView = settingsButton.imageView {
+            settingsButton.bringSubviewToFront(imageView)
+        }
+        
+        NSLayoutConstraint.activate([
+            blurView.topAnchor.constraint(equalTo: settingsButton.topAnchor),
+            blurView.leadingAnchor.constraint(equalTo: settingsButton.leadingAnchor),
+            blurView.trailingAnchor.constraint(equalTo: settingsButton.trailingAnchor),
+            blurView.bottomAnchor.constraint(equalTo: settingsButton.bottomAnchor)
+        ])
         
         settingsButton.addTarget(self, action: #selector(settingsButtonTapped), for: .touchUpInside)
         settingsButton.addTarget(self, action: #selector(buttonPressed(_:)), for: .touchDown)
         settingsButton.addTarget(self, action: #selector(buttonReleased(_:)), for: [.touchUpInside, .touchUpOutside])
+        
+        // 添加到主视图（而不是控制面板）
+        view.addSubview(settingsButton)
     }
     
     
@@ -370,7 +426,8 @@ class MainCameraViewController: UIViewController {
         controlPanelBlurView.translatesAutoresizingMaskIntoConstraints = false
         galleryButton.translatesAutoresizingMaskIntoConstraints = false
         recordButton.translatesAutoresizingMaskIntoConstraints = false
-        settingsButton.translatesAutoresizingMaskIntoConstraints = false
+        // flipCameraButton.translatesAutoresizingMaskIntoConstraints 已在 setupFlipCameraButton() 中设置
+        // settingsButton.translatesAutoresizingMaskIntoConstraints 已在 setupSettingsButton() 中设置
         
         // 模式切换器已在setupModeSwitcher中设置
         
@@ -413,11 +470,17 @@ class MainCameraViewController: UIViewController {
             galleryButton.widthAnchor.constraint(equalToConstant: 50),
             galleryButton.heightAnchor.constraint(equalToConstant: 50),
             
-            settingsButton.centerYAnchor.constraint(equalTo: recordButton.centerYAnchor),
-            settingsButton.leadingAnchor.constraint(equalTo: recordButton.trailingAnchor, constant: 40),
-            settingsButton.widthAnchor.constraint(equalToConstant: 50),
-            settingsButton.heightAnchor.constraint(equalToConstant: 50),
+            // 🆕 切换摄像头按钮（与相册按钮对称）
+            flipCameraButton.centerYAnchor.constraint(equalTo: recordButton.centerYAnchor),
+            flipCameraButton.leadingAnchor.constraint(equalTo: recordButton.trailingAnchor, constant: 60),
+            flipCameraButton.widthAnchor.constraint(equalToConstant: 50),
+            flipCameraButton.heightAnchor.constraint(equalToConstant: 50),
             
+            // 🆕 顶部右侧设置按钮（与录制指示器同高度对齐）
+            settingsButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
+            settingsButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -16),
+            settingsButton.widthAnchor.constraint(equalToConstant: 44),
+            settingsButton.heightAnchor.constraint(equalToConstant: 44),
             
             // 模式切换器约束已在 setupModeSwitcher() 中设置
         ])
@@ -510,8 +573,9 @@ class MainCameraViewController: UIViewController {
             // 更新其他按钮颜色
             self.galleryButton.backgroundColor = ThemeManager.cameraControlButtonBackground
             self.galleryButton.tintColor = ThemeManager.primaryText
-            self.settingsButton.backgroundColor = ThemeManager.cameraControlButtonBackground
-            self.settingsButton.tintColor = ThemeManager.primaryText
+            self.flipCameraButton.backgroundColor = ThemeManager.cameraControlButtonBackground  // 🆕
+            self.flipCameraButton.tintColor = ThemeManager.primaryText  // 🆕
+            // settingsButton 使用固定毛玻璃效果，不需要主题更新
             
             // 更新模式切换器颜色
             self.modeSwitcherButton.backgroundColor = self.isTimeSequenceMode 
@@ -751,6 +815,27 @@ extension MainCameraViewController {
         let navController = UINavigationController(rootViewController: galleryVC)
         navController.modalPresentationStyle = .fullScreen
         present(navController, animated: true)
+    }
+    
+    @objc private func flipCameraButtonTapped() {
+        // 触觉反馈
+        hapticManager.buttonTap()
+        
+        // 录制中禁止切换
+        guard !isRecording else {
+            print("⚠️ 录制中无法切换摄像头")
+            return
+        }
+        
+        // 切换摄像头
+        cameraManager.switchCamera()
+        
+        // 添加按钮旋转动画
+        UIView.animate(withDuration: 0.3) {
+            self.flipCameraButton.transform = CGAffineTransform(rotationAngle: .pi)
+        } completion: { _ in
+            self.flipCameraButton.transform = .identity
+        }
     }
     
     @objc private func settingsButtonTapped() {
@@ -1022,6 +1107,12 @@ extension MainCameraViewController {
         UIView.animate(withDuration: 0.3) {
             self.recordingIndicatorView.isHidden = !self.isRecording
             self.recordingTimeLabel.isHidden = !self.isRecording
+            
+            // 🆕 录制中禁用相册、切换摄像头按钮
+            self.galleryButton.isEnabled = !self.isRecording
+            self.flipCameraButton.isEnabled = !self.isRecording
+            self.galleryButton.alpha = self.isRecording ? 0.5 : 1.0
+            self.flipCameraButton.alpha = self.isRecording ? 0.5 : 1.0
             
             // 更新录制按钮外观
             if self.isRecording {
