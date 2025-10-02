@@ -77,7 +77,7 @@ class VideoDetailPopupView: UIView {
     
     // MARK: - UI Setup
     private func setupUI() {
-        backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        backgroundColor = ThemeManager.popupDimmingBackground
         
         addSubview(containerView)
         containerView.addSubview(titleLabel)

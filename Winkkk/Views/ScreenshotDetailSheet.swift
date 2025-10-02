@@ -230,7 +230,7 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     
     private func createLivePhotoIndicator() -> UIView {
         let containerView = UIView()
-        containerView.backgroundColor = UIColor.black.withAlphaComponent(0.6)
+        containerView.backgroundColor = ThemeManager.overlayMaskBackground
         containerView.layer.cornerRadius = 16
         containerView.translatesAutoresizingMaskIntoConstraints = false
         

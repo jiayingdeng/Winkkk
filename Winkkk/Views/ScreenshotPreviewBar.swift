@@ -98,7 +98,7 @@ class ScreenshotPreviewBar: UIView {
         clearButton.setTitle("🗑", for: .normal)
         clearButton.setTitleColor(UIColor.systemRed, for: .normal)
         clearButton.titleLabel?.font = ThemeManager.captionFont
-        clearButton.backgroundColor = UIColor.systemRed.withAlphaComponent(0.1)
+        clearButton.backgroundColor = ThemeManager.dangerTintedButtonBackground
         clearButton.layer.cornerRadius = ThemeManager.smallCornerRadius
         clearButton.addTarget(self, action: #selector(clearButtonTapped), for: .touchUpInside)
         headerView.addSubview(clearButton)

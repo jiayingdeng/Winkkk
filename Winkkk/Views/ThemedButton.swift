@@ -199,9 +199,10 @@ class CapsuleButton: UIButton {
     }
     
     private func addButtonShadow() {
-        layer.shadowColor = UIColor.black.withAlphaComponent(0.15).cgColor
-        layer.shadowOffset = CGSize(width: 0, height: 4)
-        layer.shadowRadius = 8
+        let shadow = ThemeManager.mediumShadow
+        layer.shadowColor = (shadow.shadowColor as? UIColor)?.cgColor ?? UIColor.black.withAlphaComponent(0.15).cgColor
+        layer.shadowOffset = shadow.shadowOffset
+        layer.shadowRadius = shadow.shadowBlurRadius
         layer.shadowOpacity = 1.0
         layer.masksToBounds = false
     }

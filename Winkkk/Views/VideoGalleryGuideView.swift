@@ -72,7 +72,7 @@ class VideoGalleryGuideView: UIView {
     // MARK: - Setup Methods
     private func setupUI() {
         // 半透明遮罩
-        overlayView.backgroundColor = UIColor.black.withAlphaComponent(0.4)
+        overlayView.backgroundColor = ThemeManager.popupDimmingBackground
         overlayView.translatesAutoresizingMaskIntoConstraints = false
         addSubview(overlayView)
         

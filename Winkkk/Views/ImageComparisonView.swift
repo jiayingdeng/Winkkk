@@ -86,7 +86,7 @@ class ImageComparisonView: UIView {
         originalLabel.text = "修复前"
         originalLabel.textColor = .white
         originalLabel.font = ThemeManager.captionFont
-        originalLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        originalLabel.backgroundColor = ThemeManager.labelOverlayBackground
         originalLabel.textAlignment = .center
         originalLabel.layer.cornerRadius = 8
         originalLabel.layer.masksToBounds = true
@@ -96,7 +96,7 @@ class ImageComparisonView: UIView {
         enhancedLabel.text = "修复后"
         enhancedLabel.textColor = .white
         enhancedLabel.font = ThemeManager.captionFont
-        enhancedLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        enhancedLabel.backgroundColor = ThemeManager.labelOverlayBackground
         enhancedLabel.textAlignment = .center
         enhancedLabel.layer.cornerRadius = 8
         enhancedLabel.layer.masksToBounds = true
@@ -108,7 +108,7 @@ class ImageComparisonView: UIView {
         instructionLabel.text = "← 拖动或点击滑块对比效果 →"
         instructionLabel.textColor = .white
         instructionLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
-        instructionLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        instructionLabel.backgroundColor = ThemeManager.labelOverlayBackground
         instructionLabel.textAlignment = .center
         instructionLabel.layer.cornerRadius = 12
         instructionLabel.layer.masksToBounds = true

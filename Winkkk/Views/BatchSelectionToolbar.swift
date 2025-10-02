@@ -97,14 +97,14 @@ class BatchSelectionToolbar: UIView {
         // 分享按钮
         shareButton.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
         shareButton.tintColor = .systemBlue
-        shareButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
+        shareButton.backgroundColor = ThemeManager.infoTintedButtonBackground
         shareButton.layer.cornerRadius = 22
         shareButton.isEnabled = false
         
         // 删除按钮
         deleteButton.setImage(UIImage(systemName: "trash"), for: .normal)
         deleteButton.tintColor = .systemRed
-        deleteButton.backgroundColor = UIColor.systemRed.withAlphaComponent(0.1)
+        deleteButton.backgroundColor = ThemeManager.dangerTintedButtonBackground
         deleteButton.layer.cornerRadius = 22
         deleteButton.isEnabled = false
         
@@ -273,10 +273,10 @@ extension BatchSelectionToolbar {
         selectionLabel.textColor = .label
         
         shareButton.tintColor = .systemBlue
-        shareButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
+        shareButton.backgroundColor = ThemeManager.infoTintedButtonBackground
         
         deleteButton.tintColor = .systemRed
-        deleteButton.backgroundColor = UIColor.systemRed.withAlphaComponent(0.1)
+        deleteButton.backgroundColor = ThemeManager.dangerTintedButtonBackground
     }
     
     // MARK: - Public Methods

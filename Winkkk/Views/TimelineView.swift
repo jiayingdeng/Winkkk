@@ -219,7 +219,7 @@ class TimelineView: UIView {
         contentView.addSubview(timeScaleView)
         
         // 缩略图容器
-        thumbnailContainerView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
+        thumbnailContainerView.backgroundColor = ThemeManager.thumbnailContainerBackground
         thumbnailContainerView.layer.cornerRadius = 8
         thumbnailContainerView.layer.masksToBounds = true
         contentView.addSubview(thumbnailContainerView)
@@ -295,10 +295,10 @@ class TimelineView: UIView {
     // 🆕 设置Live Photo模式组件
     private func setupLivePhotoComponents() {
         // 设置3秒范围指示器
-        livePhotoRangeView.backgroundColor = UIColor.systemRed.withAlphaComponent(0.3)
+        livePhotoRangeView.backgroundColor = ThemeManager.livePhotoRangeBackground
         livePhotoRangeView.layer.cornerRadius = 4
         livePhotoRangeView.layer.borderWidth = 1
-        livePhotoRangeView.layer.borderColor = UIColor.systemRed.withAlphaComponent(0.6).cgColor
+        livePhotoRangeView.layer.borderColor = ThemeManager.livePhotoRangeBorder.cgColor
         livePhotoRangeView.isHidden = true  // 默认隐藏
         
         // 添加文字标签
@@ -439,9 +439,10 @@ class TimelineView: UIView {
         thumbView.layer.borderColor = ThemeManager.buttonPrimary.cgColor
         
         // 添加阴影
-        thumbView.layer.shadowColor = UIColor.black.withAlphaComponent(0.3).cgColor
-        thumbView.layer.shadowOffset = CGSize(width: 0, height: 2)
-        thumbView.layer.shadowRadius = 4
+        let shadow = ThemeManager.mediumShadow
+        thumbView.layer.shadowColor = (shadow.shadowColor as? UIColor)?.cgColor ?? UIColor.black.withAlphaComponent(0.3).cgColor
+        thumbView.layer.shadowOffset = shadow.shadowOffset
+        thumbView.layer.shadowRadius = shadow.shadowBlurRadius
         thumbView.layer.shadowOpacity = 1.0
         thumbView.layer.masksToBounds = false
         
@@ -1230,7 +1231,7 @@ class TimelineView: UIView {
             // 🎯 优化显示质量配置
             imageView.contentMode = .scaleAspectFill
             imageView.clipsToBounds = true
-            imageView.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+            imageView.backgroundColor = ThemeManager.playIconBackground
             imageView.layer.cornerRadius = 2
             imageView.layer.borderWidth = 0.5
             imageView.layer.borderColor = UIColor.white.withAlphaComponent(0.2).cgColor
@@ -1523,7 +1524,7 @@ class TimelineView: UIView {
         let resolutionText = currentTimeResolution.displayName
         indicator.text = String(format: "%.1fx - %@", zoomScale, resolutionText)
         indicator.textColor = .white
-        indicator.backgroundColor = UIColor.black.withAlphaComponent(0.8)
+        indicator.backgroundColor = ThemeManager.zoomIndicatorBackground
         indicator.font = UIFont.systemFont(ofSize: 14, weight: .medium)
         indicator.textAlignment = .center
         indicator.layer.cornerRadius = 12

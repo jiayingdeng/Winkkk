@@ -26,7 +26,7 @@ class VideoThumbnailCell: UICollectionViewCell {
         let label = UILabel()
         label.font = ThemeManager.captionFont
         label.textColor = .white
-        label.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        label.backgroundColor = ThemeManager.labelOverlayBackground
         label.textAlignment = .center
         label.layer.cornerRadius = 8
         label.layer.masksToBounds = true
@@ -35,7 +35,7 @@ class VideoThumbnailCell: UICollectionViewCell {
     
     private let playIconView: UIView = {
         let view = UIView()
-        view.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        view.backgroundColor = ThemeManager.playIconBackground
         view.layer.cornerRadius = 20
         
         let playIcon = UIImageView(image: UIImage(systemName: "play.fill"))
@@ -61,7 +61,7 @@ class VideoThumbnailCell: UICollectionViewCell {
         let gradient = CAGradientLayer()
         gradient.colors = [
             UIColor.clear.cgColor,
-            UIColor.black.withAlphaComponent(0.3).cgColor
+            ThemeManager.gradientOverlayEnd.cgColor
         ]
         gradient.startPoint = CGPoint(x: 0, y: 0)
         gradient.endPoint = CGPoint(x: 0, y: 1)
@@ -73,7 +73,7 @@ class VideoThumbnailCell: UICollectionViewCell {
     // 新的iOS风格选择UI组件
     private let selectionOverlayView: UIView = {
         let view = UIView()
-        view.backgroundColor = UIColor.white.withAlphaComponent(0.3)
+        view.backgroundColor = ThemeManager.selectionOverlayBackground
         view.isHidden = true
         return view
     }()
@@ -112,7 +112,7 @@ class VideoThumbnailCell: UICollectionViewCell {
         let label = UILabel()
         label.font = UIFont.systemFont(ofSize: 12, weight: .medium)
         label.textColor = .white
-        label.backgroundColor = UIColor.black.withAlphaComponent(0.75)
+        label.backgroundColor = ThemeManager.labelOverlayBackground
         label.textAlignment = .center
         label.layer.cornerRadius = 6
         label.layer.masksToBounds = true
@@ -202,9 +202,10 @@ class VideoThumbnailCell: UICollectionViewCell {
         contentView.layer.masksToBounds = true
         
         // 添加阴影
-        layer.shadowColor = UIColor.black.withAlphaComponent(0.1).cgColor
-        layer.shadowOffset = CGSize(width: 0, height: 2)
-        layer.shadowRadius = 4
+        let shadow = ThemeManager.lightShadow
+        layer.shadowColor = (shadow.shadowColor as? UIColor)?.cgColor ?? UIColor.black.withAlphaComponent(0.1).cgColor
+        layer.shadowOffset = shadow.shadowOffset
+        layer.shadowRadius = shadow.shadowBlurRadius
         layer.shadowOpacity = 1.0
         layer.masksToBounds = false
         

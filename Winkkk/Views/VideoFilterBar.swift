@@ -60,7 +60,7 @@ class VideoFilterBar: UIView {
         let label = UILabel()
         label.font = UIFont.systemFont(ofSize: 13, weight: .medium)
         label.textColor = UIColor.systemBlue
-        label.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.1)
+        label.backgroundColor = ThemeManager.infoTintedButtonBackground
         label.layer.cornerRadius = 10
         label.layer.masksToBounds = true
         label.textAlignment = .center

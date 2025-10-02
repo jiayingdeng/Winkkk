@@ -113,7 +113,7 @@ class CaptureModeSwitcher: UIView {
     }
     
     private func setupSeparator() {
-        separatorView.backgroundColor = ThemeManager.overlaySecondaryText.withAlphaComponent(0.2)
+        separatorView.backgroundColor = ThemeManager.separator
     }
     
     private func setupConstraints() {

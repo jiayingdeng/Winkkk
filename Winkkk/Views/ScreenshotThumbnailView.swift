@@ -91,7 +91,7 @@ class ScreenshotThumbnailView: UIView {
         // 🎯 修改为scaleAspectFit以完整显示图片内容，不裁剪
         imageView.contentMode = .scaleAspectFit
         imageView.clipsToBounds = true
-        imageView.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        imageView.backgroundColor = ThemeManager.playIconBackground
         imageView.layer.cornerRadius = 8
         imageView.layer.borderWidth = 2
         imageView.layer.borderColor = UIColor.white.cgColor
@@ -121,7 +121,7 @@ class ScreenshotThumbnailView: UIView {
     private func setupTimestampLabel() {
         timestampLabel.font = UIFont.systemFont(ofSize: 10, weight: .medium)
         timestampLabel.textColor = .white
-        timestampLabel.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        timestampLabel.backgroundColor = ThemeManager.labelOverlayBackground
         timestampLabel.textAlignment = .center
         timestampLabel.layer.cornerRadius = 6
         timestampLabel.clipsToBounds = true
@@ -141,7 +141,7 @@ class ScreenshotThumbnailView: UIView {
     
     private func setupProcessingIndicator() {
         processingIndicator.color = UIColor.white
-        processingIndicator.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        processingIndicator.backgroundColor = ThemeManager.labelOverlayBackground
         processingIndicator.layer.cornerRadius = 8
         processingIndicator.isHidden = true
     }
@@ -165,7 +165,7 @@ class ScreenshotThumbnailView: UIView {
     private func setupLivePhotoIndicator() {
         livePhotoIndicator.image = UIImage(systemName: "livephoto")
         livePhotoIndicator.tintColor = .white
-        livePhotoIndicator.backgroundColor = UIColor.systemRed.withAlphaComponent(0.8)
+        livePhotoIndicator.backgroundColor = ThemeManager.livePhotoIndicatorBackground
         livePhotoIndicator.layer.cornerRadius = 8
         livePhotoIndicator.clipsToBounds = true
         livePhotoIndicator.contentMode = .center
