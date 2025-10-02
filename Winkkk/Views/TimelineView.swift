@@ -490,13 +490,13 @@ class TimelineView: UIView {
             thumbnailContainerView.topAnchor.constraint(equalTo: contentView.topAnchor),
             thumbnailContainerLeadingConstraint, // 🔑 动态约束
             thumbnailContainerWidthConstraint, // 🔑 动态约束
-            thumbnailContainerView.heightAnchor.constraint(equalTo: self.heightAnchor, multiplier: 0.6),  // 60%高度
+            thumbnailContainerView.heightAnchor.constraint(equalTo: self.heightAnchor, multiplier: 0.55),  // 55%高度（优化：减少5%避免时间文字与刻度线重叠）
             
             // 🎯 关键修复：时间刻度与视频内容区域对齐
             timeScaleView.topAnchor.constraint(equalTo: thumbnailContainerView.bottomAnchor),
             timeScaleLeadingConstraint, // 🔑 动态约束
             timeScaleWidthConstraint, // 🔑 动态约束
-            timeScaleView.heightAnchor.constraint(equalTo: self.heightAnchor, multiplier: 0.2),  // 20%高度
+            timeScaleView.heightAnchor.constraint(equalTo: self.heightAnchor, multiplier: 0.25),  // 25%高度（优化：增加5%避免时间文字与刻度线重叠）
             
             // 🎯 优化布局：播放轨道紧贴时间刻度（占20%高度）
             trackView.topAnchor.constraint(equalTo: timeScaleView.bottomAnchor),
@@ -1194,7 +1194,7 @@ class TimelineView: UIView {
         // 🔑 关键修复：缩略图基于视频内容区域宽度，不再基于TimelineView宽度
         let containerWidth = getActualVideoWidth()  // 使用视频内容宽度
         let thumbnailWidth = containerWidth / CGFloat(count)
-        let thumbnailHeight: CGFloat = 60  // 40 → 60px，与约束保持一致
+        let thumbnailHeight: CGFloat = 48  // 与约束保持一致（88px * 0.55 = 48.4px）
         
         // 🔍 详细调试：缩略图布局计算
         print("🖼️ [缩略图布局调试] generateThumbnailsWithCount:")
@@ -1250,7 +1250,7 @@ class TimelineView: UIView {
                 x: thumbnailX,
                 y: 0,
                 width: thumbnailWidth,
-                height: 60  // 40 → 60px
+                height: 48  // 与约束保持一致（88px * 0.55 = 48.4px）
             )
             
             // 调试边框已移除
@@ -1590,7 +1590,7 @@ class TimelineView: UIView {
                 x: CGFloat(index) * thumbnailWidth,
                 y: 0,
                 width: thumbnailWidth,
-                height: 60  // 40 → 60px
+                height: 48  // 与约束保持一致（88px * 0.55 = 48.4px）
             )
         }
         
