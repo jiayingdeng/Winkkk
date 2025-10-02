@@ -220,7 +220,7 @@ class ThemeManager: ObservableObject {
     static var buttonTextOnPrimary: UIColor {
         switch shared.currentTheme {
         case .dreamyGirl:
-            return primaryText // 深紫色文字
+            return UIColor.white // 白色（粉色按钮上）
         case .lightMinimal:
             return UIColor.white // 白色文字（黑色按钮上）
         }
