@@ -379,6 +379,68 @@ class ThemeManager: ObservableObject {
             return UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0) // 深灰黑色（与主文本色一致）
         }
     }
+    
+    // MARK: - 工具栏和编辑器专属颜色
+    
+    /// 轻量级工具栏背景色（用于拼图页面的快捷编辑工具栏）
+    static var toolbarBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return buttonPrimary.withAlphaComponent(0.95) // 粉色半透明
+        case .lightMinimal:
+            return UIColor(red: 249/255, green: 249/255, blue: 249/255, alpha: 0.95) // 浅灰白半透明
+        }
+    }
+    
+    /// 工具栏按钮背景色
+    static var toolbarButtonBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return backgroundSecondary.withAlphaComponent(0.7) // 粉紫色半透明
+        case .lightMinimal:
+            return UIColor.white.withAlphaComponent(0.8) // 白色半透明
+        }
+    }
+    
+    /// 手势反馈浮层背景色（用于显示拖动/旋转/缩放提示）
+    static var gestureFeedbackBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return buttonPrimary.withAlphaComponent(0.95) // 粉色半透明
+        case .lightMinimal:
+            return UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 0.9) // 深灰黑半透明
+        }
+    }
+    
+    /// 手势反馈文本色
+    static var gestureFeedbackText: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return primaryText // 深紫色
+        case .lightMinimal:
+            return UIColor.white // 白色（黑色背景上）
+        }
+    }
+    
+    /// 选中状态的高光边框色（用于选中的拼图框等）
+    static var selectionBorder: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 255/255, green: 182/255, blue: 193/255, alpha: 1.0) // #FFB6C1 粉色
+        case .lightMinimal:
+            return UIColor.systemBlue // iOS系统蓝
+        }
+    }
+    
+    /// 拖动预览图层的半透明遮罩
+    static var dragPreviewMask: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 230/255, green: 179/255, blue: 255/255, alpha: 0.3) // 粉紫色半透明
+        case .lightMinimal:
+            return UIColor.systemGray.withAlphaComponent(0.3) // 灰色半透明
+        }
+    }
 }
 
 // MARK: - SwiftUI Color扩展

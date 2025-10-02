@@ -133,6 +133,15 @@ class CollageViewController: UIViewController {
     private var gestureBeginScale: CGFloat = 1.0
     private var gestureBeginRotation: CGFloat = 0.0
     
+    // 🆕 实时手势预览图层（即时视觉反馈）
+    private var gesturePreviewImageView: UIImageView?
+    private var gesturePreviewInitialFrame: CGRect = .zero
+    
+    // 手势累积状态（支持多手势同时）
+    private var currentGestureTranslation = CGPoint.zero
+    private var currentGestureScale: CGFloat = 1.0
+    private var currentGestureRotation: CGFloat = 0
+    
     // 手势节流相关
     private var gestureUpdateTimer: Timer?
     private var needsGestureUpdate = false
@@ -228,13 +237,13 @@ class CollageViewController: UIViewController {
         longPressHintLabel.textColor = ThemeManager.placeholderText
         
         // 更新布局和比例选择区域颜色
-        layoutSectionView.backgroundColor = ThemeManager.backgroundSecondary
+        layoutSectionView.backgroundColor = ThemeManager.cardBackground
         layoutTitleLabel.textColor = ThemeManager.primaryText
-        aspectRatioSectionView.backgroundColor = ThemeManager.backgroundSecondary
+        aspectRatioSectionView.backgroundColor = ThemeManager.cardBackground
         aspectRatioTitleLabel.textColor = ThemeManager.primaryText
         
         // 更新轻量级工具栏颜色
-        lightEditToolbar.backgroundColor = ThemeManager.buttonPrimary.withAlphaComponent(0.95)
+        lightEditToolbar.backgroundColor = ThemeManager.toolbarBackground
         toolbarHintLabel.textColor = ThemeManager.warning
         
         // 更新工具栏按钮颜色
@@ -242,7 +251,7 @@ class CollageViewController: UIViewController {
                               toolbarFlipHButton, toolbarFlipVButton, toolbarResetButton]
         for button in toolbarButtons {
             button.tintColor = ThemeManager.buttonTextOnPrimary
-            button.backgroundColor = ThemeManager.backgroundSecondary.withAlphaComponent(0.3)
+            button.backgroundColor = ThemeManager.backgroundSecondary.withAlphaComponent(0.7)
         }
         
         // 更新底部按钮颜色
@@ -397,7 +406,7 @@ class CollageViewController: UIViewController {
     }
     
     private func setupLayoutSection() {
-        layoutSectionView.backgroundColor = ThemeManager.backgroundSecondary
+        layoutSectionView.backgroundColor = ThemeManager.cardBackground
         layoutSectionView.layer.cornerRadius = ThemeManager.standardCornerRadius
         
         // 标题 - 使用主题文字颜色
@@ -514,7 +523,7 @@ class CollageViewController: UIViewController {
     
     private func setupLightEditToolbar() {
         // 工具栏容器样式 - 使用主题按钮主色并增加不透明度确保可见性
-        lightEditToolbar.backgroundColor = ThemeManager.buttonPrimary.withAlphaComponent(0.95)
+        lightEditToolbar.backgroundColor = ThemeManager.toolbarBackground
         lightEditToolbar.layer.cornerRadius = 20
         lightEditToolbar.layer.shadowColor = UIColor.black.cgColor
         lightEditToolbar.layer.shadowOffset = CGSize(width: 0, height: 4)
@@ -548,7 +557,7 @@ class CollageViewController: UIViewController {
                 button.setImage(UIImage(systemName: iconName, withConfiguration: config), for: .normal)
             }
             button.tintColor = ThemeManager.buttonTextOnPrimary
-            button.backgroundColor = ThemeManager.backgroundSecondary.withAlphaComponent(0.3)
+            button.backgroundColor = ThemeManager.toolbarButtonBackground
             button.layer.cornerRadius = 22
             button.clipsToBounds = true
             lightEditToolbar.addSubview(button)
@@ -2226,6 +2235,110 @@ extension CollageViewController: UICollectionViewDataSource, UICollectionViewDel
 // MARK: - 直接编辑手势处理
 extension CollageViewController: UIGestureRecognizerDelegate {
     
+    // MARK: - 🆕 实时手势预览系统
+    
+    /// 创建手势预览图层（在手势开始时调用）
+    private func createGesturePreviewLayer() {
+        guard let selectedIndex = selectedImageIndex else { return }
+        
+        // 如果已经存在，直接返回（支持多手势同时）
+        if gesturePreviewImageView != nil {
+            return
+        }
+        
+        // 获取选中图片在拼图中的frame
+        guard let imageFrame = getImageFrameInCollage(at: selectedIndex) else { return }
+        
+        // 创建预览图层
+        let previewImageView = UIImageView()
+        previewImageView.image = imageItems[selectedIndex].processedImage
+        previewImageView.contentMode = .scaleAspectFill
+        previewImageView.clipsToBounds = true
+        previewImageView.frame = imageFrame
+        
+        // 添加到 previewImageView 上方
+        self.previewImageView.addSubview(previewImageView)
+        self.gesturePreviewImageView = previewImageView
+        self.gesturePreviewInitialFrame = imageFrame
+        
+        // 重置手势累积状态
+        self.currentGestureTranslation = .zero
+        self.currentGestureScale = 1.0
+        self.currentGestureRotation = 0
+        
+        // 添加轻微的视觉效果，表明这是预览层
+        previewImageView.layer.borderColor = UIColor.systemYellow.cgColor
+        previewImageView.layer.borderWidth = 2
+        previewImageView.alpha = 0.95
+    }
+    
+    /// 移除手势预览图层
+    private func removeGesturePreviewLayer() {
+        gesturePreviewImageView?.removeFromSuperview()
+        gesturePreviewImageView = nil
+        
+        // 重置手势累积状态
+        currentGestureTranslation = .zero
+        currentGestureScale = 1.0
+        currentGestureRotation = 0
+    }
+    
+    /// 获取指定索引的图片在拼图中的显示frame
+    private func getImageFrameInCollage(at index: Int) -> CGRect? {
+        guard index < imageItems.count else { return nil }
+        
+        // 获取拼图图像的显示区域
+        let displayRect = getImageDisplayRect()
+        
+        // 获取布局模板的frames
+        let collageSize = CGSize(width: 1000, height: 1000 / selectedAspectRatio.ratio)
+        let frames = selectedLayoutTemplate.frames(for: collageSize, imageCount: imageItems.count)
+        
+        guard index < frames.count else { return nil }
+        
+        // 将布局frame转换为实际显示frame
+        let layoutFrame = frames[index]
+        let scaleX = displayRect.width / collageSize.width
+        let scaleY = displayRect.height / collageSize.height
+        
+        let actualFrame = CGRect(
+            x: displayRect.minX + layoutFrame.minX * scaleX,
+            y: displayRect.minY + layoutFrame.minY * scaleY,
+            width: layoutFrame.width * scaleX,
+            height: layoutFrame.height * scaleY
+        )
+        
+        return actualFrame
+    }
+    
+    /// 更新手势预览图层的transform（实时响应手势）
+    private func updateGesturePreviewTransform() {
+        guard let previewImageView = gesturePreviewImageView else { return }
+        
+        // 构建复合transform（按照正确的顺序：缩放 → 旋转 → 平移）
+        var transform = CGAffineTransform.identity
+        
+        // 1. 应用缩放
+        if currentGestureScale != 1.0 {
+            transform = transform.scaledBy(x: currentGestureScale, y: currentGestureScale)
+        }
+        
+        // 2. 应用旋转
+        if currentGestureRotation != 0 {
+            transform = transform.rotated(by: currentGestureRotation)
+        }
+        
+        // 3. 应用平移
+        if currentGestureTranslation != .zero {
+            transform = transform.translatedBy(x: currentGestureTranslation.x, y: currentGestureTranslation.y)
+        }
+        
+        // 应用transform
+        previewImageView.transform = transform
+    }
+    
+    // MARK: - 手势节流系统
+    
     /// 节流更新拼图（避免频繁重绘）
     private func scheduleGestureUpdate() {
         needsGestureUpdate = true
@@ -2262,19 +2375,27 @@ extension CollageViewController: UIGestureRecognizerDelegate {
             gestureBeginTranslation = imageItems[selectedIndex].translation
             HapticFeedbackManager.shared.lightImpact()
             
+            // 🆕 创建实时预览图层
+            createGesturePreviewLayer()
+            
             // 显示实时反馈
             showGestureFeedback("正在拖动位置 📍")
             
         case .changed:
+            // 🆕 实时更新预览图层（60fps 视觉反馈）
+            updateGesturePreviewTransform(translation: translation)
+            
+            // 更新数据模型（用于最终生成拼图）
             let newTranslation = CGPoint(
                 x: gestureBeginTranslation.x + translation.x,
                 y: gestureBeginTranslation.y + translation.y
             )
             imageItems[selectedIndex].translation = newTranslation
-            scheduleGestureUpdate()
             
         case .ended, .cancelled:
-            finishGestureUpdate()
+            // 🆕 移除预览图层并重新生成拼图
+            removeGesturePreviewLayer()
+            regenerateCollageIfNeeded()
             HapticFeedbackManager.shared.lightImpact()
             
             // 恢复原始提示
@@ -2293,16 +2414,26 @@ extension CollageViewController: UIGestureRecognizerDelegate {
             gestureBeginScale = imageItems[selectedIndex].scale
             HapticFeedbackManager.shared.lightImpact()
             
+            // 🆕 创建实时预览图层
+            createGesturePreviewLayer()
+            
             // 显示实时反馈
             showGestureFeedback("正在双指缩放 🔍")
             
         case .changed:
             let newScale = max(0.5, min(3.0, gestureBeginScale * gesture.scale))
+            
+            // 🆕 更新累积状态并实时更新预览图层（60fps 视觉反馈）
+            currentGestureScale = gesture.scale
+            updateGesturePreviewTransform()
+            
+            // 更新数据模型（用于最终生成拼图）
             imageItems[selectedIndex].scale = newScale
-            scheduleGestureUpdate()
             
         case .ended, .cancelled:
-            finishGestureUpdate()
+            // 🆕 移除预览图层并重新生成拼图
+            removeGesturePreviewLayer()
+            regenerateCollageIfNeeded()
             HapticFeedbackManager.shared.lightImpact()
             
             // 恢复原始提示
@@ -2321,16 +2452,26 @@ extension CollageViewController: UIGestureRecognizerDelegate {
             gestureBeginRotation = imageItems[selectedIndex].rotationAngle
             HapticFeedbackManager.shared.lightImpact()
             
+            // 🆕 创建实时预览图层
+            createGesturePreviewLayer()
+            
             // 显示实时反馈
             showGestureFeedback("正在双指旋转 🔄")
             
         case .changed:
             let newRotation = gestureBeginRotation + gesture.rotation * 180 / .pi
+            
+            // 🆕 更新累积状态并实时更新预览图层（60fps 视觉反馈）
+            currentGestureRotation = gesture.rotation
+            updateGesturePreviewTransform()
+            
+            // 更新数据模型（用于最终生成拼图）
             imageItems[selectedIndex].updateRotation(newRotation)
-            scheduleGestureUpdate()
             
         case .ended, .cancelled:
-            finishGestureUpdate()
+            // 🆕 移除预览图层并重新生成拼图
+            removeGesturePreviewLayer()
+            regenerateCollageIfNeeded()
             HapticFeedbackManager.shared.lightImpact()
             
             // 恢复原始提示
@@ -2387,7 +2528,7 @@ extension CollageViewController {
         // 更新文本并高亮显示
         UIView.transition(with: toolbarHintLabel, duration: 0.2, options: .transitionCrossDissolve) {
             self.toolbarHintLabel.text = text
-            self.toolbarHintLabel.textColor = UIColor.systemGreen
+            self.toolbarHintLabel.textColor = ThemeManager.success
             self.toolbarHintLabel.alpha = 1.0
         }
     }
@@ -2396,7 +2537,7 @@ extension CollageViewController {
     private func hideGestureFeedback() {
         UIView.transition(with: toolbarHintLabel, duration: 0.3, options: .transitionCrossDissolve) {
             self.toolbarHintLabel.text = "💡 试试：拖动调整位置 • 双指缩放/旋转"
-            self.toolbarHintLabel.textColor = UIColor.systemYellow
+            self.toolbarHintLabel.textColor = ThemeManager.warning
         }
     }
     
