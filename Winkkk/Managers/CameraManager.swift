@@ -909,3 +909,69 @@ extension CameraManager: PerformanceMonitorDelegate {
         }
     }
 }
+
+// MARK: - Zoom Control
+extension CameraManager {
+    
+    /// 当前视频设备（公开访问）
+    var currentVideoDevice: AVCaptureDevice? {
+        return videoDeviceInput?.device
+    }
+    
+    /// 当前缩放倍数
+    var currentZoomFactor: CGFloat {
+        return currentVideoDevice?.videoZoomFactor ?? 1.0
+    }
+    
+    /// 最小缩放倍数
+    var minZoomFactor: CGFloat {
+        return currentVideoDevice?.minAvailableVideoZoomFactor ?? 1.0
+    }
+    
+    /// 最大缩放倍数（限制为合理范围）
+    var maxZoomFactor: CGFloat {
+        guard let device = currentVideoDevice else { return 1.0 }
+        // 限制最大10x，避免画质过差
+        return min(device.maxAvailableVideoZoomFactor, 10.0)
+    }
+    
+    /// 设置缩放倍数（录制中可调用）
+    /// - Parameters:
+    ///   - factor: 目标缩放倍数
+    ///   - animated: 是否使用平滑动画
+    func setZoomFactor(_ factor: CGFloat, animated: Bool = false) {
+        sessionQueue.async { [weak self] in
+            guard let self = self,
+                  let device = self.currentVideoDevice else { return }
+            
+            do {
+                try device.lockForConfiguration()
+                
+                // 限制在有效范围内
+                let clampedFactor = max(self.minZoomFactor, 
+                                       min(self.maxZoomFactor, factor))
+                
+                if animated {
+                    // 平滑动画缩放 (rate: 1.0-10.0，越大越快)
+                    device.ramp(toVideoZoomFactor: clampedFactor, withRate: 4.0)
+                } else {
+                    // 立即缩放
+                    device.videoZoomFactor = clampedFactor
+                }
+                
+                device.unlockForConfiguration()
+                
+                print("📷 缩放到 \(String(format: "%.1f", clampedFactor))x")
+                
+            } catch {
+                print("❌ 缩放失败: \(error)")
+            }
+        }
+    }
+    
+    /// 重置到默认缩放
+    /// - Parameter animated: 是否使用平滑动画
+    func resetZoom(animated: Bool = true) {
+        setZoomFactor(1.0, animated: animated)
+    }
+}

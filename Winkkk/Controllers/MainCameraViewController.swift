@@ -62,6 +62,9 @@ class MainCameraViewController: UIViewController {
         // 🆕 主动预热录制系统
         preWarmRecordingSystem()
         
+        // 🆕 启用缩放功能
+        setupZoomGesture()
+        
         // 触感反馈管理器已在单例初始化时准备好
     }
     
@@ -1505,4 +1508,153 @@ extension MainCameraViewController {
 // 已删除的 ShootingGuideViewControllerDelegate 相关代码
 
 // 重复的 ModeSwitcherViewDelegate 扩展已移除
+
+// MARK: - Zoom Gesture Support
+extension MainCameraViewController {
+    
+    // MARK: - 缩放状态
+    private var lastZoomFactor: CGFloat {
+        get {
+            return objc_getAssociatedObject(self, &AssociatedKeys.lastZoomFactor) as? CGFloat ?? 1.0
+        }
+        set {
+            objc_setAssociatedObject(self, &AssociatedKeys.lastZoomFactor, newValue, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        }
+    }
+    
+    // MARK: - 缩放手势设置
+    func setupZoomGesture() {
+        let pinchGesture = UIPinchGestureRecognizer(
+            target: self,
+            action: #selector(handlePinchZoom(_:))
+        )
+        pinchGesture.delegate = self
+        cameraPreviewView.addGestureRecognizer(pinchGesture)
+        
+        print("📷 缩放手势已添加到相机预览视图")
+    }
+    
+    @objc private func handlePinchZoom(_ gesture: UIPinchGestureRecognizer) {
+        switch gesture.state {
+        case .began:
+            lastZoomFactor = cameraManager.currentZoomFactor
+            
+            // 轻微触觉反馈
+            hapticManager.lightImpact()
+            
+        case .changed:
+            // 计算新的缩放倍数
+            let newZoomFactor = lastZoomFactor * gesture.scale
+            
+            // 应用缩放
+            cameraManager.setZoomFactor(newZoomFactor, animated: false)
+            
+            // 边界触觉反馈
+            if newZoomFactor <= cameraManager.minZoomFactor ||
+               newZoomFactor >= cameraManager.maxZoomFactor {
+                hapticManager.lightImpact()
+            }
+            
+        case .ended, .cancelled:
+            // 完成触觉反馈
+            hapticManager.mediumImpact()
+            
+            // 显示缩放倍数指示器
+            showZoomIndicator()
+            
+        default:
+            break
+        }
+    }
+    
+    // MARK: - 缩放倍数指示器
+    private func showZoomIndicator() {
+        let currentZoom = cameraManager.currentZoomFactor
+        
+        let indicator = UILabel()
+        indicator.text = String(format: "%.1fx", currentZoom)
+        indicator.textColor = .white
+        indicator.backgroundColor = UIColor.black.withAlphaComponent(0.7)
+        indicator.font = UIFont.monospacedSystemFont(ofSize: 20, weight: .medium)
+        indicator.textAlignment = .center
+        indicator.layer.cornerRadius = 12
+        indicator.layer.masksToBounds = true
+        
+        indicator.frame = CGRect(x: 0, y: 0, width: 80, height: 40)
+        indicator.center = CGPoint(x: view.bounds.midX, y: view.bounds.midY)
+        view.addSubview(indicator)
+        
+        // 动画显示和消失
+        indicator.alpha = 0
+        indicator.transform = CGAffineTransform(scaleX: 0.5, y: 0.5)
+        
+        UIView.animate(withDuration: 0.2) {
+            indicator.alpha = 1
+            indicator.transform = .identity
+        } completion: { _ in
+            UIView.animate(withDuration: 0.3, delay: 0.8, options: .curveEaseOut) {
+                indicator.alpha = 0
+                indicator.transform = CGAffineTransform(scaleX: 0.5, y: 0.5)
+            } completion: { _ in
+                indicator.removeFromSuperview()
+            }
+        }
+    }
+}
+
+// MARK: - UIGestureRecognizerDelegate for Zoom
+extension MainCameraViewController: UIGestureRecognizerDelegate {
+    
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                          shouldReceive touch: UITouch) -> Bool {
+        
+        // 🎯 保护所有按钮不受缩放手势影响（参考TimelineView 1726-1753行）
+        
+        // 🚨 方法1: 响应链hitTest检测（最强保护）
+        if let superview = cameraPreviewView.superview {
+            let touchPoint = touch.location(in: superview)
+            if let hitView = superview.hitTest(touchPoint, with: nil) {
+                var currentView: UIView? = hitView
+                while currentView != nil {
+                    if currentView is UIButton {
+                        print("🎯 MainCamera: 检测到按钮点击(\(type(of: currentView!))), 手势识别器让步")
+                        return false
+                    }
+                    currentView = currentView?.superview
+                }
+            }
+        }
+        
+        // 🚨 方法2: 直接检查触摸视图类型
+        let touchView = touch.view
+        if touchView is UIButton {
+            print("🎯 MainCamera: 直接检测到按钮触摸, 手势识别器让步")
+            return false
+        }
+        
+        // 🚨 方法3: 检查触摸视图的父视图链
+        var parentView = touchView?.superview
+        while parentView != nil {
+            if parentView is UIButton {
+                print("🎯 MainCamera: 检测到按钮父视图触摸, 手势识别器让步")
+                return false
+            }
+            parentView = parentView?.superview
+        }
+        
+        return true
+    }
+    
+    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        // 📹 录制中是否允许缩放？
+        
+        // ✅ 方案：录制中允许缩放（更灵活，市面主流App都支持）
+        return true
+    }
+}
+
+// MARK: - Associated Keys for Zoom State
+private struct AssociatedKeys {
+    static var lastZoomFactor: UInt8 = 0
+}
 
