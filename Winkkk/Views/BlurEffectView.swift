@@ -64,7 +64,7 @@ class BlurEffectView: UIVisualEffectView {
     
     private func setupAppearance() {
         // 设置背景色增强梦幻效果
-        backgroundColor = ThemeManager.cardBackground.withAlphaComponent(0.1)
+        backgroundColor = ThemeManager.cameraControlButtonBackground.withAlphaComponent(0.2)
         
         // 添加微妙的边框
         layer.borderColor = ThemeManager.primaryGradientStart.withAlphaComponent(0.3).cgColor
