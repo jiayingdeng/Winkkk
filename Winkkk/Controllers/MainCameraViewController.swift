@@ -228,7 +228,7 @@ class MainCameraViewController: UIViewController {
     }
     
     private func setupGalleryButton() {
-        galleryButton.backgroundColor = ThemeManager.cardBackground
+        galleryButton.backgroundColor = ThemeManager.cameraControlButtonBackground
         galleryButton.layer.cornerRadius = 25
         galleryButton.setImage(UIImage(systemName: "photo.on.rectangle"), for: .normal)
         galleryButton.tintColor = ThemeManager.primaryText
@@ -283,7 +283,7 @@ class MainCameraViewController: UIViewController {
     }
     
     private func setupSettingsButton() {
-        settingsButton.backgroundColor = ThemeManager.cardBackground
+        settingsButton.backgroundColor = ThemeManager.cameraControlButtonBackground
         settingsButton.layer.cornerRadius = 25
         settingsButton.setImage(UIImage(systemName: "gearshape"), for: .normal)
         settingsButton.tintColor = ThemeManager.primaryText

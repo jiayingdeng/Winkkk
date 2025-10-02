@@ -350,6 +350,16 @@ class ThemeManager: ObservableObject {
         }
     }
     
+    /// 录像页面按钮背景色（相册、设置等侧边按钮）
+    static var cameraControlButtonBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 230/255, green: 179/255, blue: 255/255, alpha: 0.85) // #E6B3FF 粉紫色（更饱和）
+        case .lightMinimal:
+            return UIColor(red: 255/255, green: 255/255, blue: 255/255, alpha: 0.95) // #FFFFFF 纯白（稍微半透明）
+        }
+    }
+    
     /// 半透明遮罩背景（用于loading等）
     static var overlayMaskBackground: UIColor {
         switch shared.currentTheme {
