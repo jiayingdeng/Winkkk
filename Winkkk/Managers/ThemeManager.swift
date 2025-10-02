@@ -441,6 +441,132 @@ class ThemeManager: ObservableObject {
             return UIColor.systemGray.withAlphaComponent(0.3) // 灰色半透明
         }
     }
+    
+    // MARK: - 半透明标签和遮罩颜色（用于 Views）
+    
+    /// 半透明标签背景（用于时长标签、时间戳、状态标签等）
+    static var labelOverlayBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 153/255, green: 102/255, blue: 204/255, alpha: 0.85) // 紫色半透明
+        case .lightMinimal:
+            return UIColor.black.withAlphaComponent(0.7) // 黑色半透明
+        }
+    }
+    
+    /// 全屏弹出遮罩背景（用于模态弹窗的背景遮罩）
+    static var popupDimmingBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 230/255, green: 179/255, blue: 255/255, alpha: 0.5) // 粉紫半透明
+        case .lightMinimal:
+            return UIColor.black.withAlphaComponent(0.5) // 黑色半透明
+        }
+    }
+    
+    /// 缩略图容器背景（TimelineView 中的视频缩略图容器）
+    static var thumbnailContainerBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 230/255, green: 179/255, blue: 255/255, alpha: 0.4) // 粉紫半透明
+        case .lightMinimal:
+            return UIColor.black.withAlphaComponent(0.3) // 黑色半透明
+        }
+    }
+    
+    /// 播放图标背景（VideoThumbnailCell 中的播放按钮背景）
+    static var playIconBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 153/255, green: 102/255, blue: 204/255, alpha: 0.7) // 紫色半透明
+        case .lightMinimal:
+            return UIColor.black.withAlphaComponent(0.5) // 黑色半透明
+        }
+    }
+    
+    /// 选择覆盖层背景（批量选择时的半透明覆盖层）
+    static var selectionOverlayBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 255/255, green: 182/255, blue: 193/255, alpha: 0.4) // 粉色半透明
+        case .lightMinimal:
+            return UIColor.white.withAlphaComponent(0.3) // 白色半透明
+        }
+    }
+    
+    /// 渐变遮罩底色（用于缩略图底部的渐变效果）
+    static var gradientOverlayEnd: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 153/255, green: 102/255, blue: 204/255, alpha: 0.35) // 紫色半透明
+        case .lightMinimal:
+            return UIColor.black.withAlphaComponent(0.3) // 黑色半透明
+        }
+    }
+    
+    /// 缩放指示器背景（TimelineView 中的缩放级别提示）
+    static var zoomIndicatorBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 153/255, green: 102/255, blue: 204/255, alpha: 0.9) // 紫色半透明
+        case .lightMinimal:
+            return UIColor.black.withAlphaComponent(0.8) // 黑色半透明
+        }
+    }
+    
+    // MARK: - Live Photo 专属颜色
+    
+    /// Live Photo 范围指示器背景
+    static var livePhotoRangeBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 255/255, green: 105/255, blue: 180/255, alpha: 0.4) // 粉红半透明
+        case .lightMinimal:
+            return UIColor.systemRed.withAlphaComponent(0.3) // 系统红半透明
+        }
+    }
+    
+    /// Live Photo 范围指示器边框
+    static var livePhotoRangeBorder: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 255/255, green: 105/255, blue: 180/255, alpha: 0.8) // 粉红半透明
+        case .lightMinimal:
+            return UIColor.systemRed.withAlphaComponent(0.6) // 系统红半透明
+        }
+    }
+    
+    /// Live Photo 标识图标背景
+    static var livePhotoIndicatorBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 255/255, green: 105/255, blue: 180/255, alpha: 0.9) // 粉红半透明
+        case .lightMinimal:
+            return UIColor.systemRed.withAlphaComponent(0.8) // 系统红半透明
+        }
+    }
+    
+    // MARK: - 着色按钮背景（用于半透明按钮）
+    
+    /// 信息/主要操作按钮背景
+    static var infoTintedButtonBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 200/255, green: 170/255, blue: 230/255, alpha: 0.15) // 浅紫半透明
+        case .lightMinimal:
+            return UIColor.systemBlue.withAlphaComponent(0.1) // 系统蓝半透明
+        }
+    }
+    
+    /// 危险/删除按钮背景
+    static var dangerTintedButtonBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 255/255, green: 105/255, blue: 180/255, alpha: 0.15) // 粉红半透明
+        case .lightMinimal:
+            return UIColor.systemRed.withAlphaComponent(0.1) // 系统红半透明
+        }
+    }
 }
 
 // MARK: - SwiftUI Color扩展

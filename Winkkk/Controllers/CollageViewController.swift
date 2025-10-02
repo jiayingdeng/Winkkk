@@ -2291,8 +2291,9 @@ extension CollageViewController: UIGestureRecognizerDelegate {
         let displayRect = getImageDisplayRect()
         
         // 获取布局模板的frames
-        let collageSize = CGSize(width: 1000, height: 1000 / selectedAspectRatio.ratio)
-        let frames = selectedLayoutTemplate.frames(for: collageSize, imageCount: imageItems.count)
+        let collageSize = selectedAspectRatio.size
+        let collageBounds = CGRect(origin: .zero, size: collageSize)
+        let frames = selectedLayoutTemplate.calculateFrames(for: imageItems.count, in: collageBounds)
         
         guard index < frames.count else { return nil }
         
@@ -2382,8 +2383,9 @@ extension CollageViewController: UIGestureRecognizerDelegate {
             showGestureFeedback("正在拖动位置 📍")
             
         case .changed:
-            // 🆕 实时更新预览图层（60fps 视觉反馈）
-            updateGesturePreviewTransform(translation: translation)
+            // 🆕 更新累积状态并实时更新预览图层（60fps 视觉反馈）
+            currentGestureTranslation = translation
+            updateGesturePreviewTransform()
             
             // 更新数据模型（用于最终生成拼图）
             let newTranslation = CGPoint(
