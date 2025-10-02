@@ -127,8 +127,15 @@ class CollageViewController: UIViewController {
     
     // 手势开始时的状态
     private var gestureBeginTranslation = CGPoint.zero
+    
+    // 首次选中图片的引导提示
+    private var hasShownFirstTimeGuidance = false
     private var gestureBeginScale: CGFloat = 1.0
     private var gestureBeginRotation: CGFloat = 0.0
+    
+    // 手势节流相关
+    private var gestureUpdateTimer: Timer?
+    private var needsGestureUpdate = false
     
     // MARK: - Initialization
     init(images: [UIImage]) {
@@ -191,6 +198,71 @@ class CollageViewController: UIViewController {
         
         // 进入拼图页面的触感反馈
         HapticFeedbackManager.shared.lightImpact()
+        
+        // 监听主题切换通知
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleThemeChange),
+            name: .themeDidChange,
+            object: nil
+        )
+    }
+    
+    deinit {
+        // 移除主题切换通知监听
+        NotificationCenter.default.removeObserver(self, name: .themeDidChange, object: nil)
+    }
+    
+    // MARK: - Theme Change Handler
+    
+    /// 处理主题切换
+    @objc private func handleThemeChange() {
+        // 更新头部区域颜色
+        countLabel.textColor = ThemeManager.primaryText
+        statusLabel.textColor = ThemeManager.secondaryText
+        
+        // 更新预览区域颜色
+        previewContainerView.backgroundColor = ThemeManager.backgroundSecondary
+        previewImageView.backgroundColor = ThemeManager.cardBackground
+        previewPlaceholder.textColor = ThemeManager.secondaryText
+        longPressHintLabel.textColor = ThemeManager.placeholderText
+        
+        // 更新布局和比例选择区域颜色
+        layoutSectionView.backgroundColor = ThemeManager.backgroundSecondary
+        layoutTitleLabel.textColor = ThemeManager.primaryText
+        aspectRatioSectionView.backgroundColor = ThemeManager.backgroundSecondary
+        aspectRatioTitleLabel.textColor = ThemeManager.primaryText
+        
+        // 更新轻量级工具栏颜色
+        lightEditToolbar.backgroundColor = ThemeManager.buttonPrimary.withAlphaComponent(0.95)
+        toolbarHintLabel.textColor = ThemeManager.warning
+        
+        // 更新工具栏按钮颜色
+        let toolbarButtons = [toolbarRotateLeftButton, toolbarRotateRightButton, 
+                              toolbarFlipHButton, toolbarFlipVButton, toolbarResetButton]
+        for button in toolbarButtons {
+            button.tintColor = ThemeManager.buttonTextOnPrimary
+            button.backgroundColor = ThemeManager.backgroundSecondary.withAlphaComponent(0.3)
+        }
+        
+        // 更新底部按钮颜色
+        backToProcessingButton.setTitleColor(ThemeManager.buttonTextOnPrimary, for: .normal)
+        backToProcessingButton.backgroundColor = ThemeManager.buttonPrimary
+        
+        enhanceButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+        enhanceButton.backgroundColor = ThemeManager.buttonSecondary
+        
+        // 更新其他按钮颜色
+        saveButton.setTitleColor(ThemeManager.buttonTextOnPrimary, for: .normal)
+        saveButton.backgroundColor = ThemeManager.success
+        
+        shareButton.setTitleColor(ThemeManager.buttonTextOnPrimary, for: .normal)
+        shareButton.backgroundColor = ThemeManager.buttonPrimary
+        
+        resetButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+        resetButton.backgroundColor = ThemeManager.buttonSecondary
+        
+        print("✅ CollageViewController: 主题已更新")
     }
     
     override func viewDidLayoutSubviews() {
@@ -244,9 +316,9 @@ class CollageViewController: UIViewController {
     private func setupHeaderView() {
         headerView.backgroundColor = .clear
         
-        // 数量标签 - 使用纯白色和加粗字体，确保清晰可见
+        // 数量标签 - 使用主题文字色，确保清晰可见
         countLabel.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
-        countLabel.textColor = .white // 纯白色，不透明
+        countLabel.textColor = ThemeManager.primaryText
         countLabel.textAlignment = .center
         countLabel.text = "已选择 \(imageItems.count) 张图片"
         // 添加阴影增强可读性
@@ -256,9 +328,9 @@ class CollageViewController: UIViewController {
         countLabel.layer.shadowRadius = 2
         headerView.addSubview(countLabel)
         
-        // 状态标签（移到头部区域）- 使用清晰的白色文字
+        // 状态标签（移到头部区域）- 使用主题次要文字色
         statusLabel.font = UIFont.systemFont(ofSize: 12, weight: .medium)
-        statusLabel.textColor = UIColor.white.withAlphaComponent(0.9) // 略微透明但仍然清晰
+        statusLabel.textColor = ThemeManager.secondaryText
         statusLabel.textAlignment = .center
         statusLabel.text = ""
         // 添加阴影增强可读性
@@ -270,7 +342,7 @@ class CollageViewController: UIViewController {
     }
     
     private func setupPreviewArea() {
-        previewContainerView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
+        previewContainerView.backgroundColor = ThemeManager.backgroundSecondary
         previewContainerView.layer.cornerRadius = ThemeManager.standardCornerRadius
         previewContainerView.clipsToBounds = true
         
@@ -278,20 +350,20 @@ class CollageViewController: UIViewController {
         previewImageView.contentMode = .scaleAspectFit
         previewImageView.clipsToBounds = true
         previewImageView.layer.cornerRadius = 8
-        previewImageView.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        previewImageView.backgroundColor = ThemeManager.cardBackground
         previewContainerView.addSubview(previewImageView)
         
-        // 占位文字
+        // 占位文字 - 使用主题文字颜色
         previewPlaceholder.font = ThemeManager.captionFont
-        previewPlaceholder.textColor = UIColor.white.withAlphaComponent(0.6)
+        previewPlaceholder.textColor = ThemeManager.secondaryText
         previewPlaceholder.textAlignment = .center
         previewPlaceholder.text = "选择布局后自动生成拼图"
         previewPlaceholder.numberOfLines = 0
         previewContainerView.addSubview(previewPlaceholder)
         
-        // 长按提示文字
+        // 长按提示文字 - 使用主题占位符颜色
         longPressHintLabel.font = UIFont.systemFont(ofSize: 11, weight: .regular)
-        longPressHintLabel.textColor = UIColor.white.withAlphaComponent(0.5)
+        longPressHintLabel.textColor = ThemeManager.placeholderText
         longPressHintLabel.textAlignment = .center
         longPressHintLabel.text = "💡 长按选中图片，直接拖动/缩放/旋转"
         longPressHintLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -325,12 +397,12 @@ class CollageViewController: UIViewController {
     }
     
     private func setupLayoutSection() {
-        layoutSectionView.backgroundColor = UIColor.black.withAlphaComponent(0.2)
+        layoutSectionView.backgroundColor = ThemeManager.backgroundSecondary
         layoutSectionView.layer.cornerRadius = ThemeManager.standardCornerRadius
         
-        // 标题
+        // 标题 - 使用主题文字颜色
         layoutTitleLabel.font = ThemeManager.buttonFont
-        layoutTitleLabel.textColor = .white
+        layoutTitleLabel.textColor = ThemeManager.primaryText
         layoutTitleLabel.text = "选择布局模板"
         layoutSectionView.addSubview(layoutTitleLabel)
         
@@ -345,12 +417,12 @@ class CollageViewController: UIViewController {
     }
     
     private func setupAspectRatioSection() {
-        aspectRatioSectionView.backgroundColor = UIColor.black.withAlphaComponent(0.2)
+        aspectRatioSectionView.backgroundColor = ThemeManager.backgroundSecondary
         aspectRatioSectionView.layer.cornerRadius = ThemeManager.standardCornerRadius
         
-        // 标题
+        // 标题 - 使用主题文字颜色
         aspectRatioTitleLabel.font = ThemeManager.buttonFont
-        aspectRatioTitleLabel.textColor = .white
+        aspectRatioTitleLabel.textColor = ThemeManager.primaryText
         aspectRatioTitleLabel.text = "选择比例"
         aspectRatioSectionView.addSubview(aspectRatioTitleLabel)
         
@@ -383,7 +455,7 @@ class CollageViewController: UIViewController {
         // 保存按钮 - 使用主题色确保清晰可见
         saveButton.setTitle("💾 保存", for: .normal)
         saveButton.titleLabel?.font = ThemeManager.buttonFont
-        saveButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+        saveButton.setTitleColor(ThemeManager.buttonTextOnPrimary, for: .normal)
         saveButton.backgroundColor = ThemeManager.success
         saveButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         saveButton.addTarget(self, action: #selector(saveCollage), for: .touchUpInside)
@@ -394,7 +466,7 @@ class CollageViewController: UIViewController {
         // 分享按钮 - 使用主题色确保清晰可见
         shareButton.setTitle("📤 分享", for: .normal)
         shareButton.titleLabel?.font = ThemeManager.buttonFont
-        shareButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+        shareButton.setTitleColor(ThemeManager.buttonTextOnPrimary, for: .normal)
         shareButton.backgroundColor = ThemeManager.buttonPrimary
         shareButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         shareButton.addTarget(self, action: #selector(shareCollage), for: .touchUpInside)
@@ -406,7 +478,7 @@ class CollageViewController: UIViewController {
         resetButton.setTitle("🔄 重置", for: .normal)
         resetButton.titleLabel?.font = ThemeManager.buttonFont
         resetButton.setTitleColor(ThemeManager.primaryText, for: .normal)
-        resetButton.backgroundColor = ThemeManager.warning
+        resetButton.backgroundColor = ThemeManager.buttonSecondary
         resetButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         resetButton.addTarget(self, action: #selector(resetCollage), for: .touchUpInside)
         resetButton.isEnabled = true  // 重置按钮始终可用
@@ -417,22 +489,22 @@ class CollageViewController: UIViewController {
     private func setupSecondRowButtons() {
         secondRowButtonsView.backgroundColor = .clear
         
-        // 返回截图中心按钮
+        // 返回截图中心按钮 - 使用主题色
         backToProcessingButton.setTitle("📷 返回截图中心", for: .normal)
         backToProcessingButton.titleLabel?.font = ThemeManager.buttonFont
-        backToProcessingButton.setTitleColor(.white, for: .normal)
-        backToProcessingButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
+        backToProcessingButton.setTitleColor(ThemeManager.buttonTextOnPrimary, for: .normal)
+        backToProcessingButton.backgroundColor = ThemeManager.buttonPrimary
         backToProcessingButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         backToProcessingButton.addTarget(self, action: #selector(backToProcessingTapped), for: .touchUpInside)
         backToProcessingButton.isEnabled = true  // 始终可用
         backToProcessingButton.alpha = 1.0
         secondRowButtonsView.addSubview(backToProcessingButton)
         
-        // 画质修复按钮
+        // 画质修复按钮 - 使用主题色
         enhanceButton.setTitle("🎨 画质修复", for: .normal)
         enhanceButton.titleLabel?.font = ThemeManager.buttonFont
-        enhanceButton.setTitleColor(.white, for: .normal)
-        enhanceButton.backgroundColor = UIColor.systemPurple.withAlphaComponent(0.8)
+        enhanceButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+        enhanceButton.backgroundColor = ThemeManager.buttonSecondary
         enhanceButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         enhanceButton.addTarget(self, action: #selector(enhanceCollageTapped), for: .touchUpInside)
         enhanceButton.isEnabled = false
@@ -441,8 +513,8 @@ class CollageViewController: UIViewController {
     }
     
     private func setupLightEditToolbar() {
-        // 工具栏容器样式
-        lightEditToolbar.backgroundColor = UIColor.black.withAlphaComponent(0.85)
+        // 工具栏容器样式 - 使用主题按钮主色并增加不透明度确保可见性
+        lightEditToolbar.backgroundColor = ThemeManager.buttonPrimary.withAlphaComponent(0.95)
         lightEditToolbar.layer.cornerRadius = 20
         lightEditToolbar.layer.shadowColor = UIColor.black.cgColor
         lightEditToolbar.layer.shadowOffset = CGSize(width: 0, height: 4)
@@ -451,11 +523,14 @@ class CollageViewController: UIViewController {
         lightEditToolbar.isHidden = true // 默认隐藏
         lightEditToolbar.alpha = 0
         
-        // 手势提示标签
-        toolbarHintLabel.text = "拖动调整 • 双指缩放/旋转"
-        toolbarHintLabel.font = UIFont.systemFont(ofSize: 11, weight: .medium)
-        toolbarHintLabel.textColor = UIColor.white.withAlphaComponent(0.7)
+        // 手势提示标签 - 增强视觉效果，使用主题文字色
+        toolbarHintLabel.text = "💡 试试：拖动调整位置 • 双指缩放/旋转"
+        toolbarHintLabel.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
+        toolbarHintLabel.textColor = ThemeManager.warning // 使用主题警告色（黄/橙色系）
         toolbarHintLabel.textAlignment = .center
+        toolbarHintLabel.numberOfLines = 1
+        toolbarHintLabel.adjustsFontSizeToFitWidth = true
+        toolbarHintLabel.minimumScaleFactor = 0.8
         lightEditToolbar.addSubview(toolbarHintLabel)
         
         // 按钮样式配置
@@ -472,8 +547,8 @@ class CollageViewController: UIViewController {
                 let config = UIImage.SymbolConfiguration(pointSize: 20, weight: .medium)
                 button.setImage(UIImage(systemName: iconName, withConfiguration: config), for: .normal)
             }
-            button.tintColor = .white
-            button.backgroundColor = UIColor.white.withAlphaComponent(0.15)
+            button.tintColor = ThemeManager.buttonTextOnPrimary
+            button.backgroundColor = ThemeManager.backgroundSecondary.withAlphaComponent(0.3)
             button.layer.cornerRadius = 22
             button.clipsToBounds = true
             lightEditToolbar.addSubview(button)
@@ -1033,6 +1108,12 @@ class CollageViewController: UIViewController {
                 // 🆕 显示轻量级工具栏
                 showLightEditToolbar()
                 
+                // 🆕 首次选中时显示引导提示
+                if !hasShownFirstTimeGuidance {
+                    hasShownFirstTimeGuidance = true
+                    showFirstTimeGuidance()
+                }
+                
                 // 同步更新下方小图面板的选中状态
                 var indexPathsToReload: [IndexPath] = [IndexPath(item: tappedIndex, section: 0)]
                 if let previousIndex = previousSelectedIndex {
@@ -1055,9 +1136,6 @@ class CollageViewController: UIViewController {
     // MARK: - Collage Image Long Press Handling
     
     @objc private func handleCollageImageLongPress(_ gesture: UILongPressGestureRecognizer) {
-        // 调试：打印手势状态
-        print("🔍 长按手势状态: \(gesture.state.rawValue)")
-        
         // 只在手势开始时触发（避免重复触发）
         guard gesture.state == .began else { return }
         
@@ -2148,11 +2226,34 @@ extension CollageViewController: UICollectionViewDataSource, UICollectionViewDel
 // MARK: - 直接编辑手势处理
 extension CollageViewController: UIGestureRecognizerDelegate {
     
-    @objc private func handleDirectPan(_ gesture: UIPanGestureRecognizer) {
-        guard let selectedIndex = selectedImageIndex else {
-            print("⚠️ 没有选中的图片")
-            return
+    /// 节流更新拼图（避免频繁重绘）
+    private func scheduleGestureUpdate() {
+        needsGestureUpdate = true
+        
+        // 如果定时器不存在，创建一个
+        if gestureUpdateTimer == nil {
+            gestureUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.033, repeats: true) { [weak self] _ in
+                guard let self = self else { return }
+                if self.needsGestureUpdate {
+                    self.regenerateCollageIfNeeded()
+                    self.needsGestureUpdate = false
+                }
+            }
         }
+    }
+    
+    /// 停止节流定时器并执行最后一次更新
+    private func finishGestureUpdate() {
+        gestureUpdateTimer?.invalidate()
+        gestureUpdateTimer = nil
+        if needsGestureUpdate {
+            regenerateCollageIfNeeded()
+            needsGestureUpdate = false
+        }
+    }
+    
+    @objc private func handleDirectPan(_ gesture: UIPanGestureRecognizer) {
+        guard let selectedIndex = selectedImageIndex else { return }
         
         let translation = gesture.translation(in: previewImageView)
         
@@ -2160,7 +2261,9 @@ extension CollageViewController: UIGestureRecognizerDelegate {
         case .began:
             gestureBeginTranslation = imageItems[selectedIndex].translation
             HapticFeedbackManager.shared.lightImpact()
-            print("🎯 开始拖动图片 \(selectedIndex)")
+            
+            // 显示实时反馈
+            showGestureFeedback("正在拖动位置 📍")
             
         case .changed:
             let newTranslation = CGPoint(
@@ -2168,11 +2271,14 @@ extension CollageViewController: UIGestureRecognizerDelegate {
                 y: gestureBeginTranslation.y + translation.y
             )
             imageItems[selectedIndex].translation = newTranslation
-            regenerateCollageIfNeeded()
+            scheduleGestureUpdate()
             
         case .ended, .cancelled:
+            finishGestureUpdate()
             HapticFeedbackManager.shared.lightImpact()
-            print("✅ 拖动结束")
+            
+            // 恢复原始提示
+            hideGestureFeedback()
             
         default:
             break
@@ -2180,25 +2286,27 @@ extension CollageViewController: UIGestureRecognizerDelegate {
     }
     
     @objc private func handleDirectPinch(_ gesture: UIPinchGestureRecognizer) {
-        guard let selectedIndex = selectedImageIndex else {
-            print("⚠️ 没有选中的图片")
-            return
-        }
+        guard let selectedIndex = selectedImageIndex else { return }
         
         switch gesture.state {
         case .began:
             gestureBeginScale = imageItems[selectedIndex].scale
             HapticFeedbackManager.shared.lightImpact()
-            print("🎯 开始缩放图片 \(selectedIndex)")
+            
+            // 显示实时反馈
+            showGestureFeedback("正在双指缩放 🔍")
             
         case .changed:
             let newScale = max(0.5, min(3.0, gestureBeginScale * gesture.scale))
             imageItems[selectedIndex].scale = newScale
-            regenerateCollageIfNeeded()
+            scheduleGestureUpdate()
             
         case .ended, .cancelled:
+            finishGestureUpdate()
             HapticFeedbackManager.shared.lightImpact()
-            print("✅ 缩放结束：scale=\(imageItems[selectedIndex].scale)")
+            
+            // 恢复原始提示
+            hideGestureFeedback()
             
         default:
             break
@@ -2206,25 +2314,27 @@ extension CollageViewController: UIGestureRecognizerDelegate {
     }
     
     @objc private func handleDirectRotation(_ gesture: UIRotationGestureRecognizer) {
-        guard let selectedIndex = selectedImageIndex else {
-            print("⚠️ 没有选中的图片")
-            return
-        }
+        guard let selectedIndex = selectedImageIndex else { return }
         
         switch gesture.state {
         case .began:
             gestureBeginRotation = imageItems[selectedIndex].rotationAngle
             HapticFeedbackManager.shared.lightImpact()
-            print("🎯 开始旋转图片 \(selectedIndex)")
+            
+            // 显示实时反馈
+            showGestureFeedback("正在双指旋转 🔄")
             
         case .changed:
             let newRotation = gestureBeginRotation + gesture.rotation * 180 / .pi
             imageItems[selectedIndex].updateRotation(newRotation)
-            regenerateCollageIfNeeded()
+            scheduleGestureUpdate()
             
         case .ended, .cancelled:
+            finishGestureUpdate()
             HapticFeedbackManager.shared.lightImpact()
-            print("✅ 旋转结束：rotation=\(imageItems[selectedIndex].rotationAngle)")
+            
+            // 恢复原始提示
+            hideGestureFeedback()
             
         default:
             break
@@ -2244,9 +2354,70 @@ extension CollageViewController {
     private func showLightEditToolbar() {
         guard lightEditToolbar.alpha == 0 else { return }
         
+        lightEditToolbar.isHidden = false
         UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut]) {
             self.lightEditToolbar.alpha = 1.0
             self.lightEditToolbar.transform = .identity
+        } completion: { _ in
+            // 添加手势提示的脉动动画，吸引注意力
+            self.animateGestureHint()
+        }
+    }
+    
+    /// 手势提示的脉动动画
+    private func animateGestureHint() {
+        UIView.animate(withDuration: 0.6, delay: 0, options: [.autoreverse, .repeat]) {
+            self.toolbarHintLabel.alpha = 0.6
+        }
+        
+        // 3秒后停止动画
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            self.toolbarHintLabel.layer.removeAllAnimations()
+            UIView.animate(withDuration: 0.3) {
+                self.toolbarHintLabel.alpha = 1.0
+            }
+        }
+    }
+    
+    /// 显示手势实时反馈
+    private func showGestureFeedback(_ text: String) {
+        // 停止所有动画
+        toolbarHintLabel.layer.removeAllAnimations()
+        
+        // 更新文本并高亮显示
+        UIView.transition(with: toolbarHintLabel, duration: 0.2, options: .transitionCrossDissolve) {
+            self.toolbarHintLabel.text = text
+            self.toolbarHintLabel.textColor = UIColor.systemGreen
+            self.toolbarHintLabel.alpha = 1.0
+        }
+    }
+    
+    /// 隐藏手势反馈，恢复原始提示
+    private func hideGestureFeedback() {
+        UIView.transition(with: toolbarHintLabel, duration: 0.3, options: .transitionCrossDissolve) {
+            self.toolbarHintLabel.text = "💡 试试：拖动调整位置 • 双指缩放/旋转"
+            self.toolbarHintLabel.textColor = UIColor.systemYellow
+        }
+    }
+    
+    /// 首次选中图片时显示引导提示
+    private func showFirstTimeGuidance() {
+        // 停止脉动动画
+        toolbarHintLabel.layer.removeAllAnimations()
+        
+        // 显示醒目的引导文字
+        UIView.transition(with: toolbarHintLabel, duration: 0.4, options: .transitionCrossDissolve) {
+            self.toolbarHintLabel.text = "✨ 太棒了！现在可以直接用手势调整图片啦"
+            self.toolbarHintLabel.textColor = UIColor.systemOrange
+            self.toolbarHintLabel.alpha = 1.0
+        }
+        
+        // 2秒后恢复为常规提示
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            UIView.transition(with: self.toolbarHintLabel, duration: 0.4, options: .transitionCrossDissolve) {
+                self.toolbarHintLabel.text = "💡 试试：拖动调整位置 • 双指缩放/旋转"
+                self.toolbarHintLabel.textColor = UIColor.systemYellow
+            }
         }
     }
     
@@ -2257,6 +2428,8 @@ extension CollageViewController {
         UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseIn]) {
             self.lightEditToolbar.alpha = 0
             self.lightEditToolbar.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
+        } completion: { _ in
+            self.lightEditToolbar.isHidden = true
         }
     }
     
