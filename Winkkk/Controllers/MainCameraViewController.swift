@@ -1522,7 +1522,11 @@ extension MainCameraViewController {
     
     // MARK: - 新增：直接显示场景选择
     private func showTimeSequenceSceneSelection() {
-        // 直接进入场景选择界面（已融合说明信息）
+        // 🎯 简化：直接切换到运动轨迹模式（暂时只支持这一种场景）
+        // 💡 未来如果需要多场景选择，可以恢复下面注释的代码
+        
+        /*
+        // 📝 原场景选择Sheet代码（已注释，保留备用）
         let sceneSelectionVC = SceneSelectionViewController()
         sceneSelectionVC.delegate = self
         let navController = UINavigationController(rootViewController: sceneSelectionVC)
@@ -1536,6 +1540,10 @@ extension MainCameraViewController {
         }
         
         present(navController, animated: true)
+        */
+        
+        // 直接启动运动轨迹模式
+        startTimeSequenceRecording(with: .sportMotion)
     }
     
     private func switchToNormalMode() {
@@ -1547,14 +1555,14 @@ extension MainCameraViewController {
         
         updateModeSwitcherDisplay()
         
-        // 更新界面状态
-        let alert = UIAlertController(
-            title: "✅ 模式切换成功",
-            message: "已切换到普通录像模式",
-            preferredStyle: .alert
+        // 🎯 使用Toast提示
+        showBriefSuccessToast(
+            title: "📹 普通录像模式",
+            message: "已切换到普通录像"
         )
-        alert.addAction(UIAlertAction(title: "确定", style: .default))
-        present(alert, animated: true)
+        
+        // 触觉反馈
+        HapticFeedbackManager.shared.notificationSuccess()
     }
     
     private func showTimeSequenceModeOptions() {
@@ -1610,14 +1618,17 @@ extension MainCameraViewController {
         // 切换到时间序列模式
         TimeSequenceModeManager.shared.switchToTimeSequenceMode(with: sceneType)
         
-        // 显示优化后的模式切换成功提示
-        let alert = UIAlertController(
-            title: "✅ 时间序列模式已启用",
-            message: "📹 场景类型：\(sceneType.displayName)\n⚙️ 录制参数：已优化设置\n🎯 提示：保持拍摄位置稳定",
-            preferredStyle: .alert
+        // 🎯 使用Toast提示，间接说明拍摄技巧
+        let guide = ShootingGuide.guide(for: sceneType)
+        let tipMessage = guide.tips.first ?? "保持拍摄位置稳定"
+        
+        showBriefSuccessToast(
+            title: "⏰ 时间序列模式",
+            message: "💡 \(tipMessage)\n\(guide.duration)"
         )
-        alert.addAction(UIAlertAction(title: "开始录像", style: .default))
-        present(alert, animated: true)
+        
+        // 触觉反馈
+        HapticFeedbackManager.shared.notificationSuccess()
     }
     
     private func showModeInfo() {
@@ -1644,6 +1655,87 @@ extension MainCameraViewController {
                 self.modeSwitcherMainLabel.text = "📹 普通录像"
                 self.modeSwitcherSubLabel.text = "点击切换时间序列模式"
                 self.modeSwitcherButton.backgroundColor = ThemeManager.normalRecordModeBackground
+            }
+        }
+    }
+    
+    // MARK: - Toast Notification
+    /// 显示简洁的Toast提示（参考VideoPlayerViewController实现）
+    private func showBriefSuccessToast(title: String, message: String) {
+        // 创建Toast视图
+        let toastView = UIView()
+        toastView.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.95)
+        toastView.layer.cornerRadius = 16
+        toastView.layer.shadowColor = UIColor.black.cgColor
+        toastView.layer.shadowOpacity = 0.15
+        toastView.layer.shadowOffset = CGSize(width: 0, height: 4)
+        toastView.layer.shadowRadius = 12
+        toastView.translatesAutoresizingMaskIntoConstraints = false
+        
+        // 图标
+        let iconLabel = UILabel()
+        iconLabel.text = "⏰"
+        iconLabel.font = .systemFont(ofSize: 32)
+        iconLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        // 标题
+        let titleLabel = UILabel()
+        titleLabel.text = title
+        titleLabel.textColor = ThemeManager.primaryText
+        titleLabel.font = .systemFont(ofSize: 18, weight: .semibold)
+        titleLabel.textAlignment = .center
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        // 消息
+        let messageLabel = UILabel()
+        messageLabel.text = message
+        messageLabel.textColor = ThemeManager.secondaryText
+        messageLabel.font = .systemFont(ofSize: 14, weight: .regular)
+        messageLabel.textAlignment = .center
+        messageLabel.numberOfLines = 0
+        messageLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        toastView.addSubview(iconLabel)
+        toastView.addSubview(titleLabel)
+        toastView.addSubview(messageLabel)
+        view.addSubview(toastView)
+        
+        // 布局约束
+        NSLayoutConstraint.activate([
+            toastView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            toastView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            toastView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 40),
+            toastView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -40),
+            
+            iconLabel.topAnchor.constraint(equalTo: toastView.topAnchor, constant: 20),
+            iconLabel.centerXAnchor.constraint(equalTo: toastView.centerXAnchor),
+            
+            titleLabel.topAnchor.constraint(equalTo: iconLabel.bottomAnchor, constant: 12),
+            titleLabel.leadingAnchor.constraint(equalTo: toastView.leadingAnchor, constant: 20),
+            titleLabel.trailingAnchor.constraint(equalTo: toastView.trailingAnchor, constant: -20),
+            
+            messageLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            messageLabel.leadingAnchor.constraint(equalTo: toastView.leadingAnchor, constant: 20),
+            messageLabel.trailingAnchor.constraint(equalTo: toastView.trailingAnchor, constant: -20),
+            messageLabel.bottomAnchor.constraint(equalTo: toastView.bottomAnchor, constant: -20)
+        ])
+        
+        // 动画显示
+        toastView.alpha = 0
+        toastView.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+        
+        UIView.animate(withDuration: 0.4, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5, options: .curveEaseOut, animations: {
+            toastView.alpha = 1
+            toastView.transform = .identity
+        }) { _ in
+            // 2秒后自动消失
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                UIView.animate(withDuration: 0.3, animations: {
+                    toastView.alpha = 0
+                    toastView.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+                }) { _ in
+                    toastView.removeFromSuperview()
+                }
             }
         }
     }

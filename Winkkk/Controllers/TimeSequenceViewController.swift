@@ -46,6 +46,28 @@ class TimeSequenceViewController: UIViewController {
     // 新的时间序列处理器
     private var timeSequenceProcessor: TimeSequenceProcessor?
     
+    // MARK: - 🎯 AI增强合成配置
+    
+    /// 主体提取策略（内部使用，对用户透明）
+    private enum SubjectExtractionStrategy {
+        case deepLabV3      // DeepLabV3 分割
+        case subjectEngine  // SubjectExtractionEngine
+        case mobileSAM      // MobileSAM 交互式分割
+        case centerCrop     // 中心裁剪（降级方案）
+        
+        var displayName: String {
+            switch self {
+            case .deepLabV3: return "DeepLabV3"
+            case .subjectEngine: return "SubjectEngine"
+            case .mobileSAM: return "MobileSAM"
+            case .centerCrop: return "中心裁剪"
+            }
+        }
+    }
+    
+    /// 当前使用的提取策略（默认使用 DeepLabV3）
+    private var currentExtractionStrategy: SubjectExtractionStrategy = .deepLabV3
+    
     // MARK: - UI Components
     private let gradientBackgroundView = GradientBackgroundView()
     private let scrollView = UIScrollView()
@@ -137,6 +159,9 @@ class TimeSequenceViewController: UIViewController {
         
         // 🎯 监听打开相机通知，确保能响应返回录像页面的请求
         setupNotificationObservers()
+        
+        // 🤖 初始化 DeepLabV3Manager（用于AI增强合成）
+        initializeAIModels()
         
         // 进入时间序列模式的触感反馈
         HapticFeedbackManager.shared.lightImpact()
@@ -497,6 +522,22 @@ class TimeSequenceViewController: UIViewController {
         // 移除通知监听
         NotificationCenter.default.removeObserver(self)
         print("📱 TimeSequence: Deinitializing")
+    }
+    
+    // MARK: - AI Models Initialization
+    
+    /// 初始化AI模型（用于增强合成）
+    private func initializeAIModels() {
+        // 异步初始化 DeepLabV3Manager，避免阻塞主线程
+        DispatchQueue.global(qos: .userInitiated).async {
+            do {
+                try DeepLabV3Manager.shared.initialize()
+                print("✅ TimeSequence: DeepLabV3Manager 初始化成功")
+            } catch {
+                print("⚠️ TimeSequence: DeepLabV3Manager 初始化失败: \(error)")
+                // 失败不影响基础功能，会自动降级到中心裁剪
+            }
+        }
     }
     
     // MARK: - Notification Setup
@@ -1365,8 +1406,11 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
             }
             
         case .sportMotion:
-            // 📋 策略2：轨迹叠加合成 - 适合运动轨迹
-            generateTrajectoryOverlayComposite(from: frames, sceneType: currentSceneType)
+            // 📋 策略2：🌟 AI增强的轨迹叠加合成 - 适合运动轨迹
+            generateAIEnhancedTrajectoryComposite(from: frames, sceneType: currentSceneType)
+            
+            // 旧方法（备用）：
+            // generateTrajectoryOverlayComposite(from: frames, sceneType: currentSceneType)
         }
         
         print("✅ 智能场景合成完成！场景类型: \(currentSceneType.displayName)")
@@ -1461,6 +1505,95 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
         
         resultImageView.image = compositeImage
         resultContainerView.isHidden = false
+    }
+    
+    /// 📋 策略3：🌟 AI增强的轨迹叠加合成（人物分割版）
+    private func generateAIEnhancedTrajectoryComposite(from frames: [UIImage], sceneType: SceneType) {
+        guard !frames.isEmpty else { return }
+        guard let lastFrame = frames.last else { return }
+        
+        print("🎯 开始AI增强合成，帧数: \(frames.count)")
+        
+        // 📊 记录开始时间（用于性能统计）
+        let startTime = Date()
+        
+        // 🖼️ 步骤1：使用最后一帧作为完整背景
+        let backgroundImage = lastFrame
+        let canvasSize = backgroundImage.size
+        
+        print("🌄 背景图片：使用最后一帧，尺寸: \(canvasSize.width)×\(canvasSize.height)")
+        
+        // 🎯 步骤2：批量提取所有帧的人物（使用DispatchGroup处理异步）
+        let dispatchGroup = DispatchGroup()
+        var extractedSubjects: [Int: UIImage] = [:] // [索引: 提取的人物图]
+        var successCount = 0
+        var failureCount = 0
+        
+        for (index, frame) in frames.enumerated() {
+            dispatchGroup.enter()
+            
+            extractSubjectUsingAI(from: frame, strategy: currentExtractionStrategy) { extractedSubject in
+                if let subject = extractedSubject {
+                    extractedSubjects[index] = subject
+                    successCount += 1
+                    print("✅ 帧 \(index + 1)/\(frames.count) 人物提取成功")
+                } else {
+                    extractedSubjects[index] = frame // 降级使用原图
+                    failureCount += 1
+                    print("⚠️ 帧 \(index + 1)/\(frames.count) 人物提取失败，使用原图")
+                }
+                dispatchGroup.leave()
+            }
+        }
+        
+        // 🎯 步骤3：等待所有分割完成，然后开始合成
+        dispatchGroup.notify(queue: .main) { [weak self] in
+            guard let self = self else { return }
+            
+            print("📊 人物提取完成: 成功\(successCount)张，失败\(failureCount)张")
+            
+            // 🖼️ 创建画布并绘制背景
+            UIGraphicsBeginImageContextWithOptions(canvasSize, false, 0.0)
+            
+            // 绘制完整的最后一帧作为背景
+            backgroundImage.draw(in: CGRect(origin: .zero, size: canvasSize))
+            print("🌄 背景绘制完成")
+            
+            // 🎨 步骤4：按照原透明度公式叠加每个提取的人物
+            // 反向绘制：最后一帧先绘制（底层高透明度），第一帧后绘制（上层低透明度）
+            for (drawIndex, _) in frames.enumerated().reversed() {
+                guard let extractedSubject = extractedSubjects[drawIndex] else { continue }
+                
+                // 🔧 使用原有的透明度计算方法
+                let transparencyIndex = drawIndex
+                let alpha = self.calculateAlphaForScene(
+                    index: transparencyIndex,
+                    totalFrames: frames.count,
+                    sceneType: sceneType
+                )
+                
+                // 🎨 绘制提取的人物（已移除背景）
+                extractedSubject.draw(
+                    in: CGRect(origin: .zero, size: canvasSize),
+                    blendMode: .normal,
+                    alpha: alpha
+                )
+                
+                print("🎨 叠加人物 \(drawIndex + 1)/\(frames.count)，透明度: \(String(format: "%.1f", alpha * 100))%")
+            }
+            
+            // 🎉 完成合成
+            let compositeImage = UIGraphicsGetImageFromCurrentImageContext()
+            UIGraphicsEndImageContext()
+            
+            // 📊 记录性能指标
+            let processingTime = Date().timeIntervalSince(startTime)
+            print("⏱️ AI增强合成完成！总耗时: \(String(format: "%.2f", processingTime))秒")
+            print("📈 成功率: \(successCount)/\(frames.count) = \(String(format: "%.1f", Float(successCount)/Float(frames.count)*100))%")
+            
+            self.resultImageView.image = compositeImage
+            self.resultContainerView.isHidden = false
+        }
     }
     
     /// 默认叠加合成 (无场景类型时的备用方案)
@@ -1799,6 +1932,73 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
             // 其他场景保持原有逻辑
             return (0.1, 0.7)
         }
+    }
+    
+    // MARK: - 🤖 AI增强主体提取
+    
+    /// 🔍 使用AI提取主体（统一接口）
+    private func extractSubjectUsingAI(
+        from frame: UIImage,
+        strategy: SubjectExtractionStrategy,
+        completion: @escaping (UIImage?) -> Void
+    ) {
+        switch strategy {
+        case .deepLabV3:
+            extractUsingDeepLabV3(frame: frame, completion: completion)
+            
+        case .subjectEngine:
+            extractUsingSubjectEngine(frame: frame, completion: completion)
+            
+        case .mobileSAM:
+            extractUsingMobileSAM(frame: frame, completion: completion)
+            
+        case .centerCrop:
+            // 降级方案：直接使用中心裁剪
+            let result = extractCenterRegion(from: frame, percentage: 0.4)
+            completion(result ?? frame)
+        }
+    }
+    
+    /// 🤖 使用 DeepLabV3 提取人物
+    private func extractUsingDeepLabV3(
+        frame: UIImage,
+        completion: @escaping (UIImage?) -> Void
+    ) {
+        DeepLabV3Manager.shared.segmentSubjects(from: frame) { result in
+            switch result {
+            case .success(let segmentationResult):
+                // ✅ 成功：使用提取的主体（已移除背景）
+                print("✅ DeepLabV3 分割成功，置信度: \(segmentationResult.confidence)%")
+                completion(segmentationResult.subjectImage)
+                
+            case .failure(let error):
+                // ⚠️ 失败：降级使用原图
+                print("⚠️ DeepLabV3 分割失败: \(error)，使用原图")
+                completion(frame)
+            }
+        }
+    }
+    
+    /// 🔮 使用 SubjectExtractionEngine 提取人物（占位方法，待实现）
+    private func extractUsingSubjectEngine(
+        frame: UIImage,
+        completion: @escaping (UIImage?) -> Void
+    ) {
+        // TODO: 实现 SubjectExtractionEngine 分割
+        print("⚠️ SubjectEngine 暂未实现，降级到中心裁剪")
+        let result = extractCenterRegion(from: frame, percentage: 0.4)
+        completion(result ?? frame)
+    }
+    
+    /// 🎯 使用 MobileSAM 提取人物（占位方法，待实现）
+    private func extractUsingMobileSAM(
+        frame: UIImage,
+        completion: @escaping (UIImage?) -> Void
+    ) {
+        // TODO: 实现 MobileSAM 分割
+        print("⚠️ MobileSAM 暂未实现，降级到中心裁剪")
+        let result = extractCenterRegion(from: frame, percentage: 0.4)
+        completion(result ?? frame)
     }
     
     // MARK: - 参数创建
