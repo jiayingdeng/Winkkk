@@ -106,6 +106,9 @@ class TimeSequenceViewController: UIViewController {
     private let bottomActionView = UIView()
     private let returnToRecordingButton = UIButton()
     
+    // MARK: - 🎯 布局约束（用于动态调整）
+    private var videoSelectionHeightConstraint: NSLayoutConstraint!
+    
     // MARK: - State
     private var isProcessing = false {
         didSet {
@@ -230,7 +233,7 @@ class TimeSequenceViewController: UIViewController {
         
         // 选择视频按钮
         selectVideoButton.setTitle("📱 选择要处理的视频", for: .normal)
-        selectVideoButton.setTitleColor(ThemeManager.primaryText, for: .normal)  // 🎨 修复：使用主题主文本色
+        selectVideoButton.setTitleColor(ThemeManager.buttonPrimaryText, for: .normal)  // 🎨 使用按钮主色调文字
         selectVideoButton.backgroundColor = ThemeManager.buttonPrimary
         selectVideoButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         selectVideoButton.titleLabel?.font = ThemeManager.buttonFont
@@ -286,8 +289,8 @@ class TimeSequenceViewController: UIViewController {
         
         // 处理按钮
         processButton.setTitle("🎨 生成时间序列图片", for: .normal)
-        processButton.setTitleColor(ThemeManager.primaryText, for: .normal)  // 🎨 修复：使用主题主文本色
-        processButton.backgroundColor = ThemeManager.buttonPrimary  // 🎨 修复：使用主题主按钮色而非success绿色
+        processButton.setTitleColor(ThemeManager.buttonPrimaryText, for: .normal)  // 🎨 使用按钮主色调文字
+        processButton.backgroundColor = ThemeManager.buttonPrimary  // 🎨 使用主题主按钮色
         processButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         processButton.titleLabel?.font = ThemeManager.buttonFont
         processButton.addTarget(self, action: #selector(processButtonTapped), for: .touchUpInside)
@@ -323,7 +326,7 @@ class TimeSequenceViewController: UIViewController {
         
         // 保存按钮
         saveButton.setTitle("💾 保存到相册", for: .normal)
-        saveButton.setTitleColor(ThemeManager.primaryText, for: .normal)  // 🎨 修复：使用主题主文本色
+        saveButton.setTitleColor(ThemeManager.buttonPrimaryText, for: .normal)  // 🎨 使用按钮主色调文字
         saveButton.backgroundColor = ThemeManager.buttonPrimary
         saveButton.layer.cornerRadius = ThemeManager.smallCornerRadius
         saveButton.addTarget(self, action: #selector(saveButtonTapped), for: .touchUpInside)
@@ -347,8 +350,8 @@ class TimeSequenceViewController: UIViewController {
         
         // 返回录像按钮
         returnToRecordingButton.setTitle("🎥 返回时光序列录像", for: .normal)
-        returnToRecordingButton.setTitleColor(ThemeManager.primaryText, for: .normal)  // 🎨 修复：使用主题主文本色
-        returnToRecordingButton.backgroundColor = ThemeManager.buttonSecondary  // 🎨 修复：使用主题次要按钮色
+        returnToRecordingButton.setTitleColor(ThemeManager.buttonSecondaryText, for: .normal)  // 🎨 使用按钮次要色调文字
+        returnToRecordingButton.backgroundColor = ThemeManager.buttonSecondary  // 🎨 使用主题次要按钮色
         returnToRecordingButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         returnToRecordingButton.titleLabel?.font = ThemeManager.buttonFont
         returnToRecordingButton.addTarget(self, action: #selector(returnToRecordingButtonTapped), for: .touchUpInside)
@@ -428,7 +431,6 @@ class TimeSequenceViewController: UIViewController {
             videoSelectionView.topAnchor.constraint(equalTo: headerView.bottomAnchor, constant: 20),
             videoSelectionView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             videoSelectionView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
-            videoSelectionView.heightAnchor.constraint(equalToConstant: 120),
             
             selectVideoButton.centerXAnchor.constraint(equalTo: videoSelectionView.centerXAnchor),
             selectVideoButton.centerYAnchor.constraint(equalTo: videoSelectionView.centerYAnchor),
@@ -516,6 +518,10 @@ class TimeSequenceViewController: UIViewController {
             returnToRecordingButton.widthAnchor.constraint(equalToConstant: 240),
             returnToRecordingButton.heightAnchor.constraint(equalToConstant: 44)
         ])
+        
+        // 🎯 创建并保存视频选择区域的高度约束（用于动态调整）
+        videoSelectionHeightConstraint = videoSelectionView.heightAnchor.constraint(equalToConstant: 120)
+        videoSelectionHeightConstraint.isActive = true
     }
     
     deinit {
@@ -574,21 +580,21 @@ class TimeSequenceViewController: UIViewController {
             self.resultContainerView.backgroundColor = ThemeManager.cardBackground
             self.bottomActionView.backgroundColor = ThemeManager.cardBackground
             
-            // 🎨 更新按钮颜色
+            // 🎨 更新按钮颜色（使用专门的按钮文字颜色）
             self.selectVideoButton.backgroundColor = ThemeManager.buttonPrimary
-            self.selectVideoButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+            self.selectVideoButton.setTitleColor(ThemeManager.buttonPrimaryText, for: .normal)
             
             self.processButton.backgroundColor = ThemeManager.buttonPrimary
-            self.processButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+            self.processButton.setTitleColor(ThemeManager.buttonPrimaryText, for: .normal)
             
             self.saveButton.backgroundColor = ThemeManager.buttonPrimary
-            self.saveButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+            self.saveButton.setTitleColor(ThemeManager.buttonPrimaryText, for: .normal)
             
             self.shareButton.backgroundColor = ThemeManager.success
             self.shareButton.setTitleColor(.white, for: .normal)  // 白色文字在绿色背景上
             
             self.returnToRecordingButton.backgroundColor = ThemeManager.buttonSecondary
-            self.returnToRecordingButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+            self.returnToRecordingButton.setTitleColor(ThemeManager.buttonSecondaryText, for: .normal)
             
             // 🎨 更新标签颜色
             self.previewTitleLabel.textColor = ThemeManager.primaryText
@@ -844,8 +850,9 @@ class TimeSequenceViewController: UIViewController {
     private func enterAutoProcessingMode(with videoURL: URL) {
         print("🎬 进入自动处理模式，视频URL: \(videoURL)")
         
-        // 1. 隐藏视频选择区域
+        // 1. 🎯 隐藏视频选择区域，并将高度设为 0（避免占据空间）
         videoSelectionView.isHidden = true
+        videoSelectionHeightConstraint.constant = 0
         
         // 2. 显示处理区域
         previewContainerView.isHidden = false
@@ -862,8 +869,9 @@ class TimeSequenceViewController: UIViewController {
     private func enterManualSelectionMode() {
         print("📱 进入手动选择模式")
         
-        // 1. 显示视频选择界面
+        // 1. 🎯 显示视频选择界面，并恢复高度为 120
         videoSelectionView.isHidden = false
+        videoSelectionHeightConstraint.constant = 120
         
         // 2. 隐藏处理区域（等待用户选择）
         previewContainerView.isHidden = true
@@ -1678,10 +1686,21 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
                     size: layout.subjectSize
                 )
                 
-                // 🎨 绘制主体到指定位置
-                extractedSubject.draw(in: targetRect)
+                // 🔧 计算透明度（修复：添加透明度渐变效果）
+                let alpha = calculateAlphaForScene(
+                    index: index,
+                    totalFrames: frames.count,
+                    sceneType: sceneType
+                )
                 
-                print("✅ 绘制主体 \(index + 1)/\(frames.count) 到位置: (\(Int(position.x)), \(Int(position.y)))")
+                // 🎨 绘制主体到指定位置（应用透明度）
+                extractedSubject.draw(
+                    in: targetRect,
+                    blendMode: .normal,
+                    alpha: alpha  // ✅ 修复：添加透明度参数
+                )
+                
+                print("✅ 绘制主体 \(index + 1)/\(frames.count) 到位置: (\(Int(position.x)), \(Int(position.y)))，透明度: \(String(format: "%.1f", alpha * 100))%")
             } else {
                 print("⚠️ 主体 \(index + 1) 提取失败，跳过")
             }

@@ -46,7 +46,7 @@ enum SceneType: String, CaseIterable {
         case .personAction:
             return "瑜伽、健身、化妆等"
         case .sportMotion:
-            return "投篮、滑板、跳跃等"
+            return "记录移动过程，创造动态艺术效果"
         }
     }
     
