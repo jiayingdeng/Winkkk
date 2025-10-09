@@ -1618,13 +1618,13 @@ extension MainCameraViewController {
         // 切换到时间序列模式
         TimeSequenceModeManager.shared.switchToTimeSequenceMode(with: sceneType)
         
-        // 🎯 使用Toast提示，间接说明拍摄技巧
+        // 🎯 使用Toast提示，说明模式用途和拍摄技巧
         let guide = ShootingGuide.guide(for: sceneType)
         let tipMessage = guide.tips.first ?? "保持拍摄位置稳定"
         
         showBriefSuccessToast(
-            title: "⏰ 时间序列模式",
-            message: "💡 \(tipMessage)\n\(guide.duration)"
+            title: "⏰ 时间序列·运动轨迹模式",
+            message: "🏃 捕捉人物/物体的运动轨迹\n💡 \(tipMessage)\n\(guide.duration)"
         )
         
         // 触觉反馈
