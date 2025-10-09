@@ -59,7 +59,8 @@ class VideoGalleryViewController: UIViewController {
     private var currentFilterOptions = VideoFilterOptions()
     
     // 用户引导相关
-    private var guideView: VideoGalleryGuideView?
+    // 🔧 临时注释掉，避免出错 - 2024/10/09
+    // private var guideView: VideoGalleryGuideView?
     private var filteredVideos: [VideoItem] = []
     
     // 性能优化：缩略图内存缓存
@@ -359,7 +360,8 @@ class VideoGalleryViewController: UIViewController {
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        showFirstTimeGuidanceIfNeeded()
+        // 🔧 临时注释掉教学引导，避免出错 - 2024/10/09
+        // showFirstTimeGuidanceIfNeeded()
     }
     
     override func viewWillAppear(_ animated: Bool) {
@@ -1557,6 +1559,8 @@ class VideoGalleryViewController: UIViewController {
     }
     
     // MARK: - First Time Guidance
+    // 🔧 临时注释掉教学引导功能，避免出错 - 2024/10/09
+    /*
     private func showFirstTimeGuidanceIfNeeded() {
         let hasShownGuidance = UserDefaults.standard.bool(forKey: "VideoGalleryGuidanceShown")
         if !hasShownGuidance {
@@ -1648,6 +1652,7 @@ class VideoGalleryViewController: UIViewController {
         
         return steps
     }
+    */
     
     private func showError(_ error: Error) {
         var title = "错误"
@@ -1700,6 +1705,8 @@ class VideoGalleryViewController: UIViewController {
 }
 
 // MARK: - VideoGalleryGuideDelegate
+// 🔧 临时注释掉教学引导委托，避免出错 - 2024/10/09
+/*
 extension VideoGalleryViewController: VideoGalleryGuideDelegate {
     func guideDidComplete() {
         // 标记引导已完成
@@ -1724,7 +1731,6 @@ extension VideoGalleryViewController: VideoGalleryGuideDelegate {
     }
     
     // MARK: - Debug Methods
-    #if DEBUG
     /// 重置用户引导状态（仅用于调试）
     func resetGuidanceState() {
         UserDefaults.standard.removeObject(forKey: "VideoGalleryGuidanceShown")
@@ -1736,7 +1742,12 @@ extension VideoGalleryViewController: VideoGalleryGuideDelegate {
         resetGuidanceState()
         showFirstTimeGuidanceIfNeeded()
     }
-    
+}
+*/
+
+// MARK: - Debug Methods
+#if DEBUG
+extension VideoGalleryViewController {
     /// 集成测试：验证所有新功能（仅用于调试）
     func runIntegrationTest() {
         print("🧪 开始集成测试...")
@@ -1751,7 +1762,7 @@ extension VideoGalleryViewController: VideoGalleryGuideDelegate {
         testDetailPopup()
         
         // 测试4: 用户引导系统
-        testGuidanceSystem()
+        // testGuidanceSystem() // 🔧 临时注释掉 - 2024/10/09
         
         // 测试5: 性能优化
         testPerformanceOptimizations()
@@ -1810,6 +1821,8 @@ extension VideoGalleryViewController: VideoGalleryGuideDelegate {
         }
     }
     
+    // 🔧 临时注释掉测试方法 - 2024/10/09
+    /*
     private func testGuidanceSystem() {
         print("🗺️ 测试用户引导...")
         
@@ -1822,6 +1835,7 @@ extension VideoGalleryViewController: VideoGalleryGuideDelegate {
         
         print("✅ 用户引导测试通过")
     }
+    */
     
     private func testPerformanceOptimizations() {
         print("⚡ 测试性能优化...")
@@ -1835,8 +1849,8 @@ extension VideoGalleryViewController: VideoGalleryGuideDelegate {
         
         print("✅ 性能优化测试通过")
     }
-    #endif
 }
+#endif
 
 // MARK: - UICollectionViewDataSourcePrefetching
 extension VideoGalleryViewController: UICollectionViewDataSourcePrefetching {

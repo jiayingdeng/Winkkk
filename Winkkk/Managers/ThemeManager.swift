@@ -156,6 +156,26 @@ class ThemeManager: ObservableObject {
         }
     }
     
+    /// 按钮主色调文字颜色（根据按钮背景自动选择合适的文字颜色）
+    static var buttonPrimaryText: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 102/255, green: 51/255, blue: 153/255, alpha: 1.0) // #663399 深紫色（粉色按钮上用深色文字）
+        case .lightMinimal:
+            return UIColor.white // 白色文字（深灰黑按钮上用白色文字）
+        }
+    }
+    
+    /// 按钮次要色调文字颜色
+    static var buttonSecondaryText: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor(red: 102/255, green: 51/255, blue: 153/255, alpha: 1.0) // #663399 深紫色
+        case .lightMinimal:
+            return UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 1.0) // #1C1C1E 深灰黑（浅灰按钮上用深色文字）
+        }
+    }
+    
     /// 成功色（功能色 - 所有主题通用）
     static var success: UIColor {
         switch shared.currentTheme {
@@ -597,6 +617,28 @@ class ThemeManager: ObservableObject {
             return UIColor.systemRed.withAlphaComponent(0.1) // 系统红半透明
         }
     }
+    
+    // MARK: - 权限卡片专属颜色
+    
+    /// 权限卡片容器背景
+    static var permissionCardBackground: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor.white.withAlphaComponent(0.1) // 白色半透明（在深色渐变背景上）
+        case .lightMinimal:
+            return UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 0.05) // 深色半透明（在浅色背景上）
+        }
+    }
+    
+    /// 权限卡片边框颜色
+    static var permissionCardBorder: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor.white.withAlphaComponent(0.2) // 白色半透明边框
+        case .lightMinimal:
+            return UIColor(red: 28/255, green: 28/255, blue: 30/255, alpha: 0.15) // 深色半透明边框
+        }
+    }
 }
 
 // MARK: - SwiftUI Color扩展
@@ -635,6 +677,16 @@ extension ThemeManager {
     /// SwiftUI版本的主要按钮色
     static var swiftUIButtonPrimary: Color {
         Color(buttonPrimary)
+    }
+    
+    /// SwiftUI版本的按钮主色调文字颜色
+    static var swiftUIButtonPrimaryText: Color {
+        Color(buttonPrimaryText)
+    }
+    
+    /// SwiftUI版本的按钮次要色调文字颜色
+    static var swiftUIButtonSecondaryText: Color {
+        Color(buttonSecondaryText)
     }
 }
 

@@ -200,6 +200,11 @@ class CollageViewController: UIViewController {
         // 🎨 添加直接编辑手势（拖动、缩放、旋转）
         setupDirectEditGestures()
         
+        // 🆕 添加全局点击手势 - 点击空白区域收起工具栏
+        let backgroundTapGesture = UITapGestureRecognizer(target: self, action: #selector(handleBackgroundTap(_:)))
+        backgroundTapGesture.delegate = self
+        view.addGestureRecognizer(backgroundTapGesture)
+        
         // 确保选择的模板可用
         validateSelectedTemplate()
         
@@ -406,7 +411,7 @@ class CollageViewController: UIViewController {
     }
     
     private func setupLayoutSection() {
-        layoutSectionView.backgroundColor = ThemeManager.cardBackground
+        layoutSectionView.backgroundColor = ThemeManager.backgroundSecondary
         layoutSectionView.layer.cornerRadius = ThemeManager.standardCornerRadius
         
         // 标题 - 使用主题文字颜色
@@ -445,7 +450,8 @@ class CollageViewController: UIViewController {
     }
     
     private func setupBottomButtons() {
-        bottomButtonsView.backgroundColor = .clear
+        bottomButtonsView.backgroundColor = ThemeManager.backgroundSecondary.withAlphaComponent(0.95)
+        bottomButtonsView.layer.cornerRadius = ThemeManager.standardCornerRadius
         
         // 设置第一行按钮容器
         setupFirstRowButtons()
@@ -531,9 +537,12 @@ class CollageViewController: UIViewController {
         lightEditToolbar.layer.shadowRadius = 8
         lightEditToolbar.isHidden = true // 默认隐藏
         lightEditToolbar.alpha = 0
+        lightEditToolbar.isUserInteractionEnabled = false // 隐藏时禁用交互，防止阻挡下方按钮
         
         // 手势提示标签 - 增强视觉效果，使用主题文字色
-        toolbarHintLabel.text = "💡 试试：拖动调整位置 • 双指缩放/旋转"
+        // 🚧 测试阶段暂时隐藏手势提示，只让用户使用按钮操作
+        // toolbarHintLabel.text = "💡 试试：拖动调整位置 • 双指缩放/旋转"
+        toolbarHintLabel.text = "" // 暂时不显示手势提示
         toolbarHintLabel.font = UIFont.systemFont(ofSize: 12, weight: .semibold)
         toolbarHintLabel.textColor = ThemeManager.warning // 使用主题警告色（黄/橙色系）
         toolbarHintLabel.textAlignment = .center
@@ -1139,6 +1148,53 @@ class CollageViewController: UIViewController {
                 updateEditingButtonsState()
                 HapticFeedbackManager.shared.lightImpact()
             }
+        }
+    }
+    
+    // MARK: - Background Tap Handling
+    
+    /// 处理点击空白区域 - 收起工具栏
+    @objc private func handleBackgroundTap(_ gesture: UITapGestureRecognizer) {
+        let location = gesture.location(in: view)
+        
+        // 检查是否点击在预览区域内
+        let previewFrame = previewImageView.convert(previewImageView.bounds, to: view)
+        if previewFrame.contains(location) {
+            // 点击在预览区域内，不处理（由previewImageView的手势处理）
+            return
+        }
+        
+        // 检查是否点击在工具栏内
+        if !lightEditToolbar.isHidden {
+            let toolbarFrame = lightEditToolbar.convert(lightEditToolbar.bounds, to: view)
+            if toolbarFrame.contains(location) {
+                // 点击在工具栏内，不处理
+                return
+            }
+        }
+        
+        // 检查是否点击在底部按钮区域内
+        let bottomStackFrame = bottomButtonsView.convert(bottomButtonsView.bounds, to: view)
+        if bottomStackFrame.contains(location) {
+            // 点击在底部按钮区域内，不处理
+            return
+        }
+        
+        // 检查是否点击在布局选择区域内
+        let layoutFrame = layoutSectionView.convert(layoutSectionView.bounds, to: view)
+        if layoutFrame.contains(location) {
+            // 点击在布局选择区域内，不处理
+            return
+        }
+        
+        // 点击在空白区域，收起工具栏和取消选择
+        if selectedImageIndex != nil {
+            selectedImageIndex = nil
+            selectionBorderLayer?.removeFromSuperlayer()
+            selectionBorderLayer = nil
+            hideLightEditToolbar()
+            updateEditingButtonsState()
+            HapticFeedbackManager.shared.lightImpact()
         }
     }
     
@@ -2588,6 +2644,15 @@ extension CollageViewController: UIGestureRecognizerDelegate {
         
         return true
     }
+    
+    /// 手势代理方法 - 控制手势是否接收触摸事件
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+        // 如果点击的是按钮或其他交互控件，不处理
+        if touch.view is UIButton || touch.view is UIControl {
+            return false
+        }
+        return true
+    }
 }
 
 // MARK: - 🆕 Light Edit Toolbar
@@ -2598,6 +2663,7 @@ extension CollageViewController {
         guard lightEditToolbar.alpha == 0 else { return }
         
         lightEditToolbar.isHidden = false
+        lightEditToolbar.isUserInteractionEnabled = true // 显示时启用交互
         UIView.animate(withDuration: 0.25, delay: 0, options: [.curveEaseOut]) {
             self.lightEditToolbar.alpha = 1.0
             self.lightEditToolbar.transform = .identity
@@ -2624,50 +2690,55 @@ extension CollageViewController {
     
     /// 显示手势实时反馈
     private func showGestureFeedback(_ text: String) {
+        // 🚧 测试阶段暂时不显示手势反馈提示
         // 停止所有动画
-        toolbarHintLabel.layer.removeAllAnimations()
+        // toolbarHintLabel.layer.removeAllAnimations()
         
         // 更新文本并高亮显示
-        UIView.transition(with: toolbarHintLabel, duration: 0.2, options: .transitionCrossDissolve) {
-            self.toolbarHintLabel.text = text
-            self.toolbarHintLabel.textColor = ThemeManager.success
-            self.toolbarHintLabel.alpha = 1.0
-        }
+        // UIView.transition(with: toolbarHintLabel, duration: 0.2, options: .transitionCrossDissolve) {
+        //     self.toolbarHintLabel.text = text
+        //     self.toolbarHintLabel.textColor = ThemeManager.success
+        //     self.toolbarHintLabel.alpha = 1.0
+        // }
     }
     
     /// 隐藏手势反馈，恢复原始提示
     private func hideGestureFeedback() {
         UIView.transition(with: toolbarHintLabel, duration: 0.3, options: .transitionCrossDissolve) {
-            self.toolbarHintLabel.text = "💡 试试：拖动调整位置 • 双指缩放/旋转"
+            // 🚧 测试阶段暂时不显示手势提示
+            // self.toolbarHintLabel.text = "💡 试试：拖动调整位置 • 双指缩放/旋转"
+            self.toolbarHintLabel.text = ""
             self.toolbarHintLabel.textColor = ThemeManager.warning
         }
     }
     
     /// 首次选中图片时显示引导提示
     private func showFirstTimeGuidance() {
+        // 🚧 测试阶段暂时不显示手势引导提示
         // 停止脉动动画
         toolbarHintLabel.layer.removeAllAnimations()
         
         // 显示醒目的引导文字
-        UIView.transition(with: toolbarHintLabel, duration: 0.4, options: .transitionCrossDissolve) {
-            self.toolbarHintLabel.text = "✨ 太棒了！现在可以直接用手势调整图片啦"
-            self.toolbarHintLabel.textColor = UIColor.systemOrange
-            self.toolbarHintLabel.alpha = 1.0
-        }
+        // UIView.transition(with: toolbarHintLabel, duration: 0.4, options: .transitionCrossDissolve) {
+        //     self.toolbarHintLabel.text = "✨ 太棒了！现在可以直接用手势调整图片啦"
+        //     self.toolbarHintLabel.textColor = UIColor.systemOrange
+        //     self.toolbarHintLabel.alpha = 1.0
+        // }
         
         // 2秒后恢复为常规提示
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-            UIView.transition(with: self.toolbarHintLabel, duration: 0.4, options: .transitionCrossDissolve) {
-                self.toolbarHintLabel.text = "💡 试试：拖动调整位置 • 双指缩放/旋转"
-                self.toolbarHintLabel.textColor = UIColor.systemYellow
-            }
-        }
+        // DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+        //     UIView.transition(with: self.toolbarHintLabel, duration: 0.4, options: .transitionCrossDissolve) {
+        //         self.toolbarHintLabel.text = "💡 试试：拖动调整位置 • 双指缩放/旋转"
+        //         self.toolbarHintLabel.textColor = UIColor.systemYellow
+        //     }
+        // }
     }
     
     /// 隐藏轻量级工具栏
     private func hideLightEditToolbar() {
         guard lightEditToolbar.alpha > 0 else { return }
         
+        lightEditToolbar.isUserInteractionEnabled = false // 隐藏时禁用交互
         UIView.animate(withDuration: 0.2, delay: 0, options: [.curveEaseIn]) {
             self.lightEditToolbar.alpha = 0
             self.lightEditToolbar.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)

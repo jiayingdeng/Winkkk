@@ -105,7 +105,8 @@ class OnboardingViewController: UIViewController {
     
     // MARK: - UI Setup
     private func setupUI() {
-        view.backgroundColor = .black
+        // 🎨 根据主题设置基础背景色，确保与文字颜色有对比度
+        view.backgroundColor = ThemeManager.background
         
         // 添加渐变背景
         view.addSubview(gradientBackgroundView)
@@ -146,15 +147,26 @@ class OnboardingViewController: UIViewController {
             return
         }
         
+        // 确保scrollView已经布局完成
+        view.layoutIfNeeded()
+        
+        guard scrollView.bounds.height > 0 else {
+            print("⚠️ OnboardingViewController: ScrollView bounds not ready")
+            return
+        }
+        
         onboardingPages.removeAll()
+        
+        let pageHeight = scrollView.bounds.height
+        let pageWidth = scrollView.bounds.width
         
         for (index, data) in onboardingData.enumerated() {
             let pageView = OnboardingPageView(data: data)
             pageView.frame = CGRect(
-                x: CGFloat(index) * view.bounds.width,
+                x: CGFloat(index) * pageWidth,
                 y: 0,
-                width: view.bounds.width,
-                height: view.bounds.height - 200 // 留出底部按钮空间
+                width: pageWidth,
+                height: pageHeight
             )
             contentView.addSubview(pageView)
             
@@ -165,8 +177,8 @@ class OnboardingViewController: UIViewController {
         contentView.frame = CGRect(
             x: 0,
             y: 0,
-            width: view.bounds.width * CGFloat(onboardingData.count),
-            height: view.bounds.height - 200
+            width: pageWidth * CGFloat(onboardingData.count),
+            height: pageHeight
         )
         
         scrollView.contentSize = contentView.frame.size
@@ -188,24 +200,24 @@ class OnboardingViewController: UIViewController {
             gradientBackgroundView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             gradientBackgroundView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
-            // 滚动视图
+            // 滚动视图 - 使用底部约束而非固定高度，确保响应式布局
             scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.heightAnchor.constraint(equalToConstant: view.bounds.height - 200),
+            scrollView.bottomAnchor.constraint(equalTo: pageControl.topAnchor, constant: -20),
             
             // 页面指示器
-            pageControl.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 20),
+            pageControl.bottomAnchor.constraint(equalTo: continueButton.topAnchor, constant: -30),
             pageControl.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             
             // 继续按钮
-            continueButton.topAnchor.constraint(equalTo: pageControl.bottomAnchor, constant: 30),
+            continueButton.bottomAnchor.constraint(equalTo: skipButton.topAnchor, constant: -15),
             continueButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 40),
             continueButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -40),
             // continueButton高度由CapsuleButton内部管理，无需重复设置约束
             
-            // 跳过按钮
-            skipButton.topAnchor.constraint(equalTo: continueButton.bottomAnchor, constant: 15),
+            // 跳过按钮 - 固定在安全区域底部
+            skipButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
             skipButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             skipButton.heightAnchor.constraint(equalToConstant: 30)
         ])
@@ -398,15 +410,13 @@ class OnboardingPageView: UIView {
     }
     
     private func setupUI() {
-        // 图标
-        iconView.contentMode = .scaleAspectFit
-        iconView.tintColor = .white
-        addSubview(iconView)
-        
-        // 装饰视图
-        decorationView.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        // 装饰视图（放在图标下方）
         decorationView.layer.cornerRadius = 60
         addSubview(decorationView)
+        
+        // 图标 - 根据主题动态设置颜色以确保可见性
+        iconView.contentMode = .scaleAspectFit
+        addSubview(iconView)
         
         // 标题
         titleLabel.textAlignment = .center
@@ -471,11 +481,18 @@ class OnboardingPageView: UIView {
         subtitleLabel.text = data.subtitle
         descriptionLabel.text = data.description
         
-        // 添加渐变效果到装饰视图
+        // 🎨 根据主题设置图标颜色，确保在任何背景下都可见
+        // 简约浅色主题使用深色图标，梦幻少女主题使用白色图标
+        let iconColor: UIColor = ThemeManager.shared.currentTheme == .lightMinimal 
+            ? ThemeManager.primaryText  // 深色图标
+            : .white  // 白色图标
+        iconView.tintColor = iconColor
+        
+        // 添加渐变效果到装饰视图 - 增强透明度以提高可见性
         let gradientLayer = CAGradientLayer()
         gradientLayer.colors = [
-            data.backgroundColor.withAlphaComponent(0.3).cgColor,
-            data.backgroundColor.withAlphaComponent(0.1).cgColor
+            data.backgroundColor.withAlphaComponent(0.5).cgColor,
+            data.backgroundColor.withAlphaComponent(0.2).cgColor
         ]
         gradientLayer.startPoint = CGPoint(x: 0, y: 0)
         gradientLayer.endPoint = CGPoint(x: 1, y: 1)

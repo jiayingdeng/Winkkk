@@ -138,6 +138,7 @@ class ImageEnhanceViewController: UIViewController {
     // MARK: - Public Methods
     /// 设置已修复的图片（用于从批量修复界面进入时预设图片）
     func setEnhancedImage(_ image: UIImage) {
+        print("✅ ImageEnhanceVC.setEnhancedImage: 设置预设修复图片，尺寸=\(image.size)")
         self.enhancedImage = image
         
         // 如果视图已加载，立即更新显示
@@ -151,15 +152,47 @@ class ImageEnhanceViewController: UIViewController {
             shareButton.alpha = 1.0
             
             statusLabel.text = "修复完成！可以保存或分享"
+            print("✅ ImageEnhanceVC.setEnhancedImage: 已更新UI显示")
         }
     }
     
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        // 🔧 调试日志：记录原始图片信息
+        print("✅ ImageEnhanceVC.viewDidLoad: 原始图片尺寸=\(originalImage.size)")
+        if let batchContext = batchContext {
+            print("✅ ImageEnhanceVC.viewDidLoad: 批量模式，当前索引=\(batchContext.currentIndex), 总数=\(batchContext.items.count)")
+        }
+        
         setupUI()
         setupConstraints()
         configureInitialState()
+        
+        // 🔧 关键修复：如果有预设的修复图片（从批量修复页面进入），立即应用到UI
+        if let presetEnhancedImage = enhancedImage {
+            print("✅ ImageEnhanceVC.viewDidLoad: 发现预设修复图片，尺寸=\(presetEnhancedImage.size)")
+            
+            // 设置到对比视图
+            comparisonView.setEnhancedImage(presetEnhancedImage)
+            
+            // 重置竖线到中线位置，展示标准修复前后对比
+            comparisonView.resetToCenter()
+            
+            // 启用保存和分享按钮
+            saveButton.isEnabled = true
+            saveButton.alpha = 1.0
+            shareButton.isEnabled = true
+            shareButton.alpha = 1.0
+            
+            // 更新状态标签
+            statusLabel.text = "修复完成！可以保存或分享"
+            
+            print("✅ viewDidLoad: 已应用预设的修复图片到UI")
+        } else {
+            print("ℹ️ ImageEnhanceVC.viewDidLoad: 无预设修复图片，将在viewDidAppear时自动修复")
+        }
     }
     
     override func viewDidAppear(_ animated: Bool) {
@@ -232,8 +265,9 @@ class ImageEnhanceViewController: UIViewController {
             title = sourceType.displayName
         }
         
-        navigationController?.navigationBar.tintColor = .white
-        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: UIColor.white]
+        // 🎨 使用主题颜色，确保在白色背景下可见
+        navigationController?.navigationBar.tintColor = ThemeManager.primaryText
+        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: ThemeManager.primaryText]
         
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             title: "返回",
@@ -659,6 +693,10 @@ class ImageEnhanceViewController: UIViewController {
             action: #selector(nextImageTapped)
         )
         
+        // 🎨 使用主题颜色，确保在白色背景下可见
+        prevButton.tintColor = ThemeManager.primaryText
+        nextButton.tintColor = ThemeManager.primaryText
+        
         // 根据当前位置启用/禁用按钮
         prevButton.isEnabled = context.currentIndex > 0
         nextButton.isEnabled = context.currentIndex < context.items.count - 1
@@ -746,12 +784,15 @@ class ImageEnhanceViewController: UIViewController {
     }
     
     private func updateContentForCurrentImage(_ item: BatchEnhanceItem) {
+        print("✅ ImageEnhanceVC.updateContentForCurrentImage: 原始图片尺寸=\(item.originalImage.size)")
+        
         // 更新对比视图的原图
         comparisonView.setOriginalImage(item.originalImage)
         
         // 根据图片状态设置修复结果和来源类型
         if item.processingState == .completed, let enhancedImage = item.enhancedImage {
             // 已修复的图片
+            print("✅ ImageEnhanceVC.updateContentForCurrentImage: 已修复，修复图片尺寸=\(enhancedImage.size)")
             sourceType = .fromBatchCompleted
             self.enhancedImage = enhancedImage
             comparisonView.setEnhancedImage(enhancedImage)
@@ -764,6 +805,7 @@ class ImageEnhanceViewController: UIViewController {
             
         } else {
             // 未修复的图片
+            print("ℹ️ ImageEnhanceVC.updateContentForCurrentImage: 未修复，状态=\(item.processingState)")
             sourceType = .fromBatch
             enhancedImage = nil
             comparisonView.resetToOriginalImage()
@@ -804,6 +846,7 @@ class ImageEnhanceViewController: UIViewController {
             for item in leftBarButtonItems {
                 if item.image == UIImage(systemName: "chevron.left") {
                     item.isEnabled = context.currentIndex > 0
+                    item.tintColor = ThemeManager.primaryText  // 🎨 使用主题颜色
                 }
             }
         }
@@ -812,6 +855,7 @@ class ImageEnhanceViewController: UIViewController {
         if let rightBarButtonItem = navigationItem.rightBarButtonItem,
            rightBarButtonItem.image == UIImage(systemName: "chevron.right") {
             rightBarButtonItem.isEnabled = context.currentIndex < context.items.count - 1
+            rightBarButtonItem.tintColor = ThemeManager.primaryText  // 🎨 使用主题颜色
         }
     }
     

@@ -676,7 +676,14 @@ class TimeSequenceViewController: UIViewController {
     }
     
     @objc private func processButtonTapped() {
-        print("🎨 处理时间序列")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🎨 用户点击「生成时间序列图片」按钮")
+        print("📊 当前状态:")
+        print("   - selectedFrameCount: \(selectedFrameCount)")
+        print("   - extractedFrames.count: \(extractedFrames.count)")
+        print("   - resultImageView.image: \(resultImageView.image != nil ? "已有图片" : "无图片")")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        
         HapticFeedbackManager.shared.buttonTap()
         
         guard let videoURL = selectedVideoURL else {
@@ -703,6 +710,10 @@ class TimeSequenceViewController: UIViewController {
         
         // 🆕 使用用户选择的帧数创建自定义参数
         let customParameters = createCustomParameters(for: sceneType, frameCount: selectedFrameCount)
+        print("📋 创建处理参数:")
+        print("   - 场景类型: \(sceneType.displayName)")
+        print("   - 帧数: \(selectedFrameCount)")
+        print("   - 视频URL: \(videoURL.lastPathComponent)")
         
         // 重新创建处理器以使用新参数
         timeSequenceProcessor = TimeSequenceProcessor(sceneType: sceneType, parameters: customParameters)
@@ -719,8 +730,12 @@ class TimeSequenceViewController: UIViewController {
             return
         }
         
+        print("✅ TimeSequenceProcessor 重新创建成功")
+        
         isProcessing = true
         processor.processVideo(at: videoURL)
+        
+        print("🚀 开始处理视频...")
     }
     
     @objc private func saveButtonTapped() {
@@ -783,19 +798,28 @@ class TimeSequenceViewController: UIViewController {
         print("🎥 返回时光序列录像")
         HapticFeedbackManager.shared.buttonTap()
         
-        // 直接返回到时光序列录像界面
-        dismiss(animated: true) {
-            // 发送通知告知主界面用户想要继续录像
-            NotificationCenter.default.post(
-                name: NSNotification.Name("TimeSequenceProcessingCompleted"),
-                object: nil,
-                userInfo: [
-                    "shouldResetMode": false, // 关键：不重置模式
-                    "returnToTimeSequenceMode": true, // 返回到时光序列模式状态
-                    "shouldStartRecording": true // 新增：提示应该准备开始录像
-                ]
-            )
-        }
+        // 🎯 重要修复：不管从哪里跳转过来（相册或录像页面），都要回到录像页面
+        // 使用 .shouldOpenCamera 通知机制，让 MainCameraViewController 统一关闭所有模态界面
+        
+        // 先发送处理完成通知，保持时光序列模式状态
+        NotificationCenter.default.post(
+            name: NSNotification.Name("TimeSequenceProcessingCompleted"),
+            object: nil,
+            userInfo: [
+                "shouldResetMode": false, // 关键：不重置模式
+                "returnToTimeSequenceMode": true, // 返回到时光序列模式状态
+                "shouldStartRecording": true // 新增：提示应该准备开始录像
+            ]
+        )
+        
+        // 然后发送打开相机通知，让 MainCameraViewController 关闭所有模态界面并回到录像页面
+        // 传递 keepTimeSequenceMode 参数，保持时光序列模式
+        print("📡 发送打开相机通知，回到录像页面并保持时光序列模式")
+        NotificationCenter.default.post(
+            name: .shouldOpenCamera,
+            object: nil,
+            userInfo: ["keepTimeSequenceMode": true]
+        )
     }
     
     // MARK: - Helper Methods
@@ -883,7 +907,14 @@ class TimeSequenceViewController: UIViewController {
     
     /// 自动开始处理视频
     private func automaticallyStartProcessing(videoURL: URL) {
-        print("⚡ 自动开始处理视频：\(videoURL)")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("⚡ 自动处理模式：从录像界面跳转而来")
+        print("📊 当前状态:")
+        print("   - selectedFrameCount: \(selectedFrameCount)")
+        print("   - extractedFrames.count: \(extractedFrames.count)")
+        print("   - resultImageView.image: \(resultImageView.image != nil ? "已有图片" : "无图片")")
+        print("   - 视频URL: \(videoURL.lastPathComponent)")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         
         guard let sceneType = sceneType else {
             print("❌ 场景类型未设置")
@@ -893,7 +924,9 @@ class TimeSequenceViewController: UIViewController {
         
         // 🔧 修复：使用用户选择的帧数创建自定义参数
         let customParameters = createCustomParameters(for: sceneType, frameCount: selectedFrameCount)
-        print("🔧 自动模式参数：帧数=\(selectedFrameCount), 场景=\(sceneType.displayName)")
+        print("📋 创建处理参数:")
+        print("   - 场景类型: \(sceneType.displayName)")
+        print("   - 帧数: \(selectedFrameCount)")
         
         // 🔧 修复：重新创建处理器以使用正确参数
         timeSequenceProcessor = TimeSequenceProcessor(sceneType: sceneType, parameters: customParameters)
@@ -905,6 +938,8 @@ class TimeSequenceViewController: UIViewController {
             return
         }
         
+        print("✅ TimeSequenceProcessor 创建成功")
+        
         // 1. 更新UI状态
         statusLabel.text = "正在分析视频..."
         progressView.isHidden = false
@@ -914,6 +949,8 @@ class TimeSequenceViewController: UIViewController {
         // 2. 开始处理
         isProcessing = true
         processor.processVideo(at: videoURL)
+        
+        print("🚀 开始自动处理视频...")
     }
     
     /// 更新标题为当前模式
@@ -1372,11 +1409,21 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
     
     func timeSequenceProcessor(_ processor: TimeSequenceProcessor, didCompleteWithFrames frames: [UIImage]) {
         DispatchQueue.main.async {
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            print("✅ TimeSequenceProcessor 完成帧提取")
+            print("📊 提取结果:")
+            print("   - 提取的帧数: \(frames.count)")
+            for (index, frame) in frames.enumerated() {
+                print("   - 帧 \(index + 1): 尺寸 \(frame.size.width)×\(frame.size.height)")
+            }
+            print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+            
             self.isProcessing = false
             self.extractedFrames = frames
             self.updateFramesPreview()
             
             // 生成合成图片
+            print("🎨 开始生成合成图片...")
             self.generateCompositeImage(from: frames)
             
             // 🆕 处理完成后恢复正常标题状态
@@ -1413,7 +1460,17 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
     
     private func generateCompositeImage(from frames: [UIImage]) {
         // 🌟 智能场景合成逻辑 - 根据场景类型选择最佳合成策略
-        guard !frames.isEmpty else { return }
+        guard !frames.isEmpty else {
+            print("❌ frames 数组为空，无法合成")
+            return
+        }
+        
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+        print("🎨 开始智能场景合成")
+        print("📊 输入信息:")
+        print("   - 帧数: \(frames.count)")
+        print("   - 场景类型: \(sceneType?.displayName ?? "未设置")")
+        print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
         
         // 🔍 获取当前场景类型
         guard let currentSceneType = sceneType else {
@@ -1425,15 +1482,18 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
         // 🎯 根据场景类型选择合成策略
         switch currentSceneType {
         case .objectChange, .personAction:
+            print("📋 选择策略: 多主体共享背景合成 / 水平时间轴")
             // 📋 策略1：多主体共享背景合成 - 🌟 新功能！
             if frames.count >= 3 {
+                print("   - 使用多主体共享背景合成（帧数 >= 3）")
                 generateSharedBackgroundMultiSubjectComposite(from: frames, sceneType: currentSceneType)
             } else {
-                // 帧数太少时降级到水平时间轴
+                print("   - 帧数太少，降级到水平时间轴合成")
                 generateHorizontalTimelineComposite(from: frames, sceneType: currentSceneType)
             }
             
         case .sportMotion:
+            print("📋 选择策略: AI增强的轨迹叠加合成")
             // 📋 策略2：🌟 AI增强的轨迹叠加合成 - 适合运动轨迹
             generateAIEnhancedTrajectoryComposite(from: frames, sceneType: currentSceneType)
             
@@ -1441,7 +1501,7 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
             // generateTrajectoryOverlayComposite(from: frames, sceneType: currentSceneType)
         }
         
-        print("✅ 智能场景合成完成！场景类型: \(currentSceneType.displayName)")
+        print("✅ 智能场景合成调用完成！场景类型: \(currentSceneType.displayName)")
     }
     
     /// 📋 策略1：水平时间轴合成 (物体变化 + 人物动作类)
@@ -1541,6 +1601,7 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
         guard let lastFrame = frames.last else { return }
         
         print("🎯 开始AI增强合成，帧数: \(frames.count)")
+        print("📊 当前内存状态: extractedFrames.count = \(extractedFrames.count), selectedFrameCount = \(selectedFrameCount)")
         
         // 📊 记录开始时间（用于性能统计）
         let startTime = Date()
@@ -1557,19 +1618,23 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
         var successCount = 0
         var failureCount = 0
         
+        print("🔍 开始批量提取人物，共 \(frames.count) 帧")
+        
         for (index, frame) in frames.enumerated() {
             dispatchGroup.enter()
+            print("🔄 进入 dispatchGroup，索引: \(index)")
             
             extractSubjectUsingAI(from: frame, strategy: currentExtractionStrategy) { extractedSubject in
                 if let subject = extractedSubject {
                     extractedSubjects[index] = subject
                     successCount += 1
-                    print("✅ 帧 \(index + 1)/\(frames.count) 人物提取成功")
+                    print("✅ 帧 \(index + 1)/\(frames.count) 人物提取成功，尺寸: \(subject.size.width)×\(subject.size.height)")
                 } else {
                     extractedSubjects[index] = frame // 降级使用原图
                     failureCount += 1
-                    print("⚠️ 帧 \(index + 1)/\(frames.count) 人物提取失败，使用原图")
+                    print("⚠️ 帧 \(index + 1)/\(frames.count) 人物提取失败，使用原图，尺寸: \(frame.size.width)×\(frame.size.height)")
                 }
+                print("🔄 离开 dispatchGroup，索引: \(index)")
                 dispatchGroup.leave()
             }
         }
@@ -1579,6 +1644,10 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
             guard let self = self else { return }
             
             print("📊 人物提取完成: 成功\(successCount)张，失败\(failureCount)张")
+            print("📊 extractedSubjects 字典内容:")
+            for (index, image) in extractedSubjects.sorted(by: { $0.key < $1.key }) {
+                print("   - 索引 \(index): 尺寸 \(image.size.width)×\(image.size.height)")
+            }
             
             // 🖼️ 创建画布并绘制背景
             UIGraphicsBeginImageContextWithOptions(canvasSize, false, 0.0)
@@ -1590,7 +1659,10 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
             // 🎨 步骤4：按照原透明度公式叠加每个提取的人物
             // 反向绘制：最后一帧先绘制（底层高透明度），第一帧后绘制（上层低透明度）
             for (drawIndex, _) in frames.enumerated().reversed() {
-                guard let extractedSubject = extractedSubjects[drawIndex] else { continue }
+                guard let extractedSubject = extractedSubjects[drawIndex] else {
+                    print("⚠️ 跳过索引 \(drawIndex)，未找到提取的主体")
+                    continue
+                }
                 
                 // 🔧 使用原有的透明度计算方法
                 let transparencyIndex = drawIndex
@@ -1607,7 +1679,7 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
                     alpha: alpha
                 )
                 
-                print("🎨 叠加人物 \(drawIndex + 1)/\(frames.count)，透明度: \(String(format: "%.1f", alpha * 100))%")
+                print("🎨 叠加人物 \(drawIndex + 1)/\(frames.count)，透明度: \(String(format: "%.1f", alpha * 100))%，尺寸: \(extractedSubject.size.width)×\(extractedSubject.size.height)")
             }
             
             // 🎉 完成合成
@@ -1618,6 +1690,10 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
             let processingTime = Date().timeIntervalSince(startTime)
             print("⏱️ AI增强合成完成！总耗时: \(String(format: "%.2f", processingTime))秒")
             print("📈 成功率: \(successCount)/\(frames.count) = \(String(format: "%.1f", Float(successCount)/Float(frames.count)*100))%")
+            
+            if let finalImage = compositeImage {
+                print("🖼️ 最终合成图尺寸: \(finalImage.size.width)×\(finalImage.size.height)")
+            }
             
             self.resultImageView.image = compositeImage
             self.resultContainerView.isHidden = false
@@ -2003,16 +2079,24 @@ extension TimeSequenceViewController: TimeSequenceProcessorDelegate {
         frame: UIImage,
         completion: @escaping (UIImage?) -> Void
     ) {
+        print("🤖 调用 DeepLabV3Manager.segmentSubjects，输入尺寸: \(frame.size.width)×\(frame.size.height)")
+        
         DeepLabV3Manager.shared.segmentSubjects(from: frame) { result in
             switch result {
             case .success(let segmentationResult):
                 // ✅ 成功：使用提取的主体（已移除背景）
-                print("✅ DeepLabV3 分割成功，置信度: \(segmentationResult.confidence)%")
+                print("✅ DeepLabV3 分割成功！")
+                print("   - 置信度: \(segmentationResult.confidence)%")
+                print("   - 主体图尺寸: \(segmentationResult.subjectImage.size.width)×\(segmentationResult.subjectImage.size.height)")
+                print("   - 是否检测到主体: \(segmentationResult.confidence > 0)")
                 completion(segmentationResult.subjectImage)
                 
             case .failure(let error):
                 // ⚠️ 失败：降级使用原图
-                print("⚠️ DeepLabV3 分割失败: \(error)，使用原图")
+                print("❌ DeepLabV3 分割失败！")
+                print("   - 错误: \(error)")
+                print("   - 错误描述: \(error.localizedDescription)")
+                print("   - 降级使用原图，尺寸: \(frame.size.width)×\(frame.size.height)")
                 completion(frame)
             }
         }

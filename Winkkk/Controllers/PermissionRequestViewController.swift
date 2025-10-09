@@ -79,7 +79,8 @@ class PermissionRequestViewController: UIViewController {
     
     // MARK: - UI Setup
     private func setupUI() {
-        view.backgroundColor = .black
+        // 🎨 根据主题设置基础背景色，确保与文字颜色有对比度
+        view.backgroundColor = ThemeManager.background
         
         // 渐变背景
         view.addSubview(gradientBackgroundView)
@@ -118,7 +119,7 @@ class PermissionRequestViewController: UIViewController {
         
         // 稍后按钮
         laterButton.setTitle("稍后再说", for: .normal)
-        laterButton.setTitleColor(UIColor.white.withAlphaComponent(0.6), for: .normal)
+        laterButton.setTitleColor(ThemeManager.overlaySecondaryText, for: .normal)
         laterButton.titleLabel?.font = ThemeManager.bodyFont
         laterButton.addTarget(self, action: #selector(laterButtonTapped), for: .touchUpInside)
         contentView.addSubview(laterButton)
@@ -356,19 +357,45 @@ class PermissionCard: UIView {
         setupGestures()
         configureContent()
         updatePermissionStatus()
+        
+        // 监听主题切换
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleThemeChange),
+            name: .themeDidChange,
+            object: nil
+        )
     }
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
     
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+    
+    @objc private func handleThemeChange() {
+        // 更新容器背景和边框
+        containerView.backgroundColor = ThemeManager.permissionCardBackground
+        containerView.layer.borderColor = ThemeManager.permissionCardBorder.cgColor
+        
+        // 更新文本颜色
+        titleLabel.textColor = ThemeManager.overlayTextWhite
+        descriptionLabel.textColor = ThemeManager.overlaySecondaryText
+        statusLabel.textColor = ThemeManager.overlayTextWhite
+        
+        // 🎨 更新状态视图的颜色
+        updateUI()
+    }
+    
     // MARK: - UI Setup
     private func setupUI() {
         // 容器
-        containerView.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        containerView.backgroundColor = ThemeManager.permissionCardBackground
         containerView.layer.cornerRadius = 12
         containerView.layer.borderWidth = 1
-        containerView.layer.borderColor = UIColor.white.withAlphaComponent(0.2).cgColor
+        containerView.layer.borderColor = ThemeManager.permissionCardBorder.cgColor
         addSubview(containerView)
         
         // 图标
@@ -470,9 +497,17 @@ class PermissionCard: UIView {
                 self.statusLabel.text = "已授权"
                 self.containerView.layer.borderColor = ThemeManager.success.withAlphaComponent(0.5).cgColor
             } else {
-                self.statusView.backgroundColor = UIColor.white.withAlphaComponent(0.2)
+                // 🎨 根据主题设置未授权状态的背景色
+                let pendingBgColor: UIColor = ThemeManager.shared.currentTheme == .dreamyGirl
+                    ? UIColor.white.withAlphaComponent(0.2)  // 梦幻主题：白色半透明
+                    : ThemeManager.buttonPrimary.withAlphaComponent(0.3)  // 简约主题：主色半透明
+                self.statusView.backgroundColor = pendingBgColor
                 self.statusLabel.text = self.permission.isRequired ? "需要" : "可选"
-                self.containerView.layer.borderColor = UIColor.white.withAlphaComponent(0.2).cgColor
+                
+                let pendingBorderColor: UIColor = ThemeManager.shared.currentTheme == .dreamyGirl
+                    ? UIColor.white.withAlphaComponent(0.2)
+                    : ThemeManager.buttonPrimary.withAlphaComponent(0.3)
+                self.containerView.layer.borderColor = pendingBorderColor.cgColor
             }
         }
     }

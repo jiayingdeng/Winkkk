@@ -151,16 +151,8 @@ class CapsuleButton: UIButton {
         gradientLayer.endPoint = CGPoint(x: 1, y: 0)
         layer.insertSublayer(gradientLayer, at: 0)
         
-        // 文字颜色 - 根据主题选择合适的文字颜色
-        let textColor: UIColor
-        switch ThemeManager.shared.currentTheme {
-        case .lightMinimal:
-            // 黑白主题下，primary按钮有深色渐变背景，需要白色文字
-            textColor = .white
-        case .dreamyGirl:
-            // 梦幻粉主题下，使用主题的primaryText
-            textColor = ThemeManager.primaryText
-        }
+        // 🎨 文字颜色 - 使用专门的按钮文字颜色
+        let textColor = ThemeManager.buttonPrimaryText
         
         setTitleColor(textColor, for: .normal)
         setTitleColor(textColor.withAlphaComponent(0.6), for: .highlighted)
@@ -320,7 +312,7 @@ struct ThemedButton: View {
     private var textColor: Color {
         switch style {
         case .primary, .floating:
-            return ThemeManager.swiftUIPrimaryText
+            return ThemeManager.swiftUIButtonPrimaryText  // 🎨 使用专门的按钮文字颜色
         case .secondary:
             return ThemeManager.swiftUIButtonPrimary
         case .ghost:

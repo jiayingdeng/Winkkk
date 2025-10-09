@@ -594,6 +594,9 @@ class MainCameraViewController: UIViewController {
     @objc private func handleShouldOpenCamera(_ notification: Notification) {
         print("📱 收到打开相机通知，准备展示录像页面")
         
+        // 🎯 检查是否需要保持时光序列模式（从时光序列处理页面返回时）
+        let keepTimeSequenceMode = notification.userInfo?["keepTimeSequenceMode"] as? Bool ?? false
+        
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
             
@@ -605,22 +608,44 @@ class MainCameraViewController: UIViewController {
                 self.dismissAllModalViewControllers {
                     print("✅ 所有模态界面已关闭，现在在主录像页面")
                     
-                    // 确保状态已重置
-                    self.isTimeSequenceMode = false
-                    self.updateModeSwitcherDisplay()
+                    // 🎯 根据通知参数决定是否保持时光序列模式
+                    if keepTimeSequenceMode {
+                        print("🎬 保持时光序列模式状态")
+                        // 确保界面状态与全局状态同步
+                        if TimeSequenceModeManager.shared.isTimeSequenceMode {
+                            self.isTimeSequenceMode = true
+                            self.updateModeSwitcherDisplay()
+                        }
+                    } else {
+                        print("🔄 重置到普通模式")
+                        self.isTimeSequenceMode = false
+                        self.updateModeSwitcherDisplay()
+                    }
                     
                     // 🚀 优化：快速检查相机状态并启动
                     self.ensureCameraReady()
                     
                     // 🔧 修复：安全地展示成功提示消息
-                    self.safelyPresentSuccessAlert()
+                    if !keepTimeSequenceMode {
+                        self.safelyPresentSuccessAlert()
+                    }
                 }
             } else {
                 print("✅ 当前已在主录像页面")
                 
-                // 确保状态已重置
-                self.isTimeSequenceMode = false
-                self.updateModeSwitcherDisplay()
+                // 🎯 根据通知参数决定是否保持时光序列模式
+                if keepTimeSequenceMode {
+                    print("🎬 保持时光序列模式状态")
+                    // 确保界面状态与全局状态同步
+                    if TimeSequenceModeManager.shared.isTimeSequenceMode {
+                        self.isTimeSequenceMode = true
+                        self.updateModeSwitcherDisplay()
+                    }
+                } else {
+                    print("🔄 重置到普通模式")
+                    self.isTimeSequenceMode = false
+                    self.updateModeSwitcherDisplay()
+                }
                 
                 // 🚀 优化：快速检查相机状态并启动
                 self.ensureCameraReady()

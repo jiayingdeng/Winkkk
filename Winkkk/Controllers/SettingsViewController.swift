@@ -128,54 +128,54 @@ class SettingsViewController: UIViewController {
                 ]
             ),
             
-            // 开发者选项 (调试用)
-            SettingsSection(
-                title: "开发者选项",
-                items: [
-                    SettingsItem(
-                        type: .action,
-                        title: "🔍 主体提取调试",
-                        subtitle: "测试Vision框架+Core Image三阶段智能主体提取算法",
-                        icon: "magnifyingglass.circle",
-                        action: { [weak self] in self?.showSubjectExtractionDebug() }
-                    ),
-                    SettingsItem(
-                        type: .action,
-                        title: "🎯 MobileSAM智能分割",
-                        subtitle: "AI驱动的物体精确分割（支持任意点击物体）",
-                        icon: "scissors.badge.ellipsis",
-                        action: { [weak self] in self?.showSAMSegmentationTest() }
-                    ),
-                    SettingsItem(
-                        type: .action,
-                        title: "🎯 DeepLabV3人物分割",
-                        subtitle: "专业人物分割测试（运动轨迹场景优化）",
-                        icon: "person.crop.circle.fill",
-                        action: { [weak self] in self?.showDeepLabV3Test() }
-                    ),
-                    SettingsItem(
-                        type: .action,
-                        title: "DETR智能分割测试",
-                        subtitle: "测试DETR模型多类别分割效果（人物、动物、植物、食物）",
-                        icon: "brain.head.profile",
-                        action: { [weak self] in self?.showDETRSegmentationTest() }
-                    ),
-                    SettingsItem(
-                        type: .action,
-                        title: "📹 DeepLabV3视频分割测试",
-                        subtitle: "选择视频文件提取关键帧，测试DeepLabV3批量人物分割效果与一致性",
-                        icon: "video.badge.waveform",
-                        action: { [weak self] in self?.showVideoSegmentationTest() }
-                    ),
-                    SettingsItem(
-                        type: .action,
-                        title: "多主体合成测试",
-                        subtitle: "上传视频自动提取关键帧，测试多主体共享背景合成效果",
-                        icon: "camera.macro.circle",
-                        action: { [weak self] in self?.showMultiSubjectCompositeTest() }
-                    )
-                ]
-            ),
+            // 🔒 开发者选项 (调试用) - 已隐藏
+            // SettingsSection(
+            //     title: "开发者选项",
+            //     items: [
+            //         SettingsItem(
+            //             type: .action,
+            //             title: "🔍 主体提取调试",
+            //             subtitle: "测试Vision框架+Core Image三阶段智能主体提取算法",
+            //             icon: "magnifyingglass.circle",
+            //             action: { [weak self] in self?.showSubjectExtractionDebug() }
+            //         ),
+            //         SettingsItem(
+            //             type: .action,
+            //             title: "🎯 MobileSAM智能分割",
+            //             subtitle: "AI驱动的物体精确分割（支持任意点击物体）",
+            //             icon: "scissors.badge.ellipsis",
+            //             action: { [weak self] in self?.showSAMSegmentationTest() }
+            //         ),
+            //         SettingsItem(
+            //             type: .action,
+            //             title: "🎯 DeepLabV3人物分割",
+            //             subtitle: "专业人物分割测试（运动轨迹场景优化）",
+            //             icon: "person.crop.circle.fill",
+            //             action: { [weak self] in self?.showDeepLabV3Test() }
+            //         ),
+            //         SettingsItem(
+            //             type: .action,
+            //             title: "DETR智能分割测试",
+            //             subtitle: "测试DETR模型多类别分割效果（人物、动物、植物、食物）",
+            //             icon: "brain.head.profile",
+            //             action: { [weak self] in self?.showDETRSegmentationTest() }
+            //         ),
+            //         SettingsItem(
+            //             type: .action,
+            //             title: "📹 DeepLabV3视频分割测试",
+            //             subtitle: "选择视频文件提取关键帧，测试DeepLabV3批量人物分割效果与一致性",
+            //             icon: "video.badge.waveform",
+            //             action: { [weak self] in self?.showVideoSegmentationTest() }
+            //         ),
+            //         SettingsItem(
+            //             type: .action,
+            //             title: "多主体合成测试",
+            //             subtitle: "上传视频自动提取关键帧，测试多主体共享背景合成效果",
+            //             icon: "camera.macro.circle",
+            //             action: { [weak self] in self?.showMultiSubjectCompositeTest() }
+            //         )
+            //     ]
+            // ),
             
             // 关于
             SettingsSection(
