@@ -845,7 +845,7 @@ class SettingsSwitchCell: UITableViewCell {
     }
     
     @objc private func switchValueChanged() {
-        HapticFeedbackManager.shared.trigger(.light)
+        HapticFeedbackManager.shared.lightImpact()
         switchAction?(switchControl.isOn)
     }
 }

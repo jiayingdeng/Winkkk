@@ -510,7 +510,7 @@ class PermissionCard: UIView {
     // MARK: - Actions
     @objc private func cardTapped() {
         if !isPermissionGranted {
-            HapticFeedbackManager.shared.trigger(.light)
+            HapticFeedbackManager.shared.lightImpact()
             delegate?.permissionCardDidRequestPermission(self)
         }
     }
