@@ -1352,6 +1352,7 @@ class TimelineView: UIView {
         switch gesture.state {
         case .began:
             isDragging = true
+            isPlaybackProgressUpdate = false  // 🔧 用户手动拖动，不是播放进度更新
             delegate?.timelineViewDidBeginSeeking(self)
             
             // 🎯 白色竖线脉冲效果，强调截图瞄准器
@@ -1673,6 +1674,12 @@ extension TimelineView: UIScrollViewDelegate {
     func scrollViewDidEndDragging(_ scrollView: UIScrollView, willDecelerate decelerate: Bool) {
         if !decelerate {
             updateVisibleThumbnails()
+            
+            // 🎯 关键修复：直接停止拖动时（无惯性滚动），也要触发预览更新
+            let captureTime = getCurrentCaptureTime()
+            let progress = duration > 0 ? captureTime / duration : 0
+            delegate?.timelineView(self, didSeekToProgress: progress)
+            
             print("📍 滚动拖拽结束，可恢复自动跟踪")
         }
     }

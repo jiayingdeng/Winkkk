@@ -54,14 +54,16 @@ class ImageComparisonView: UIView {
         layer.cornerRadius = ThemeManager.standardCornerRadius
         layer.masksToBounds = true
         
-        // 原始图像视图
-        originalImageView.contentMode = .scaleAspectFill
+        // 原始图像视图 - 使用 scaleAspectFit 完整显示图片不裁剪
+        originalImageView.contentMode = .scaleAspectFit
         originalImageView.clipsToBounds = true
+        originalImageView.backgroundColor = .black  // 设置背景色避免空白区域
         addSubview(originalImageView)
         
-        // 增强图像视图
-        enhancedImageView.contentMode = .scaleAspectFill
+        // 增强图像视图 - 使用 scaleAspectFit 完整显示图片不裁剪
+        enhancedImageView.contentMode = .scaleAspectFit
         enhancedImageView.clipsToBounds = true
+        enhancedImageView.backgroundColor = .black  // 设置背景色避免空白区域
         enhancedImageView.alpha = 0 // 初始隐藏
         addSubview(enhancedImageView)
         
@@ -184,9 +186,9 @@ class ImageComparisonView: UIView {
             enhancedLabel.widthAnchor.constraint(equalToConstant: 60),
             enhancedLabel.heightAnchor.constraint(equalToConstant: 24),
             
-            // 滑动指引标签
+            // 滑动指引标签 - 调整位置避免被底部按钮遮挡
             instructionLabel.centerXAnchor.constraint(equalTo: centerXAnchor),
-            instructionLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -16),
+            instructionLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -100), // 从-16改为-100，为底部控制面板留出空间
             instructionLabel.heightAnchor.constraint(equalToConstant: 32),
             instructionLabel.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 20),
             instructionLabel.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -20),

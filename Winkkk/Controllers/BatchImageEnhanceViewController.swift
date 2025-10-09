@@ -339,14 +339,14 @@ class BatchImageEnhanceViewController: UIViewController {
         
         // 数量标签 - 调整为更大字体
         countLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
-        countLabel.textColor = .white
+        countLabel.textColor = ThemeManager.primaryText  // 🎨 使用主题颜色
         countLabel.textAlignment = .center
         countLabel.text = "共 \(enhanceItems.count) 张图片，请选择需要修复的图片"
         headerView.addSubview(countLabel)
         
         // 提示标签 - 添加智能提示
         tipsLabel.font = ThemeManager.captionFont
-        tipsLabel.textColor = UIColor.white.withAlphaComponent(0.7)
+        tipsLabel.textColor = ThemeManager.secondaryText  // 🎨 使用主题次要颜色
         tipsLabel.textAlignment = .center
         tipsLabel.text = "💡 想要不同修复强度？点击单个图片进入详细修复"
         tipsLabel.numberOfLines = 2
@@ -363,10 +363,10 @@ class BatchImageEnhanceViewController: UIViewController {
         
         // 修复等级选择
         levelSegmentedControl.selectedSegmentIndex = 1 // 默认中度
-        levelSegmentedControl.backgroundColor = UIColor.white.withAlphaComponent(0.1)
+        levelSegmentedControl.backgroundColor = ThemeManager.cardBackground  // 🎨 使用主题卡片背景色
         levelSegmentedControl.selectedSegmentTintColor = ThemeManager.buttonPrimary
-        levelSegmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .normal)
-        levelSegmentedControl.setTitleTextAttributes([.foregroundColor: UIColor.white], for: .selected)
+        levelSegmentedControl.setTitleTextAttributes([.foregroundColor: ThemeManager.primaryText], for: .normal)  // 🎨 使用主题文字颜色
+        levelSegmentedControl.setTitleTextAttributes([.foregroundColor: ThemeManager.buttonPrimaryText], for: .selected)  // 🎨 使用按钮文字颜色
         levelSegmentedControl.addTarget(self, action: #selector(levelChanged(_:)), for: .valueChanged)
         controlPanelView.addSubview(levelSegmentedControl)
         
@@ -374,7 +374,7 @@ class BatchImageEnhanceViewController: UIViewController {
         startButton.setTitle("开始修复", for: .normal)
         // 注意：禁用状态的文案在updateStartButtonText()中动态设置
         startButton.backgroundColor = ThemeManager.buttonPrimary
-        startButton.setTitleColor(.white, for: .normal)
+        startButton.setTitleColor(ThemeManager.buttonPrimaryText, for: .normal)  // 🎨 使用主题按钮文字颜色
         startButton.titleLabel?.font = ThemeManager.buttonFont
         startButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         startButton.addTarget(self, action: #selector(startButtonTapped), for: .touchUpInside)
@@ -384,7 +384,7 @@ class BatchImageEnhanceViewController: UIViewController {
         pauseButton.setTitle("暂停", for: .normal)
         pauseButton.setTitle("继续", for: .selected)
         pauseButton.backgroundColor = ThemeManager.buttonSecondary
-        pauseButton.setTitleColor(.white, for: .normal)
+        pauseButton.setTitleColor(ThemeManager.buttonSecondaryText, for: .normal)  // 🎨 使用主题按钮次要文字颜色
         pauseButton.titleLabel?.font = ThemeManager.buttonFont
         pauseButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         pauseButton.addTarget(self, action: #selector(pauseButtonTapped), for: .touchUpInside)
@@ -393,8 +393,8 @@ class BatchImageEnhanceViewController: UIViewController {
         
         // 重置按钮
         resetButton.setTitle("重置", for: .normal)
-        resetButton.backgroundColor = UIColor.systemRed.withAlphaComponent(0.8)
-        resetButton.setTitleColor(.white, for: .normal)
+        resetButton.backgroundColor = ThemeManager.destructive  // 🎨 使用主题危险色
+        resetButton.setTitleColor(.white, for: .normal)  // ⚪ 危险按钮文字保持白色以确保对比度
         resetButton.titleLabel?.font = ThemeManager.buttonFont
         resetButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         resetButton.addTarget(self, action: #selector(resetButtonTapped), for: .touchUpInside)
@@ -403,28 +403,28 @@ class BatchImageEnhanceViewController: UIViewController {
     }
     
     private func setupProgressView() {
-        progressContainerView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
+        progressContainerView.backgroundColor = ThemeManager.cardBackground.withAlphaComponent(0.8)  // 🎨 使用主题卡片背景色
         progressContainerView.layer.cornerRadius = ThemeManager.standardCornerRadius
         // 状态容器始终显示，提供持续的状态反馈
         progressContainerView.isHidden = false
         
         // 总体进度条
         overallProgressView.progressTintColor = ThemeManager.buttonPrimary
-        overallProgressView.trackTintColor = UIColor.white.withAlphaComponent(0.2)
+        overallProgressView.trackTintColor = ThemeManager.secondaryText.withAlphaComponent(0.3)  // 🎨 使用主题次要色作为轨道颜色
         overallProgressView.layer.cornerRadius = 2
         overallProgressView.clipsToBounds = true
         progressContainerView.addSubview(overallProgressView)
         
         // 进度标签
         progressLabel.font = ThemeManager.captionFont
-        progressLabel.textColor = .white
+        progressLabel.textColor = ThemeManager.primaryText  // 🎨 使用主题文字颜色
         progressLabel.textAlignment = .center
         progressLabel.text = "0%"
         progressContainerView.addSubview(progressLabel)
         
         // 状态标签
         statusLabel.font = ThemeManager.captionFont
-        statusLabel.textColor = UIColor.white.withAlphaComponent(0.8)
+        statusLabel.textColor = ThemeManager.secondaryText  // 🎨 使用主题次要文字颜色
         statusLabel.textAlignment = .center
         statusLabel.text = "准备就绪"
         progressContainerView.addSubview(statusLabel)
@@ -464,7 +464,7 @@ class BatchImageEnhanceViewController: UIViewController {
         // 保存全部按钮
         saveAllButton.setTitle("保存已完成", for: .normal)
         saveAllButton.backgroundColor = ThemeManager.buttonPrimary
-        saveAllButton.setTitleColor(.white, for: .normal)
+        saveAllButton.setTitleColor(ThemeManager.buttonPrimaryText, for: .normal)  // 🎨 使用主题按钮文字颜色
         saveAllButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
         saveAllButton.titleLabel?.adjustsFontSizeToFitWidth = true
         saveAllButton.titleLabel?.minimumScaleFactor = 0.8
@@ -477,7 +477,7 @@ class BatchImageEnhanceViewController: UIViewController {
         // 分享全部按钮
         shareAllButton.setTitle("分享已完成", for: .normal)
         shareAllButton.backgroundColor = ThemeManager.buttonSecondary
-        shareAllButton.setTitleColor(.white, for: .normal)
+        shareAllButton.setTitleColor(ThemeManager.buttonSecondaryText, for: .normal)  // 🎨 使用主题按钮次要文字颜色
         shareAllButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
         shareAllButton.titleLabel?.adjustsFontSizeToFitWidth = true
         shareAllButton.titleLabel?.minimumScaleFactor = 0.8
@@ -489,8 +489,8 @@ class BatchImageEnhanceViewController: UIViewController {
         
         // 拼图创建按钮
         createCollageButton.setTitle("拼图创建", for: .normal)
-        createCollageButton.backgroundColor = UIColor.systemTeal.withAlphaComponent(0.8)
-        createCollageButton.setTitleColor(.white, for: .normal)
+        createCollageButton.backgroundColor = ThemeManager.success  // 🎨 使用主题成功色
+        createCollageButton.setTitleColor(.white, for: .normal)  // ⚪ 成功色按钮文字保持白色以确保对比度
         createCollageButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
         createCollageButton.titleLabel?.adjustsFontSizeToFitWidth = true
         createCollageButton.titleLabel?.minimumScaleFactor = 0.8
@@ -503,8 +503,8 @@ class BatchImageEnhanceViewController: UIViewController {
         // 选择模式按钮（全选/反选）
         selectModeButton.setTitle("全选", for: .normal)
         selectModeButton.setTitle("反选", for: .selected)
-        selectModeButton.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.8)
-        selectModeButton.setTitleColor(.white, for: .normal)
+        selectModeButton.backgroundColor = ThemeManager.buttonPrimary  // 🎨 使用主题主按钮色
+        selectModeButton.setTitleColor(ThemeManager.buttonPrimaryText, for: .normal)  // 🎨 使用主题按钮文字颜色
         selectModeButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
         selectModeButton.titleLabel?.adjustsFontSizeToFitWidth = true
         selectModeButton.titleLabel?.minimumScaleFactor = 0.8
@@ -516,8 +516,8 @@ class BatchImageEnhanceViewController: UIViewController {
         
         // 重新开始按钮
         reselectButton.setTitle("重新开始", for: .normal)
-        reselectButton.backgroundColor = UIColor.systemOrange.withAlphaComponent(0.8)
-        reselectButton.setTitleColor(.white, for: .normal)
+        reselectButton.backgroundColor = ThemeManager.warning  // 🎨 使用主题警告色
+        reselectButton.setTitleColor(.white, for: .normal)  // ⚪ 警告色按钮文字保持白色以确保对比度
         reselectButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
         reselectButton.titleLabel?.adjustsFontSizeToFitWidth = true
         reselectButton.titleLabel?.minimumScaleFactor = 0.8
@@ -528,8 +528,8 @@ class BatchImageEnhanceViewController: UIViewController {
         
         // 返回截图中心按钮
         returnToCenterButton.setTitle("返回截图中心", for: .normal)
-        returnToCenterButton.backgroundColor = UIColor.systemGreen.withAlphaComponent(0.8)
-        returnToCenterButton.setTitleColor(.white, for: .normal)
+        returnToCenterButton.backgroundColor = ThemeManager.success  // 🎨 使用主题成功色
+        returnToCenterButton.setTitleColor(.white, for: .normal)  // ⚪ 成功色按钮文字保持白色以确保对比度
         returnToCenterButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
         returnToCenterButton.titleLabel?.adjustsFontSizeToFitWidth = true
         returnToCenterButton.titleLabel?.minimumScaleFactor = 0.8
@@ -541,8 +541,8 @@ class BatchImageEnhanceViewController: UIViewController {
     
     private func configureNavigationBar() {
         title = "批量画质修复"
-        navigationController?.navigationBar.tintColor = .white
-        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: UIColor.white]
+        navigationController?.navigationBar.tintColor = ThemeManager.primaryText  // 🎨 使用主题文字颜色
+        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: ThemeManager.primaryText]  // 🎨 使用主题文字颜色
         
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             title: "取消",
@@ -762,34 +762,46 @@ extension BatchImageEnhanceViewController {
         let selectedCount = selectedIndices.count
         statusLabel.text = "正在处理\(selectedCount)张选中图片..."
         
-        // 逐个处理图片（避免内存过载）
-        for (index, item) in itemsToProcess {
+        // 🔧 关键修复：逐个处理图片，确保索引对应关系正确
+        // itemsToProcess 中的元素格式是 (originalIndex, item)
+        // 例如选择第1、3、5张时，itemsToProcess = [(0, item0), (2, item2), (4, item4)]
+        for (originalIndex, item) in itemsToProcess {
             processingGroup.enter()
             
-            item.processingState = .processing
+            print("🔄 开始处理索引\(originalIndex)的图片，原图尺寸=\(item.originalImage.size)")
+            
+            // 设置处理状态
+            enhanceItems[originalIndex].processingState = .processing
             
             DispatchQueue.main.async {
-                self.collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
+                // ✅ 使用原始索引刷新UI
+                self.collectionView.reloadItems(at: [IndexPath(item: originalIndex, section: 0)])
             }
             
-            imageEnhancer.enhanceImage(item.originalImage, level: currentLevel) { [weak self] result in
+            // ✅ 只捕获索引，不捕获item引用，避免闭包引用问题
+            imageEnhancer.enhanceImage(item.originalImage, level: currentLevel) { [weak self, index = originalIndex] result in
                 guard let self = self else { return }
                 
                 DispatchQueue.main.async {
                     switch result {
                     case .success(let enhancedImage):
-                        item.enhancedImage = enhancedImage
-                        item.processingState = .completed
-                        item.progress = 1.0
+                        print("✅ 索引\(index)修复成功，原图尺寸=\(self.enhanceItems[index].originalImage.size)，修复图尺寸=\(enhancedImage.size)")
+                        // ✅ 直接通过索引访问数组元素，避免引用混乱
+                        self.enhanceItems[index].enhancedImage = enhancedImage
+                        self.enhanceItems[index].processingState = .completed
+                        self.enhanceItems[index].progress = 1.0
                         self.completedCount += 1
                         
                     case .failure(let error):
-                        item.error = error
-                        item.processingState = .failed
-                        item.progress = 0.0
+                        print("❌ 索引\(index)修复失败: \(error)")
+                        // ✅ 直接通过索引访问数组元素
+                        self.enhanceItems[index].error = error
+                        self.enhanceItems[index].processingState = .failed
+                        self.enhanceItems[index].progress = 0.0
                         self.failedCount += 1
                     }
                     
+                    // ✅ 使用捕获的原始索引刷新UI
                     self.collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
                     self.updateOverallProgress()
                     self.updatePageState()
@@ -981,6 +993,19 @@ extension BatchImageEnhanceViewController {
         // 创建分享界面
         let activityVC = UIActivityViewController(activityItems: imagesToShare, applicationActivities: nil)
         
+        // 分享完成回调
+        activityVC.completionWithItemsHandler = { [weak self] activityType, completed, returnedItems, error in
+            if completed {
+                // 分享成功
+                DispatchQueue.main.async {
+                    let count = imagesToShare.count
+                    let message = count == 1 ? "已成功分享1张图片" : "已成功分享\(count)张图片"
+                    self?.showToast(icon: "square.and.arrow.up.circle.fill", title: "分享成功", message: message)
+                    HapticFeedbackManager.shared.notificationSuccess()
+                }
+            }
+        }
+        
         // iPad适配
         if let popover = activityVC.popoverPresentationController {
             popover.sourceView = shareAllButton
@@ -1027,7 +1052,8 @@ extension BatchImageEnhanceViewController {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
             progressAlert.dismiss(animated: true) {
                 let message = totalCount == 1 ? "已保存1张修复后的图片到相册" : "已保存\(totalCount)张修复后的图片到相册"
-                self.showAlert(title: "保存成功", message: message)
+                // 使用Toast提示代替Alert
+                self.showToast(icon: "checkmark.circle.fill", title: "保存成功", message: message)
                 HapticFeedbackManager.shared.notificationSuccess()
             }
         }
@@ -1254,12 +1280,30 @@ extension BatchImageEnhanceViewController {
     
     /// 显示单图详细查看页面
     private func showDetailView(for item: BatchEnhanceItem, at index: Int) {
+        // 🔧 确保索引有效性
+        guard index >= 0 && index < enhanceItems.count else {
+            print("❌ showDetailView: 索引越界 index=\(index), total=\(enhanceItems.count)")
+            return
+        }
+        
+        // 🔧 使用索引获取实际的item，确保对应关系正确
+        let actualItem = enhanceItems[index]
+        
+        print("✅ showDetailView: 打开索引\(index)的图片")
+        print("   - 原图尺寸: \(actualItem.originalImage.size)")
+        print("   - 处理状态: \(actualItem.processingState)")
+        print("   - 是否有修复图: \(actualItem.enhancedImage != nil)")
+        if let enhanced = actualItem.enhancedImage {
+            print("   - 修复图尺寸: \(enhanced.size)")
+        }
+        
         // 创建批量上下文
         let batchContext = BatchContext(
             items: enhanceItems,
             currentIndex: index,
             enhanceLevel: currentLevel,
             onItemUpdated: { [weak self] updatedIndex, newEnhancedImage in
+                print("✅ 批量上下文回调: 更新索引\(updatedIndex)的修复图片")
                 self?.enhanceItems[updatedIndex].enhancedImage = newEnhancedImage
                 self?.enhanceItems[updatedIndex].processingState = .completed
                 self?.collectionView.reloadItems(at: [IndexPath(item: updatedIndex, section: 0)])
@@ -1268,38 +1312,38 @@ extension BatchImageEnhanceViewController {
         
         let imageEnhanceVC: ImageEnhanceViewController
         
-        if item.processingState == .completed, let enhancedImage = item.enhancedImage {
+        // ✅ 使用actualItem确保对应关系正确
+        if actualItem.processingState == .completed, let enhancedImage = actualItem.enhancedImage {
             // 已修复的图片：使用扩展初始化，跳过自动修复
+            print("✅ 创建单图修复页面: 已修复状态，索引=\(index)")
             imageEnhanceVC = ImageEnhanceViewController(
-                image: item.originalImage,
+                image: actualItem.originalImage,  // ✅ 使用actualItem
                 timestamp: Date().timeIntervalSince1970,
-                enhanceLevel: currentLevel,  // 传递当前批量修复使用的等级
-                skipAutoEnhance: true,      // 跳过自动修复
-                batchContext: batchContext   // 传递批量上下文
+                enhanceLevel: currentLevel,
+                skipAutoEnhance: true,
+                batchContext: batchContext
             )
             
-            // 设置来源类型为已完成的批量修复
             imageEnhanceVC.sourceType = .fromBatchCompleted
-            
-            // 预设已修复的图片
             imageEnhanceVC.setEnhancedImage(enhancedImage)
             
         } else {
             // 未修复的图片：使用扩展初始化，保持当前等级但允许自动修复
+            print("✅ 创建单图修复页面: 未修复状态，索引=\(index)")
             imageEnhanceVC = ImageEnhanceViewController(
-                image: item.originalImage,
+                image: actualItem.originalImage,  // ✅ 使用actualItem
                 timestamp: Date().timeIntervalSince1970,
-                enhanceLevel: currentLevel,  // 传递当前批量修复使用的等级
-                skipAutoEnhance: false,     // 允许自动修复
-                batchContext: batchContext   // 传递批量上下文
+                enhanceLevel: currentLevel,
+                skipAutoEnhance: false,
+                batchContext: batchContext
             )
             
-            // 设置来源类型为批量修复
             imageEnhanceVC.sourceType = .fromBatch
         }
         
         // 设置完成回调（用户在详细页面重新修复后）
         imageEnhanceVC.onEnhancementComplete = { [weak self] newEnhancedImage in
+            print("✅ 单图修复完成回调: 更新索引\(index)的修复图片")
             self?.enhanceItems[index].enhancedImage = newEnhancedImage
             self?.enhanceItems[index].processingState = .completed
             self?.collectionView.reloadItems(at: [IndexPath(item: index, section: 0)])
@@ -1396,7 +1440,15 @@ extension BatchImageEnhanceViewController: UICollectionViewDelegateFlowLayout {
         let availableWidth = collectionView.bounds.width - (padding * 2) - spacing
         let itemWidth = availableWidth / 2
         
-        return CGSize(width: itemWidth, height: itemWidth + 60) // 额外高度用于显示状态信息
+        // 🎯 根据图片实际比例计算高度
+        let item = enhanceItems[indexPath.item]
+        let imageAspectRatio = item.originalImage.size.height / item.originalImage.size.width
+        let imageHeight = itemWidth * imageAspectRatio
+        
+        // 状态信息区域固定高度为 60
+        let statusHeight: CGFloat = 60
+        
+        return CGSize(width: itemWidth, height: imageHeight + statusHeight)
     }
 }
 
@@ -1434,6 +1486,9 @@ class BatchEnhanceCell: UICollectionViewCell {
     // 覆盖层
     private let overlayView = UIView()
     
+    // 约束引用
+    private var containerHeightConstraint: NSLayoutConstraint?
+    
     // MARK: - Interactive Buttons
     private let selectionButton = UIButton()    // 选择框区域按钮
     private let imageContentButton = UIButton() // 图片内容区域按钮
@@ -1461,14 +1516,16 @@ class BatchEnhanceCell: UICollectionViewCell {
         containerView.layer.borderColor = UIColor.white.withAlphaComponent(0.2).cgColor
         contentView.addSubview(containerView)
         
-        // 原图视图
-        originalImageView.contentMode = .scaleAspectFill
+        // 原图视图 - 使用 scaleAspectFit 完整显示图片不裁剪
+        originalImageView.contentMode = .scaleAspectFit
         originalImageView.clipsToBounds = true
+        originalImageView.backgroundColor = .black  // 设置背景色避免空白区域
         containerView.addSubview(originalImageView)
         
-        // 修复后图片视图
-        enhancedImageView.contentMode = .scaleAspectFill
+        // 修复后图片视图 - 使用 scaleAspectFit 完整显示图片不裁剪
+        enhancedImageView.contentMode = .scaleAspectFit
         enhancedImageView.clipsToBounds = true
+        enhancedImageView.backgroundColor = .black  // 设置背景色避免空白区域
         enhancedImageView.alpha = 0
         containerView.addSubview(enhancedImageView)
         
@@ -1618,14 +1675,12 @@ class BatchEnhanceCell: UICollectionViewCell {
         selectionButton.translatesAutoresizingMaskIntoConstraints = false
         imageContentButton.translatesAutoresizingMaskIntoConstraints = false
         
-        let imageHeight = frame.width // 正方形图片区域
-        
         NSLayoutConstraint.activate([
             // 容器视图
             containerView.topAnchor.constraint(equalTo: contentView.topAnchor),
             containerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             containerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            containerView.heightAnchor.constraint(equalTo: containerView.widthAnchor), // 正方形
+            // 高度约束将在 configure 方法中根据图片比例动态设置
             
             // 原图 (左半部分)
             originalImageView.topAnchor.constraint(equalTo: containerView.topAnchor),
@@ -1719,6 +1774,9 @@ class BatchEnhanceCell: UICollectionViewCell {
         // 设置原图
         originalImageView.image = item.originalImage
         
+        // 🎯 根据图片实际比例动态设置容器高度
+        updateContainerHeight(for: item.originalImage)
+        
         // 根据状态配置UI
         switch item.processingState {
         case .pending:
@@ -1742,6 +1800,21 @@ class BatchEnhanceCell: UICollectionViewCell {
         
         // 根据状态设置按钮可用性
         updateButtonStates(for: item.processingState)
+    }
+    
+    /// 根据图片比例更新容器高度
+    private func updateContainerHeight(for image: UIImage) {
+        let imageAspectRatio = image.size.height / image.size.width
+        
+        // 移除旧的高度约束
+        containerHeightConstraint?.isActive = false
+        
+        // 创建新的高度约束，基于图片的实际比例
+        containerHeightConstraint = containerView.heightAnchor.constraint(
+            equalTo: containerView.widthAnchor,
+            multiplier: imageAspectRatio
+        )
+        containerHeightConstraint?.isActive = true
     }
     
     private func updateButtonStates(for processingState: BatchEnhanceItem.ProcessingState) {
@@ -1942,5 +2015,89 @@ extension BatchImageEnhanceViewController {
         tipsLabel.isHidden = false
         
         overallProgressView.progress = 1.0
+    }
+    
+    /// 显示Toast提示
+    private func showToast(icon: String, title: String, message: String) {
+        let toastView = UIView()
+        toastView.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.95)
+        toastView.layer.cornerRadius = 16
+        toastView.layer.shadowColor = UIColor.black.cgColor
+        toastView.layer.shadowOpacity = 0.15
+        toastView.layer.shadowOffset = CGSize(width: 0, height: 4)
+        toastView.layer.shadowRadius = 12
+        toastView.translatesAutoresizingMaskIntoConstraints = false
+        
+        let iconLabel = UILabel()
+        iconLabel.text = icon.contains(".") ? "" : icon
+        if icon.contains(".") {
+            // 使用SF Symbol
+            let imageAttachment = NSTextAttachment()
+            let config = UIImage.SymbolConfiguration(pointSize: 44, weight: .medium)
+            if let image = UIImage(systemName: icon, withConfiguration: config)?.withTintColor(ThemeManager.success, renderingMode: .alwaysOriginal) {
+                imageAttachment.image = image
+                let attributedString = NSAttributedString(attachment: imageAttachment)
+                iconLabel.attributedText = attributedString
+            }
+        }
+        iconLabel.font = UIFont.systemFont(ofSize: 44)
+        iconLabel.textAlignment = .center
+        iconLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        let titleLabel = UILabel()
+        titleLabel.text = title
+        titleLabel.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+        titleLabel.textColor = ThemeManager.primaryText
+        titleLabel.textAlignment = .center
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        let messageLabel = UILabel()
+        messageLabel.text = message
+        messageLabel.font = UIFont.systemFont(ofSize: 14, weight: .regular)
+        messageLabel.textColor = ThemeManager.secondaryText
+        messageLabel.textAlignment = .center
+        messageLabel.numberOfLines = 0
+        messageLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        toastView.addSubview(iconLabel)
+        toastView.addSubview(titleLabel)
+        toastView.addSubview(messageLabel)
+        view.addSubview(toastView)
+        
+        NSLayoutConstraint.activate([
+            toastView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            toastView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            toastView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 40),
+            toastView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -40),
+            
+            iconLabel.topAnchor.constraint(equalTo: toastView.topAnchor, constant: 20),
+            iconLabel.centerXAnchor.constraint(equalTo: toastView.centerXAnchor),
+            
+            titleLabel.topAnchor.constraint(equalTo: iconLabel.bottomAnchor, constant: 12),
+            titleLabel.leadingAnchor.constraint(equalTo: toastView.leadingAnchor, constant: 20),
+            titleLabel.trailingAnchor.constraint(equalTo: toastView.trailingAnchor, constant: -20),
+            
+            messageLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            messageLabel.leadingAnchor.constraint(equalTo: toastView.leadingAnchor, constant: 20),
+            messageLabel.trailingAnchor.constraint(equalTo: toastView.trailingAnchor, constant: -20),
+            messageLabel.bottomAnchor.constraint(equalTo: toastView.bottomAnchor, constant: -20)
+        ])
+        
+        // 动画显示
+        toastView.alpha = 0
+        toastView.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+        
+        UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5, options: .curveEaseOut, animations: {
+            toastView.alpha = 1
+            toastView.transform = .identity
+        }) { _ in
+            // 2秒后自动消失
+            UIView.animate(withDuration: 0.25, delay: 2.0, options: .curveEaseIn, animations: {
+                toastView.alpha = 0
+                toastView.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+            }) { _ in
+                toastView.removeFromSuperview()
+            }
+        }
     }
 }

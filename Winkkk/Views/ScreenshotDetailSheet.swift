@@ -21,6 +21,7 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     private let screenshots: [ScreenshotItem]
     private var currentIndex: Int
     private let showShareButton: Bool  // 🆕 是否显示分享按钮
+    private var hasScrolledToInitialIndex = false  // 🔧 标记是否已经滚动到初始位置
     
     // MARK: - UI Components
     private let gradientBackgroundView = GradientBackgroundView()
@@ -62,9 +63,17 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
         NotificationCenter.default.removeObserver(self)
     }
     
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // 🔧 只在第一次布局时滚动到目标位置，避免显示跳跃
+        if !hasScrolledToInitialIndex && scrollView.frame.width > 0 {
+            scrollToCurrentIndex(animated: false)
+            hasScrolledToInitialIndex = true
+        }
+    }
+    
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
-        scrollToCurrentIndex(animated: false)
         
         print("📱 ScreenshotDetailSheet已完全显示")
         

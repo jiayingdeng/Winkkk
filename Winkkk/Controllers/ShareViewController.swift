@@ -56,6 +56,18 @@ class ShareViewController: UIViewController {
         setupUI()
         setupConstraints()
         configureInitialState()
+        
+        // 🎨 监听主题切换通知
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleThemeChange),
+            name: .themeDidChange,
+            object: nil
+        )
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self, name: .themeDidChange, object: nil)
     }
     
     // MARK: - UI Setup
@@ -83,8 +95,9 @@ class ShareViewController: UIViewController {
     
     private func setupNavigationBar() {
         title = "分享"
-        navigationController?.navigationBar.tintColor = .white
-        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: UIColor.white]
+        // 🎨 使用主题色，确保按钮在各种背景下都可见
+        navigationController?.navigationBar.tintColor = ThemeManager.buttonPrimary
+        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: ThemeManager.primaryText]
         
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             title: "取消",
@@ -431,6 +444,36 @@ class ShareViewController: UIViewController {
     private func trackShareEvent(type: String) {
         // TODO: 集成分析工具
         print("分享事件: \(type)")
+    }
+    
+    // MARK: - Theme Change Handler
+    
+    /// 处理主题切换
+    @objc private func handleThemeChange() {
+        // 🎨 更新导航栏颜色
+        navigationController?.navigationBar.tintColor = ThemeManager.buttonPrimary
+        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: ThemeManager.primaryText]
+        
+        // 更新背景和容器颜色
+        previewContainer.backgroundColor = ThemeManager.cardBackground
+        watermarkSection.backgroundColor = ThemeManager.cardBackground
+        shareOptionsSection.backgroundColor = ThemeManager.cardBackground
+        
+        // 更新标签颜色
+        watermarkLabel.textColor = ThemeManager.primaryText
+        watermarkPreview.textColor = ThemeManager.secondaryText
+        
+        // 更新按钮颜色
+        shareButton.backgroundColor = ThemeManager.buttonPrimary
+        shareButton.setTitleColor(ThemeManager.buttonTextOnPrimary, for: .normal)
+        
+        saveButton.backgroundColor = ThemeManager.success
+        saveButton.setTitleColor(ThemeManager.buttonTextOnPrimary, for: .normal)
+        
+        copyButton.backgroundColor = ThemeManager.buttonSecondary
+        copyButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+        
+        print("✅ ShareViewController: 主题已更新")
     }
     
     // MARK: - Actions

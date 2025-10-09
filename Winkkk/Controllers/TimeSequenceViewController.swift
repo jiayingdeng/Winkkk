@@ -568,6 +568,10 @@ class TimeSequenceViewController: UIViewController {
     @objc private func handleThemeChange() {
         print("🎨 TimeSequenceViewController: 主题已切换，更新UI颜色")
         
+        // 🎨 更新导航栏颜色（不需要动画）
+        navigationController?.navigationBar.tintColor = .black
+        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: UIColor.white]
+        
         UIView.animate(withDuration: 0.3) {
             // 🎨 更新标题颜色
             self.titleLabel.textColor = ThemeManager.primaryText
@@ -621,7 +625,7 @@ class TimeSequenceViewController: UIViewController {
     
     private func configureNavigationBar() {
         title = "时间序列模式"
-        navigationController?.navigationBar.tintColor = .white
+        navigationController?.navigationBar.tintColor = .black  // 🎨 改为黑色，更容易看见
         navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: UIColor.white]
         
         navigationItem.leftBarButtonItem = UIBarButtonItem(

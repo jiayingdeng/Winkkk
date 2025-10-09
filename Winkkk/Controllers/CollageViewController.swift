@@ -231,6 +231,10 @@ class CollageViewController: UIViewController {
     
     /// 处理主题切换
     @objc private func handleThemeChange() {
+        // 🎨 更新导航栏颜色
+        navigationController?.navigationBar.tintColor = ThemeManager.buttonPrimary
+        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: ThemeManager.primaryText]
+        
         // 更新头部区域颜色
         countLabel.textColor = ThemeManager.primaryText
         statusLabel.textColor = ThemeManager.secondaryText
@@ -324,7 +328,9 @@ class CollageViewController: UIViewController {
         contentView.addSubview(aspectRatioSectionView)
         contentView.addSubview(layoutSectionView)
         contentView.addSubview(bottomButtonsView)
-        contentView.addSubview(lightEditToolbar) // 工具栏在最上层
+        
+        // 工具栏添加到主视图，避免与滚动内容冲突
+        view.addSubview(lightEditToolbar)
     }
     
     private func setupHeaderView() {
@@ -411,8 +417,11 @@ class CollageViewController: UIViewController {
     }
     
     private func setupLayoutSection() {
-        layoutSectionView.backgroundColor = ThemeManager.backgroundSecondary
+        // 使用更深的背景色，增加可读性
+        layoutSectionView.backgroundColor = UIColor(white: 0.95, alpha: 1.0)
         layoutSectionView.layer.cornerRadius = ThemeManager.standardCornerRadius
+        layoutSectionView.layer.borderWidth = 1
+        layoutSectionView.layer.borderColor = UIColor(white: 0.85, alpha: 1.0).cgColor
         
         // 标题 - 使用主题文字颜色
         layoutTitleLabel.font = ThemeManager.buttonFont
@@ -431,8 +440,11 @@ class CollageViewController: UIViewController {
     }
     
     private func setupAspectRatioSection() {
-        aspectRatioSectionView.backgroundColor = ThemeManager.backgroundSecondary
+        // 使用更深的背景色，增加可读性
+        aspectRatioSectionView.backgroundColor = UIColor(white: 0.95, alpha: 1.0)
         aspectRatioSectionView.layer.cornerRadius = ThemeManager.standardCornerRadius
+        aspectRatioSectionView.layer.borderWidth = 1
+        aspectRatioSectionView.layer.borderColor = UIColor(white: 0.85, alpha: 1.0).cgColor
         
         // 标题 - 使用主题文字颜色
         aspectRatioTitleLabel.font = ThemeManager.buttonFont
@@ -749,10 +761,10 @@ class CollageViewController: UIViewController {
             enhanceButton.widthAnchor.constraint(equalTo: secondRowButtonsView.widthAnchor, multiplier: 0.48),
             enhanceButton.heightAnchor.constraint(equalToConstant: 52),
             
-            // 轻量级工具栏 - 固定在预览图下方
-            lightEditToolbar.topAnchor.constraint(equalTo: previewContainerView.bottomAnchor, constant: 12),
-            lightEditToolbar.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-            lightEditToolbar.widthAnchor.constraint(lessThanOrEqualTo: contentView.widthAnchor, constant: -32),
+            // 轻量级工具栏 - 浮动在屏幕底部（现在是view的子视图，不会阻挡contentView的内容）
+            lightEditToolbar.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -20),
+            lightEditToolbar.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            lightEditToolbar.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, constant: -32),
             lightEditToolbar.heightAnchor.constraint(equalToConstant: 100),
             
             // 工具栏内部布局 - 手势提示标签
@@ -852,8 +864,9 @@ class CollageViewController: UIViewController {
     
     private func configureNavigationBar() {
         title = "创建拼图"
-        navigationController?.navigationBar.tintColor = .white
-        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: UIColor.white]
+        // 🎨 使用主题色，确保按钮在各种背景下都可见
+        navigationController?.navigationBar.tintColor = ThemeManager.buttonPrimary
+        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: ThemeManager.primaryText]
         
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             title: "取消",

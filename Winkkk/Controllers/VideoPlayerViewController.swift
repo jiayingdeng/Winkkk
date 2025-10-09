@@ -89,6 +89,8 @@ class VideoPlayerViewController: UIViewController {
     private var previewUpdateTimer: Timer?
     private let previewUpdateInterval: TimeInterval = 1.0/30.0  // 30fps限制
     private var lastPreviewUpdateTime: TimeInterval = 0
+    private var isSeeking = false  // 🆕 标记是否正在执行 seek 操作
+    private var pendingSeekTime: CMTime?  // 🆕 待执行的 seek 时间
     
     // 🎯 响应式布局约束
     // private var controlPanelHeightConstraint: NSLayoutConstraint? // 三分屏布局使用比例约束，不需要动态高度
@@ -855,19 +857,36 @@ class VideoPlayerViewController: UIViewController {
     
     // 🎯 执行视频帧跳转 (仅在预览模式下，播放状态时不干扰)
     private func performVideoSeek(to time: CMTime) {
-        // 🆕 双轨同步：如果正在播放流动，不执行手动跳转，避免干扰播放
-        guard !isFlowing else {
-            print("🎯 播放状态中，跳过手动帧跳转，保持播放连续性")
+        // 🔧 修复：用户拖动时间轴时，即使正在播放也应该响应拖动
+        // 因为 timelineViewDidBeginSeeking 已经调用了 stopFlowing()
+        // 这里不应该再检查 isFlowing，直接执行 seek
+        
+        // 🆕 如果正在 seeking，保存待执行的时间，等当前 seek 完成后再执行
+        if isSeeking {
+            pendingSeekTime = time
+            print("🔄 正在seek中，保存待执行时间: \(time.formattedString)")
             return
         }
         
+        isSeeking = true
         player?.seek(to: time, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] completed in
-            if completed {
-                DispatchQueue.main.async {
-                    self?.currentTime = time
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                self.isSeeking = false
+                
+                if completed {
+                    self.currentTime = time
                     // 🎯 更新合并的时间标签
-                    self?.updateTimeInfoLabel()
-                    print("🎯 预览模式：已跳转到 \(time.formattedString)")
+                    self.updateTimeInfoLabel()
+                    print("🎯 预览更新：已跳转到 \(time.formattedString)")
+                }
+                
+                // 🆕 如果有待执行的 seek，立即执行
+                if let pendingTime = self.pendingSeekTime {
+                    self.pendingSeekTime = nil
+                    print("▶️ 执行待处理的seek: \(pendingTime.formattedString)")
+                    self.performVideoSeek(to: pendingTime)
                 }
             }
         }
@@ -1628,8 +1647,9 @@ extension VideoPlayerViewController: TimelineViewDelegate {
         // 更新截取时间标签显示
         updateCaptureTimeLabel(captureTime)
         
-        // 🎯 实时预览：立即更新视频帧到对应时间
-        updateVideoPreview(to: captureTime)
+        // 🎯 关键修复：拖动时立即更新预览，不使用防抖延迟
+        // 直接调用performVideoSeek而不是updateVideoPreview，避免防抖导致预览延迟
+        performVideoSeek(to: captureTime)
     }
     
     func timelineViewDidBeginSeeking(_ timelineView: TimelineView) {
@@ -1640,6 +1660,16 @@ extension VideoPlayerViewController: TimelineViewDelegate {
     func timelineViewDidEndSeeking(_ timelineView: TimelineView) {
         // 🎯 用户结束滚动，可以选择恢复流动或保持停止状态
         // 用户体验：让用户手动控制是否继续流动
+        
+        // 🔧 修复：用户停止拖动时，强制更新预览到最终位置（无防抖）
+        let finalCaptureTime = timelineView.getCurrentCaptureTime()
+        let finalTime = CMTime(seconds: finalCaptureTime, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        
+        // 取消之前的定时器
+        previewUpdateTimer?.invalidate()
+        
+        // 🆕 使用统一的 seek 方法，支持排队机制
+        performVideoSeek(to: finalTime)
     }
 }
 
