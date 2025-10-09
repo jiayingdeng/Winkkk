@@ -20,6 +20,7 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     weak var delegate: ScreenshotDetailSheetDelegate?
     private let screenshots: [ScreenshotItem]
     private var currentIndex: Int
+    private let showShareButton: Bool  // 🆕 是否显示分享按钮
     
     // MARK: - UI Components
     private let gradientBackgroundView = GradientBackgroundView()
@@ -31,9 +32,10 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     private let shareButton = UIButton()
     
     // MARK: - Initialization
-    init(screenshots: [ScreenshotItem], currentIndex: Int = 0) {
+    init(screenshots: [ScreenshotItem], currentIndex: Int = 0, showShareButton: Bool = true) {
         self.screenshots = screenshots
         self.currentIndex = min(max(currentIndex, 0), screenshots.count - 1)
+        self.showShareButton = showShareButton  // 🆕 保存配置
         super.init(nibName: nil, bundle: nil)
         
         modalPresentationStyle = .pageSheet
@@ -53,6 +55,11 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
         setupConstraints()
         setupGestures()
         updateUI()
+        setupThemeObserver()
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
     
     override func viewDidAppear(_ animated: Bool) {
@@ -90,22 +97,25 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
     private func setupNavigationBar() {
         navigationBar.backgroundColor = .clear
         
-        // 标题 - 使用白色文字
+        // 标题 - 使用主题色
         titleLabel.text = "\(currentIndex + 1) / \(screenshots.count)"
         titleLabel.font = .systemFont(ofSize: 17, weight: .semibold)
-        titleLabel.textColor = .white
+        titleLabel.textColor = ThemeManager.overlayTextWhite
         titleLabel.textAlignment = .center
         
-        // 关闭按钮 - 使用白色
+        // 关闭按钮 - 使用主题色
         closeButton.setTitle("✕", for: .normal)
-        closeButton.setTitleColor(.white, for: .normal)
+        closeButton.setTitleColor(ThemeManager.navigationBarButtonIcon, for: .normal)
         closeButton.titleLabel?.font = .systemFont(ofSize: 18, weight: .medium)
         closeButton.addTarget(self, action: #selector(closeButtonTapped), for: .touchUpInside)
         
-        // 分享按钮 - 使用白色
-        shareButton.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
-        shareButton.tintColor = .white
+        // 分享按钮 - 使用主题色，显式设置渲染模式
+        if let shareImage = UIImage(systemName: "square.and.arrow.up")?.withRenderingMode(.alwaysTemplate) {
+            shareButton.setImage(shareImage, for: .normal)
+        }
+        shareButton.tintColor = ThemeManager.navigationBarButtonIcon
         shareButton.addTarget(self, action: #selector(shareButtonTapped), for: .touchUpInside)
+        shareButton.isHidden = !showShareButton  // 🆕 根据配置控制显示/隐藏
         
         navigationBar.addSubview(titleLabel)
         navigationBar.addSubview(closeButton)
@@ -236,13 +246,13 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
         
         let iconLabel = UILabel()
         iconLabel.text = "LIVE"
-        iconLabel.textColor = .white
+        iconLabel.textColor = ThemeManager.buttonTextOnPrimary  // 使用主题色（始终白色）
         iconLabel.font = .systemFont(ofSize: 12, weight: .semibold)
         iconLabel.translatesAutoresizingMaskIntoConstraints = false
         
         let circleView = UIView()
         circleView.backgroundColor = .clear
-        circleView.layer.borderColor = UIColor.white.cgColor
+        circleView.layer.borderColor = ThemeManager.buttonTextOnPrimary.cgColor  // 使用主题色（始终白色）
         circleView.layer.borderWidth = 1.5
         circleView.layer.cornerRadius = 6
         circleView.translatesAutoresizingMaskIntoConstraints = false
@@ -533,6 +543,30 @@ class ScreenshotDetailSheet: UIViewController, PHLivePhotoViewDelegate {
                 livePhotoView.delegate = nil
             }
         }
+    }
+    
+    // MARK: - Theme Management
+    
+    /// 设置主题观察者
+    private func setupThemeObserver() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleThemeChange),
+            name: .themeDidChange,
+            object: nil
+        )
+    }
+    
+    /// 处理主题切换
+    @objc private func handleThemeChange() {
+        updateNavigationBarColors()
+    }
+    
+    /// 更新导航栏颜色
+    private func updateNavigationBarColors() {
+        titleLabel.textColor = ThemeManager.overlayTextWhite
+        closeButton.setTitleColor(ThemeManager.navigationBarButtonIcon, for: .normal)
+        shareButton.tintColor = ThemeManager.navigationBarButtonIcon
     }
     
     /// 设置静态图片视图的辅助方法

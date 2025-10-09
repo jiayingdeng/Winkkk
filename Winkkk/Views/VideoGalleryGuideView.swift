@@ -234,39 +234,104 @@ class VideoGalleryGuideView: UIView {
         // 获取目标视图在当前视图中的坐标
         let targetFrame = targetView.convert(targetView.bounds, to: self)
         
-        // 根据箭头方向调整气泡位置
+        // 获取安全区域
+        let safeInsets = safeAreaInsets
+        let topSafeArea = safeInsets.top
+        let bottomSafeArea = safeInsets.bottom
+        let leftSafeArea = safeInsets.left
+        let rightSafeArea = safeInsets.right
+        
+        // 气泡尺寸和边距
+        let bubbleWidth: CGFloat = 280
+        let bubbleEstimatedHeight: CGFloat = 180 // 预估高度
+        let margin: CGFloat = 20
+        let edgeMargin: CGFloat = 20 // 距离屏幕边缘的最小距离
+        
+        // 根据箭头方向调整气泡位置，并确保不超出屏幕
+        var verticalConstraint: NSLayoutConstraint
+        var horizontalConstraint: NSLayoutConstraint
+        
         switch step.arrowDirection {
         case .up:
-            bubbleConstraints = [
-                bubbleView.topAnchor.constraint(equalTo: topAnchor, constant: targetFrame.maxY + 20),
-                bubbleView.centerXAnchor.constraint(equalTo: leadingAnchor, constant: targetFrame.midX),
-                bubbleView.widthAnchor.constraint(equalToConstant: 280)
-            ]
+            // 气泡在目标下方
+            let proposedTop = targetFrame.maxY + margin
+            let minTop = topSafeArea + edgeMargin
+            let actualTop = max(proposedTop, minTop)
+            
+            verticalConstraint = bubbleView.topAnchor.constraint(equalTo: topAnchor, constant: actualTop)
+            
+            // 水平居中对齐目标，但确保不超出屏幕
+            let proposedCenterX = targetFrame.midX
+            let minCenterX = leftSafeArea + edgeMargin + bubbleWidth / 2
+            let maxCenterX = bounds.width - rightSafeArea - edgeMargin - bubbleWidth / 2
+            let actualCenterX = min(max(proposedCenterX, minCenterX), maxCenterX)
+            
+            horizontalConstraint = bubbleView.centerXAnchor.constraint(equalTo: leadingAnchor, constant: actualCenterX)
+            
         case .down:
-            bubbleConstraints = [
-                bubbleView.bottomAnchor.constraint(equalTo: topAnchor, constant: targetFrame.minY - 20),
-                bubbleView.centerXAnchor.constraint(equalTo: leadingAnchor, constant: targetFrame.midX),
-                bubbleView.widthAnchor.constraint(equalToConstant: 280)
-            ]
+            // 气泡在目标上方
+            let proposedBottom = targetFrame.minY - margin
+            let maxBottom = bounds.height - bottomSafeArea - edgeMargin
+            let actualBottom = min(proposedBottom, maxBottom)
+            
+            verticalConstraint = bubbleView.bottomAnchor.constraint(equalTo: topAnchor, constant: actualBottom)
+            
+            // 水平居中对齐目标，但确保不超出屏幕
+            let proposedCenterX = targetFrame.midX
+            let minCenterX = leftSafeArea + edgeMargin + bubbleWidth / 2
+            let maxCenterX = bounds.width - rightSafeArea - edgeMargin - bubbleWidth / 2
+            let actualCenterX = min(max(proposedCenterX, minCenterX), maxCenterX)
+            
+            horizontalConstraint = bubbleView.centerXAnchor.constraint(equalTo: leadingAnchor, constant: actualCenterX)
+            
         case .left:
-            bubbleConstraints = [
-                bubbleView.trailingAnchor.constraint(equalTo: leadingAnchor, constant: targetFrame.minX - 20),
-                bubbleView.centerYAnchor.constraint(equalTo: topAnchor, constant: targetFrame.midY),
-                bubbleView.widthAnchor.constraint(equalToConstant: 280)
-            ]
+            // 气泡在目标右侧
+            let proposedLeading = targetFrame.maxX + margin
+            let minLeading = leftSafeArea + edgeMargin
+            let actualLeading = max(proposedLeading, minLeading)
+            
+            horizontalConstraint = bubbleView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: actualLeading)
+            
+            // 垂直居中对齐目标，但确保不超出屏幕
+            let proposedCenterY = targetFrame.midY
+            let minCenterY = topSafeArea + edgeMargin + bubbleEstimatedHeight / 2
+            let maxCenterY = bounds.height - bottomSafeArea - edgeMargin - bubbleEstimatedHeight / 2
+            let actualCenterY = min(max(proposedCenterY, minCenterY), maxCenterY)
+            
+            verticalConstraint = bubbleView.centerYAnchor.constraint(equalTo: topAnchor, constant: actualCenterY)
+            
         case .right:
-            bubbleConstraints = [
-                bubbleView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: targetFrame.maxX + 20),
-                bubbleView.centerYAnchor.constraint(equalTo: topAnchor, constant: targetFrame.midY),
-                bubbleView.widthAnchor.constraint(equalToConstant: 280)
-            ]
+            // 气泡在目标左侧
+            let proposedTrailing = targetFrame.minX - margin
+            let maxTrailing = bounds.width - rightSafeArea - edgeMargin
+            let actualTrailing = min(proposedTrailing, maxTrailing)
+            
+            horizontalConstraint = bubbleView.trailingAnchor.constraint(equalTo: leadingAnchor, constant: actualTrailing)
+            
+            // 垂直居中对齐目标，但确保不超出屏幕
+            let proposedCenterY = targetFrame.midY
+            let minCenterY = topSafeArea + edgeMargin + bubbleEstimatedHeight / 2
+            let maxCenterY = bounds.height - bottomSafeArea - edgeMargin - bubbleEstimatedHeight / 2
+            let actualCenterY = min(max(proposedCenterY, minCenterY), maxCenterY)
+            
+            verticalConstraint = bubbleView.centerYAnchor.constraint(equalTo: topAnchor, constant: actualCenterY)
+            
         case .none:
-            bubbleConstraints = [
-                bubbleView.centerXAnchor.constraint(equalTo: centerXAnchor),
-                bubbleView.centerYAnchor.constraint(equalTo: centerYAnchor),
-                bubbleView.widthAnchor.constraint(equalToConstant: 280)
-            ]
+            // 居中显示
+            verticalConstraint = bubbleView.centerYAnchor.constraint(equalTo: centerYAnchor)
+            horizontalConstraint = bubbleView.centerXAnchor.constraint(equalTo: centerXAnchor)
         }
+        
+        bubbleConstraints = [
+            verticalConstraint,
+            horizontalConstraint,
+            bubbleView.widthAnchor.constraint(equalToConstant: bubbleWidth),
+            // 添加额外的安全约束，确保气泡不会超出屏幕
+            bubbleView.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: leftSafeArea + edgeMargin),
+            bubbleView.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -(rightSafeArea + edgeMargin)),
+            bubbleView.topAnchor.constraint(greaterThanOrEqualTo: topAnchor, constant: topSafeArea + edgeMargin),
+            bubbleView.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -(bottomSafeArea + edgeMargin))
+        ]
         
         NSLayoutConstraint.activate(bubbleConstraints)
         

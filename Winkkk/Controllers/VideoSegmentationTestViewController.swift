@@ -95,7 +95,7 @@ class VideoSegmentationTestViewController: UIViewController {
     
     // MARK: - UI Setup
     private func setupUI() {
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = ThemeManager.background
         navigationItem.title = "视频分割测试"
         navigationItem.largeTitleDisplayMode = .never
         
@@ -129,11 +129,12 @@ class VideoSegmentationTestViewController: UIViewController {
     private func setupHeaderViews() {
         titleLabel.text = "📹 视频分割测试"
         titleLabel.font = .systemFont(ofSize: 28, weight: .bold)
+        titleLabel.textColor = ThemeManager.primaryText
         titleLabel.textAlignment = .center
         
         subtitleLabel.text = "从相册选择视频，自动提取关键帧并进行DeepLabV3主体分割测试"
         subtitleLabel.font = .systemFont(ofSize: 14, weight: .regular)
-        subtitleLabel.textColor = .systemGray
+        subtitleLabel.textColor = ThemeManager.secondaryText
         subtitleLabel.textAlignment = .center
         subtitleLabel.numberOfLines = 0
         
@@ -143,19 +144,19 @@ class VideoSegmentationTestViewController: UIViewController {
     }
     
     private func setupVideoSelectionView() {
-        videoSelectionView.backgroundColor = .systemGray6
+        videoSelectionView.backgroundColor = ThemeManager.cardBackground
         videoSelectionView.layer.cornerRadius = 12
         
         selectVideoButton.setTitle("📱 从相册选择视频", for: .normal)
         selectVideoButton.titleLabel?.font = .systemFont(ofSize: 18, weight: .semibold)
-        selectVideoButton.backgroundColor = .systemBlue
-        selectVideoButton.setTitleColor(.white, for: .normal)
+        selectVideoButton.backgroundColor = ThemeManager.buttonPrimary
+        selectVideoButton.setTitleColor(ThemeManager.shared.currentTheme == .lightMinimal ? .white : ThemeManager.primaryText, for: .normal)
         selectVideoButton.layer.cornerRadius = 10
         selectVideoButton.addTarget(self, action: #selector(selectVideoTapped), for: .touchUpInside)
         
         videoInfoLabel.text = "尚未选择视频"
         videoInfoLabel.font = .systemFont(ofSize: 14, weight: .regular)
-        videoInfoLabel.textColor = .systemGray
+        videoInfoLabel.textColor = ThemeManager.secondaryText
         videoInfoLabel.numberOfLines = 0
         videoInfoLabel.textAlignment = .center
         
@@ -167,14 +168,14 @@ class VideoSegmentationTestViewController: UIViewController {
     }
     
     private func setupControlView() {
-        controlView.backgroundColor = .systemBackground
+        controlView.backgroundColor = ThemeManager.cardBackground
         controlView.layer.cornerRadius = 12
         controlView.layer.borderWidth = 1
-        controlView.layer.borderColor = UIColor.systemGray4.cgColor
+        controlView.layer.borderColor = ThemeManager.separator.cgColor
         
         startProcessingButton.setTitle("🚀 开始处理", for: .normal)
         startProcessingButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .semibold)
-        startProcessingButton.backgroundColor = .systemGreen
+        startProcessingButton.backgroundColor = ThemeManager.success
         startProcessingButton.setTitleColor(.white, for: .normal)
         startProcessingButton.layer.cornerRadius = 8
         startProcessingButton.addTarget(self, action: #selector(startProcessingTapped), for: .touchUpInside)
@@ -186,6 +187,7 @@ class VideoSegmentationTestViewController: UIViewController {
         
         frameCountLabel.text = "提取帧数: 5"
         frameCountLabel.font = .systemFont(ofSize: 14, weight: .medium)
+        frameCountLabel.textColor = ThemeManager.primaryText
         frameCountLabel.textAlignment = .center
         
         [startProcessingButton, frameCountSlider, frameCountLabel].forEach {
@@ -196,20 +198,21 @@ class VideoSegmentationTestViewController: UIViewController {
     }
     
     private func setupProgressView() {
-        progressView.backgroundColor = .systemGray6.withAlphaComponent(0.8)
+        progressView.backgroundColor = ThemeManager.cardBackground.withAlphaComponent(0.8)
         progressView.layer.cornerRadius = 10
         progressView.isHidden = true
         
-        progressBar.progressTintColor = .systemBlue
-        progressBar.trackTintColor = .systemGray4
+        progressBar.progressTintColor = ThemeManager.buttonPrimary
+        progressBar.trackTintColor = ThemeManager.separator
         
         progressLabel.text = "正在处理..."
         progressLabel.font = .systemFont(ofSize: 14, weight: .medium)
+        progressLabel.textColor = ThemeManager.primaryText
         progressLabel.textAlignment = .center
         
         timeRemainingLabel.text = ""
         timeRemainingLabel.font = .systemFont(ofSize: 12, weight: .regular)
-        timeRemainingLabel.textColor = .systemGray
+        timeRemainingLabel.textColor = ThemeManager.secondaryText
         timeRemainingLabel.textAlignment = .center
         
         [progressBar, progressLabel, timeRemainingLabel].forEach {
@@ -221,14 +224,15 @@ class VideoSegmentationTestViewController: UIViewController {
     
     private func setupResultsView() {
         // 结果标题区域
-        resultsHeaderView.backgroundColor = .systemBackground
+        resultsHeaderView.backgroundColor = ThemeManager.background
         
         resultsHeaderLabel.text = "🎯 分割结果"
         resultsHeaderLabel.font = .systemFont(ofSize: 20, weight: .bold)
+        resultsHeaderLabel.textColor = ThemeManager.primaryText
         
         statisticsLabel.text = ""
         statisticsLabel.font = .systemFont(ofSize: 12, weight: .regular)
-        statisticsLabel.textColor = .systemGray
+        statisticsLabel.textColor = ThemeManager.secondaryText
         statisticsLabel.numberOfLines = 0
         
         [resultsHeaderLabel, statisticsLabel].forEach {
@@ -236,7 +240,7 @@ class VideoSegmentationTestViewController: UIViewController {
         }
         
         // 配置CollectionView
-        collectionView.backgroundColor = .systemBackground
+        collectionView.backgroundColor = ThemeManager.background
         collectionView.delegate = self
         collectionView.dataSource = self
         collectionView.register(
@@ -250,19 +254,19 @@ class VideoSegmentationTestViewController: UIViewController {
     }
     
     private func setupBottomActions() {
-        bottomActionsView.backgroundColor = .systemGray6.withAlphaComponent(0.5)
+        bottomActionsView.backgroundColor = ThemeManager.cardBackground.withAlphaComponent(0.5)
         bottomActionsView.layer.cornerRadius = 12
         
         exportButton.setTitle("📤 导出结果", for: .normal)
         exportButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
-        exportButton.backgroundColor = .systemIndigo
-        exportButton.setTitleColor(.white, for: .normal)
+        exportButton.backgroundColor = ThemeManager.buttonPrimary
+        exportButton.setTitleColor(ThemeManager.shared.currentTheme == .lightMinimal ? .white : ThemeManager.primaryText, for: .normal)
         exportButton.layer.cornerRadius = 8
         exportButton.addTarget(self, action: #selector(exportResultsTapped), for: .touchUpInside)
         
         clearButton.setTitle("🗑 清除结果", for: .normal)
         clearButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
-        clearButton.backgroundColor = .systemRed.withAlphaComponent(0.8)
+        clearButton.backgroundColor = ThemeManager.error
         clearButton.setTitleColor(.white, for: .normal)
         clearButton.layer.cornerRadius = 8
         clearButton.addTarget(self, action: #selector(clearResultsTapped), for: .touchUpInside)

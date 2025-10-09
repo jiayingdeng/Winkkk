@@ -85,8 +85,8 @@ class MultiSubjectCompositeTestViewController: UIViewController {
     private func setupControlArea() {
         // 视频选择按钮
         selectVideoButton.setTitle("📹 选择测试视频", for: .normal)
-        selectVideoButton.backgroundColor = .systemBlue
-        selectVideoButton.setTitleColor(.white, for: .normal)
+        selectVideoButton.backgroundColor = ThemeManager.buttonPrimary
+        selectVideoButton.setTitleColor(ThemeManager.shared.currentTheme == .lightMinimal ? .white : ThemeManager.primaryText, for: .normal)
         selectVideoButton.layer.cornerRadius = 8
         selectVideoButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
         
@@ -108,14 +108,14 @@ class MultiSubjectCompositeTestViewController: UIViewController {
         
         // 处理按钮
         processButton.setTitle("🚀 开始智能处理", for: .normal)
-        processButton.backgroundColor = .systemGreen
+        processButton.backgroundColor = ThemeManager.success
         processButton.setTitleColor(.white, for: .normal)
         processButton.layer.cornerRadius = 8
         processButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
         
         // 进度条
         progressView.isHidden = true
-        progressView.progressTintColor = .systemBlue
+        progressView.progressTintColor = ThemeManager.buttonPrimary
         
         // 添加调试参数界面
         setupDebugParametersUI()
@@ -124,7 +124,7 @@ class MultiSubjectCompositeTestViewController: UIViewController {
     private func setupDebugParametersUI() {
         // 创建调试参数容器
         let debugContainer = UIView()
-        debugContainer.backgroundColor = .systemGray6
+        debugContainer.backgroundColor = ThemeManager.cardBackground
         debugContainer.layer.cornerRadius = 8
         debugContainer.translatesAutoresizingMaskIntoConstraints = false
         
@@ -132,7 +132,7 @@ class MultiSubjectCompositeTestViewController: UIViewController {
         let titleLabel = UILabel()
         titleLabel.text = "🔧 智能检测参数调试"
         titleLabel.font = .systemFont(ofSize: 16, weight: .semibold)
-        titleLabel.textColor = .systemBlue
+        titleLabel.textColor = ThemeManager.primaryText
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         
         // 创建参数滑块
@@ -141,8 +141,8 @@ class MultiSubjectCompositeTestViewController: UIViewController {
         // 添加保存配置按钮
         let saveConfigButton = UIButton(type: .system)
         saveConfigButton.setTitle("💾 保存最佳配置", for: .normal)
-        saveConfigButton.backgroundColor = .systemPurple
-        saveConfigButton.setTitleColor(.white, for: .normal)
+        saveConfigButton.backgroundColor = ThemeManager.buttonPrimary
+        saveConfigButton.setTitleColor(ThemeManager.shared.currentTheme == .lightMinimal ? .white : ThemeManager.primaryText, for: .normal)
         saveConfigButton.layer.cornerRadius = 6
         saveConfigButton.titleLabel?.font = .systemFont(ofSize: 14, weight: .medium)
         saveConfigButton.addTarget(self, action: #selector(saveBestConfigTapped), for: .touchUpInside)
@@ -260,13 +260,13 @@ class MultiSubjectCompositeTestViewController: UIViewController {
     
     private func setupResultArea() {
         resultImageView.contentMode = .scaleAspectFit
-        resultImageView.backgroundColor = .systemGray6
+        resultImageView.backgroundColor = ThemeManager.cardBackground
         resultImageView.layer.cornerRadius = 8
         resultImageView.clipsToBounds = true
         
         saveButton.setTitle("💾 保存到相册", for: .normal)
-        saveButton.backgroundColor = .systemOrange
-        saveButton.setTitleColor(.white, for: .normal)
+        saveButton.backgroundColor = ThemeManager.buttonPrimary
+        saveButton.setTitleColor(ThemeManager.shared.currentTheme == .lightMinimal ? .white : ThemeManager.primaryText, for: .normal)
         saveButton.layer.cornerRadius = 8
         saveButton.titleLabel?.font = .systemFont(ofSize: 16, weight: .medium)
         saveButton.isHidden = true

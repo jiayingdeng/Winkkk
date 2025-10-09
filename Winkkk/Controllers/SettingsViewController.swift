@@ -92,19 +92,19 @@ class SettingsViewController: UIViewController {
                 ]
             ),
             
-            // 外观
-            SettingsSection(
-                title: "外观",
-                items: [
-                    SettingsItem(
-                        type: .selection,
-                        title: "主题",
-                        subtitle: ThemeManager.shared.currentTheme.displayName,
-                        icon: "paintbrush.fill",
-                        action: { [weak self] in self?.showThemeSettings() }
-                    )
-                ]
-            ),
+            // 外观（已隐藏主题切换入口）
+            // SettingsSection(
+            //     title: "外观",
+            //     items: [
+            //         SettingsItem(
+            //             type: .selection,
+            //             title: "主题",
+            //             subtitle: ThemeManager.shared.currentTheme.displayName,
+            //             icon: "paintbrush.fill",
+            //             action: { [weak self] in self?.showThemeSettings() }
+            //         )
+            //     ]
+            // ),
             
             // 存储管理
             SettingsSection(

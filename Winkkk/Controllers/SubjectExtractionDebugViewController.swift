@@ -150,12 +150,12 @@ class SubjectExtractionDebugViewController: UIViewController {
         
         // 确保导航栏不透明，避免内容重叠
         navigationController?.navigationBar.isTranslucent = false
-        navigationController?.navigationBar.backgroundColor = .systemBackground
+        navigationController?.navigationBar.backgroundColor = ThemeManager.background
         
         // 强制设置导航栏外观以避免重叠
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = .systemBackground
+        appearance.backgroundColor = ThemeManager.background
         navigationController?.navigationBar.standardAppearance = appearance
         navigationController?.navigationBar.scrollEdgeAppearance = appearance
         
@@ -179,7 +179,7 @@ class SubjectExtractionDebugViewController: UIViewController {
     }
     
     private func setupUI() {
-        view.backgroundColor = UIColor.systemBackground
+        view.backgroundColor = ThemeManager.background
         
         // Setup scroll view
         scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -209,7 +209,7 @@ class SubjectExtractionDebugViewController: UIViewController {
         subtitleLabel.text = "🤖 测试Vision框架 + Core Image + 颜色分析三阶段算法"
         subtitleLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
         subtitleLabel.textAlignment = .center
-        subtitleLabel.textColor = .systemBlue
+        subtitleLabel.textColor = ThemeManager.secondaryText
         subtitleLabel.numberOfLines = 0
         subtitleLabel.backgroundColor = .clear // 确保背景透明
         
@@ -219,7 +219,7 @@ class SubjectExtractionDebugViewController: UIViewController {
     }
     
     private func setupImageSelectionSection() {
-        imageSelectionCard.backgroundColor = UIColor.systemGray6
+        imageSelectionCard.backgroundColor = ThemeManager.cardBackground
         imageSelectionCard.layer.cornerRadius = 12
         imageSelectionCard.layer.shadowColor = UIColor.black.cgColor
         imageSelectionCard.layer.shadowOffset = CGSize(width: 0, height: 2)
@@ -227,22 +227,22 @@ class SubjectExtractionDebugViewController: UIViewController {
         imageSelectionCard.layer.shadowRadius = 4
         
         selectImageButton.setTitle("📸 选择测试图像", for: .normal)
-        selectImageButton.setTitleColor(.white, for: .normal)
-        selectImageButton.backgroundColor = .systemBlue
+        selectImageButton.setTitleColor(ThemeManager.shared.currentTheme == .lightMinimal ? .white : ThemeManager.primaryText, for: .normal)
+        selectImageButton.backgroundColor = ThemeManager.buttonPrimary
         selectImageButton.layer.cornerRadius = 8
         selectImageButton.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
         selectImageButton.addTarget(self, action: #selector(selectImageTapped), for: .touchUpInside)
         
         originalImageView.contentMode = .scaleAspectFit
-        originalImageView.backgroundColor = UIColor.systemGray5
+        originalImageView.backgroundColor = ThemeManager.backgroundSecondary
         originalImageView.layer.cornerRadius = 8
         originalImageView.clipsToBounds = true
         originalImageView.image = UIImage(systemName: "photo.on.rectangle")
-        originalImageView.tintColor = .systemGray3
+        originalImageView.tintColor = ThemeManager.separator
         
         imageInfoLabel.text = "请选择一张包含明显主体的图像进行测试"
         imageInfoLabel.font = UIFont.systemFont(ofSize: 14)
-        imageInfoLabel.textColor = .systemGray
+        imageInfoLabel.textColor = ThemeManager.secondaryText
         imageInfoLabel.textAlignment = .center
         imageInfoLabel.numberOfLines = 0
         
@@ -257,11 +257,12 @@ class SubjectExtractionDebugViewController: UIViewController {
     }
     
     private func setupParametersSection() {
-        parametersCard.backgroundColor = UIColor.systemGray6
+        parametersCard.backgroundColor = ThemeManager.cardBackground
         parametersCard.layer.cornerRadius = 12
         
         parametersLabel.text = "🎛️ 算法参数调节"
         parametersLabel.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+        parametersLabel.textColor = ThemeManager.primaryText
         
         [parametersCard, parametersLabel].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
@@ -294,6 +295,7 @@ class SubjectExtractionDebugViewController: UIViewController {
             let label = UILabel()
             label.text = "\(title): \(String(format: "%.2f", value))"
             label.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+            label.textColor = ThemeManager.primaryText
             label.translatesAutoresizingMaskIntoConstraints = false
             
             let slider = UISlider()
@@ -333,39 +335,43 @@ class SubjectExtractionDebugViewController: UIViewController {
     }
     
     private func setupComplexBackgroundPresets() {
-        presetsCard.backgroundColor = UIColor.systemOrange.withAlphaComponent(0.1)
+        presetsCard.backgroundColor = ThemeManager.cardBackground
         presetsCard.layer.cornerRadius = 12
         presetsCard.layer.borderWidth = 1
-        presetsCard.layer.borderColor = UIColor.systemOrange.withAlphaComponent(0.3).cgColor
+        presetsCard.layer.borderColor = ThemeManager.warning.withAlphaComponent(0.3).cgColor
         
         presetsLabel.text = "⚙️ 复杂背景快速预设"
         presetsLabel.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
-        presetsLabel.textColor = .systemOrange
+        presetsLabel.textColor = ThemeManager.primaryText
         
         // 面包烘烤预设
         breadPresetButton.setTitle("🍞 面包/烘烤预设", for: .normal)
-        breadPresetButton.backgroundColor = UIColor.systemOrange.withAlphaComponent(0.2)
+        breadPresetButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+        breadPresetButton.backgroundColor = ThemeManager.warning.withAlphaComponent(0.2)
         breadPresetButton.layer.cornerRadius = 8
         breadPresetButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
         breadPresetButton.addTarget(self, action: #selector(applyBreadPreset), for: .touchUpInside)
         
         // 金属反光预设
         metalReflectionButton.setTitle("🔧 金属反光预设", for: .normal)
-        metalReflectionButton.backgroundColor = UIColor.systemGray.withAlphaComponent(0.2)
+        metalReflectionButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+        metalReflectionButton.backgroundColor = ThemeManager.separator.withAlphaComponent(0.2)
         metalReflectionButton.layer.cornerRadius = 8
         metalReflectionButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
         metalReflectionButton.addTarget(self, action: #selector(applyMetalReflectionPreset), for: .touchUpInside)
         
         // 强光环境预设
         outdoorLightButton.setTitle("☀️ 强光环境预设", for: .normal)
-        outdoorLightButton.backgroundColor = UIColor.systemYellow.withAlphaComponent(0.2)
+        outdoorLightButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+        outdoorLightButton.backgroundColor = ThemeManager.warning.withAlphaComponent(0.3)
         outdoorLightButton.layer.cornerRadius = 8
         outdoorLightButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
         outdoorLightButton.addTarget(self, action: #selector(applyOutdoorLightPreset), for: .touchUpInside)
         
         // 重置默认
         resetDefaultButton.setTitle("🔄 重置默认", for: .normal)
-        resetDefaultButton.backgroundColor = UIColor.systemRed.withAlphaComponent(0.2)
+        resetDefaultButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+        resetDefaultButton.backgroundColor = ThemeManager.error.withAlphaComponent(0.2)
         resetDefaultButton.layer.cornerRadius = 8
         resetDefaultButton.titleLabel?.font = UIFont.systemFont(ofSize: 14, weight: .medium)
         resetDefaultButton.addTarget(self, action: #selector(resetToDefault), for: .touchUpInside)
@@ -383,11 +389,12 @@ class SubjectExtractionDebugViewController: UIViewController {
     }
     
     private func setupSceneTypeSection() {
-        sceneTypeCard.backgroundColor = UIColor.systemGray6
+        sceneTypeCard.backgroundColor = ThemeManager.cardBackground
         sceneTypeCard.layer.cornerRadius = 12
         
         sceneTypeLabel.text = "🎯 场景类型选择"
         sceneTypeLabel.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+        sceneTypeLabel.textColor = ThemeManager.primaryText
         
         // 创建场景类型选择控件
         let items = SubjectType.allCases.map { "\($0.icon) \($0.rawValue)" }
@@ -410,19 +417,19 @@ class SubjectExtractionDebugViewController: UIViewController {
     private func setupProcessSection() {
         processButton.setTitle("🚀 开始三阶段提取", for: .normal)
         processButton.setTitleColor(.white, for: .normal)
-        processButton.backgroundColor = .systemGreen
+        processButton.backgroundColor = ThemeManager.success
         processButton.layer.cornerRadius = 12
         processButton.titleLabel?.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
         processButton.addTarget(self, action: #selector(startExtraction), for: .touchUpInside)
         processButton.isEnabled = false
         
         processingIndicator.hidesWhenStopped = true
-        processingIndicator.color = .systemBlue
+        processingIndicator.color = ThemeManager.buttonPrimary
         
         statusLabel.text = "请先选择测试图像"
         statusLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
         statusLabel.textAlignment = .center
-        statusLabel.textColor = .systemGray
+        statusLabel.textColor = ThemeManager.secondaryText
         statusLabel.numberOfLines = 0
         
         [processButton, processingIndicator, statusLabel].forEach {
@@ -432,12 +439,13 @@ class SubjectExtractionDebugViewController: UIViewController {
     }
     
     private func setupResultsSection() {
-        resultsCard.backgroundColor = UIColor.systemGray6
+        resultsCard.backgroundColor = ThemeManager.cardBackground
         resultsCard.layer.cornerRadius = 12
         resultsCard.isHidden = true
         
         resultsLabel.text = "📊 三阶段提取结果"
         resultsLabel.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+        resultsLabel.textColor = ThemeManager.primaryText
         
         [resultsCard, resultsLabel].forEach {
             $0.translatesAutoresizingMaskIntoConstraints = false
@@ -489,23 +497,23 @@ class SubjectExtractionDebugViewController: UIViewController {
         title: String,
         description: String
     ) {
-        card.backgroundColor = UIColor.systemBackground
+        card.backgroundColor = ThemeManager.background
         card.layer.cornerRadius = 8
         card.layer.borderWidth = 1
-        card.layer.borderColor = UIColor.systemGray4.cgColor
+        card.layer.borderColor = ThemeManager.separator.cgColor
         
         label.text = title
         label.font = UIFont.systemFont(ofSize: 16, weight: .semibold)
-        label.textColor = .systemBlue
+        label.textColor = ThemeManager.primaryText
         
         imageView.contentMode = .scaleAspectFit
-        imageView.backgroundColor = UIColor.systemGray6
+        imageView.backgroundColor = ThemeManager.cardBackground
         imageView.layer.cornerRadius = 6
         imageView.clipsToBounds = true
         
         infoLabel.text = description
         infoLabel.font = UIFont.systemFont(ofSize: 12)
-        infoLabel.textColor = .systemGray
+        infoLabel.textColor = ThemeManager.secondaryText
         infoLabel.numberOfLines = 0
         
         [card, label, imageView, infoLabel].forEach {
@@ -519,15 +527,16 @@ class SubjectExtractionDebugViewController: UIViewController {
     }
     
     private func setupPerformanceSection() {
-        performanceCard.backgroundColor = UIColor.systemGray6
+        performanceCard.backgroundColor = ThemeManager.cardBackground
         performanceCard.layer.cornerRadius = 12
         performanceCard.isHidden = true
         
         performanceLabel.text = "⚡ 性能分析"
         performanceLabel.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+        performanceLabel.textColor = ThemeManager.primaryText
         
         performanceInfoLabel.font = UIFont.monospacedSystemFont(ofSize: 14, weight: .regular)
-        performanceInfoLabel.textColor = .systemGray
+        performanceInfoLabel.textColor = ThemeManager.secondaryText
         performanceInfoLabel.numberOfLines = 0
         
         [performanceCard, performanceLabel, performanceInfoLabel].forEach {

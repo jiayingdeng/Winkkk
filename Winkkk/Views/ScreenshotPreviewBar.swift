@@ -427,7 +427,8 @@ class ScreenshotPreviewBar: UIView {
     // MARK: - 🆕 Sheet Preview Methods
     private func presentScreenshotDetailSheet(for screenshot: ScreenshotItem, at index: Int) {
         let screenshots = screenshotManager.screenshots
-        let detailSheet = ScreenshotDetailSheet(screenshots: screenshots, currentIndex: index)
+        // 🎯 视频编辑页面预览：不显示分享按钮（用户还在选择阶段）
+        let detailSheet = ScreenshotDetailSheet(screenshots: screenshots, currentIndex: index, showShareButton: false)
         detailSheet.delegate = self
         // 详情页会自动监听MultiSelectionManager的状态
         

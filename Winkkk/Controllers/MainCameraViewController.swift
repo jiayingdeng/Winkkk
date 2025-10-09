@@ -310,18 +310,19 @@ class MainCameraViewController: UIViewController {
     }
     
     private func setupSettingsButton() {
-        // 🆕 顶部设置按钮 - 毛玻璃效果
+        // 🆕 顶部设置按钮 - 浅灰色半透明背景
         settingsButton.translatesAutoresizingMaskIntoConstraints = false
         
-        // 添加毛玻璃背景容器
-        let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemThinMaterialDark))
-        blurView.isUserInteractionEnabled = false
-        blurView.layer.cornerRadius = 22
-        blurView.clipsToBounds = true
-        blurView.translatesAutoresizingMaskIntoConstraints = false
-        settingsButton.insertSubview(blurView, at: 0)
+        // 添加浅灰色半透明背景容器
+        let backgroundView = UIView()
+        backgroundView.backgroundColor = UIColor(white: 0.9, alpha: 0.3)  // 浅灰色 + 30% 透明度
+        backgroundView.isUserInteractionEnabled = false
+        backgroundView.layer.cornerRadius = 22
+        backgroundView.clipsToBounds = true
+        backgroundView.translatesAutoresizingMaskIntoConstraints = false
+        settingsButton.insertSubview(backgroundView, at: 0)
         
-        // 设置图标（确保在毛玻璃之上）
+        // 设置图标（确保在背景之上）
         let gearIcon = UIImage(systemName: "gearshape.fill")
         settingsButton.setImage(gearIcon, for: .normal)
         settingsButton.tintColor = .white
@@ -338,10 +339,10 @@ class MainCameraViewController: UIViewController {
         }
         
         NSLayoutConstraint.activate([
-            blurView.topAnchor.constraint(equalTo: settingsButton.topAnchor),
-            blurView.leadingAnchor.constraint(equalTo: settingsButton.leadingAnchor),
-            blurView.trailingAnchor.constraint(equalTo: settingsButton.trailingAnchor),
-            blurView.bottomAnchor.constraint(equalTo: settingsButton.bottomAnchor)
+            backgroundView.topAnchor.constraint(equalTo: settingsButton.topAnchor),
+            backgroundView.leadingAnchor.constraint(equalTo: settingsButton.leadingAnchor),
+            backgroundView.trailingAnchor.constraint(equalTo: settingsButton.trailingAnchor),
+            backgroundView.bottomAnchor.constraint(equalTo: settingsButton.bottomAnchor)
         ])
         
         settingsButton.addTarget(self, action: #selector(settingsButtonTapped), for: .touchUpInside)
@@ -1062,21 +1063,30 @@ extension MainCameraViewController {
     }
     
     private func stopRecording() {
-        guard isRecording else { return }
+        guard isRecording else {
+            print("⚠️ stopRecording: 当前未在录制状态，忽略停止请求")
+            return
+        }
+        
+        print("🛑 stopRecording: 正在请求停止录制...")
         
         cameraManager.stopRecording { [weak self] result in
             DispatchQueue.main.async {
+                print("📥 stopRecording: 收到停止录制回调")
+                
                 self?.isRecording = false
                 self?.stopRecordingTimer()
                 
                 switch result {
                 case .success(let url):
+                    print("✅ stopRecording: 录制成功完成，URL: \(url)")
                     self?.handleRecordingComplete(url: url)
                     
                     // 触觉反馈
                     self?.hapticManager.recordingStop()
                     
                 case .failure(let error):
+                    print("❌ stopRecording: 录制停止失败，错误: \(error.localizedDescription)")
                     self?.showError(error)
                 }
             }

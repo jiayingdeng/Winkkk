@@ -516,6 +516,7 @@ extension ScreenshotProcessingViewController: UICollectionViewDelegate {
         HapticFeedbackManager.shared.lightImpact()
         
         // 弹出Sheet查看大图 - 支持左右滑动查看所有截图
+        // 📸 截图中心：显示分享按钮（默认值 showShareButton: true）
         let detailSheet = ScreenshotDetailSheet(screenshots: screenshots, currentIndex: indexPath.item)
         present(detailSheet, animated: true)
     }
@@ -756,6 +757,7 @@ extension ScreenshotProcessingViewController {
         }
         
         // 使用现有的截图详情界面来播放Live Photo
+        // 📸 截图中心：显示分享按钮（默认值 showShareButton: true）
         let detailSheet = ScreenshotDetailSheet(screenshots: livePhotos, currentIndex: 0)
         present(detailSheet, animated: true)
     }
@@ -782,6 +784,7 @@ extension ScreenshotProcessingViewController {
             HapticFeedbackManager.shared.buttonTap()
             
             // 跳转到详情界面预览
+            // 📸 截图中心：显示分享按钮（默认值 showShareButton: true）
             let detailSheet = ScreenshotDetailSheet(screenshots: livePhotos, currentIndex: 0)
             self.present(detailSheet, animated: true)
         })

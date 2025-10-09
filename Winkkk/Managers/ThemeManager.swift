@@ -42,8 +42,8 @@ class ThemeManager: ObservableObject {
     
     // MARK: - 当前主题
     
-    /// 当前应用主题（默认：梦幻少女）
-    @Published var currentTheme: AppTheme = .dreamyGirl {
+    /// 当前应用主题（默认：简约浅色）
+    @Published var currentTheme: AppTheme = .lightMinimal {
         didSet {
             // 保存到 UserDefaults
             UserDefaults.standard.set(currentTheme.rawValue, forKey: "AppTheme")
@@ -298,6 +298,16 @@ class ThemeManager: ObservableObject {
         }
     }
     
+    /// 导航栏按钮图标色（用于Sheet顶部导航栏的按钮）
+    static var navigationBarButtonIcon: UIColor {
+        switch shared.currentTheme {
+        case .dreamyGirl:
+            return UIColor.white // 白色（在粉紫色渐变背景上）
+        case .lightMinimal:
+            return UIColor.black.withAlphaComponent(0.85) // 深色（在浅色背景上）
+        }
+    }
+    
     /// 成功提示背景色（温暖的米白色）
     static var successToastBackground: UIColor {
         switch shared.currentTheme {
@@ -334,9 +344,9 @@ class ThemeManager: ObservableObject {
     static var timeSequenceModeBackground: UIColor {
         switch shared.currentTheme {
         case .dreamyGirl:
-            return UIColor(red: 178/255, green: 156/255, blue: 250/255, alpha: 0.8) // #B29CFA 梦幻紫色
+            return UIColor(red: 178/255, green: 156/255, blue: 250/255, alpha: 0.6) // #B29CFA 深粉紫色（稍微饱和）
         case .lightMinimal:
-            return UIColor.systemBlue.withAlphaComponent(0.8) // iOS系统蓝
+            return UIColor(red: 100/255, green: 120/255, blue: 150/255, alpha: 0.5) // 中灰蓝色（优雅低调）
         }
     }
     
@@ -344,9 +354,9 @@ class ThemeManager: ObservableObject {
     static var normalRecordModeBackground: UIColor {
         switch shared.currentTheme {
         case .dreamyGirl:
-            return UIColor(red: 144/255, green: 238/255, blue: 144/255, alpha: 0.8) // #90EE90 温柔绿
+            return UIColor(red: 200/255, green: 170/255, blue: 230/255, alpha: 0.5) // #C8AAE6 浅粉紫色（柔和）
         case .lightMinimal:
-            return UIColor.systemGreen.withAlphaComponent(0.8) // iOS系统绿
+            return UIColor(red: 120/255, green: 140/255, blue: 160/255, alpha: 0.4) // 浅灰蓝色（优雅低调）
         }
     }
     

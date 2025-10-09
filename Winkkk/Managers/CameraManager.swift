@@ -540,10 +540,18 @@ extension CameraManager {
     }
     
     func stopRecording(completion: @escaping (Result<URL, Error>) -> Void) {
+        print("🎬 CameraManager.stopRecording: 收到停止录制请求")
+        
         sessionQueue.async { [weak self] in
-            guard let self = self else { return }
+            guard let self = self else {
+                print("❌ CameraManager.stopRecording: self 已释放")
+                return
+            }
+            
+            print("🔍 CameraManager.stopRecording: 当前录制状态 = \(self.isRecording)")
             
             guard self.isRecording else {
+                print("⚠️ CameraManager.stopRecording: 未在录制状态，返回错误")
                 DispatchQueue.main.async {
                     completion(.failure(CameraError.notRecording))
                 }
@@ -551,6 +559,7 @@ extension CameraManager {
             }
             
             guard let movieOutput = self.movieFileOutput else {
+                print("❌ CameraManager.stopRecording: movieFileOutput 为 nil")
                 DispatchQueue.main.async {
                     completion(.failure(CameraError.outputSetupFailed))
                 }
@@ -559,12 +568,14 @@ extension CameraManager {
             
             // 🆕 停止性能监控
             self.performanceMonitor.stopMonitoring()
+            print("🔍 停止设备性能监控")
             print("🎥 录制结束，最终质量: \(self.currentRecordingQuality.displayName)")
             
             // 保存回调
             self.recordingCompletion = completion
             
             // 停止录制
+            print("📹 CameraManager.stopRecording: 调用 movieOutput.stopRecording()")
             movieOutput.stopRecording()
         }
     }
@@ -581,7 +592,7 @@ extension CameraManager: AVCaptureFileOutputRecordingDelegate {
     func fileOutput(_ output: AVCaptureFileOutput, 
                    didStartRecordingTo fileURL: URL, 
                    from connections: [AVCaptureConnection]) {
-        print("开始录制到: \(fileURL)")
+        print("📹 AVCaptureDelegate: 开始录制到: \(fileURL)")
     }
     
     func fileOutput(_ output: AVCaptureFileOutput, 
@@ -589,16 +600,29 @@ extension CameraManager: AVCaptureFileOutputRecordingDelegate {
                    from connections: [AVCaptureConnection], 
                    error: Error?) {
         
+        print("📹 AVCaptureDelegate: didFinishRecordingTo 被调用")
+        print("   - URL: \(outputFileURL)")
+        print("   - Error: \(error?.localizedDescription ?? "无错误")")
+        print("   - 当前 isRecording: \(isRecording)")
+        
         isRecording = false
         
         DispatchQueue.main.async { [weak self] in
-            if let error = error {
-                self?.recordingCompletion?(.failure(error))
-            } else {
-                self?.recordingCompletion?(.success(outputFileURL))
+            guard let self = self else {
+                print("❌ AVCaptureDelegate: self 已释放，无法调用回调")
+                return
             }
             
-            self?.recordingCompletion = nil
+            if let error = error {
+                print("❌ AVCaptureDelegate: 录制出错，调用失败回调")
+                self.recordingCompletion?(.failure(error))
+            } else {
+                print("✅ AVCaptureDelegate: 录制成功，调用成功回调")
+                self.recordingCompletion?(.success(outputFileURL))
+            }
+            
+            self.recordingCompletion = nil
+            print("🧹 AVCaptureDelegate: 清空 recordingCompletion")
         }
     }
 }
@@ -931,8 +955,8 @@ extension CameraManager {
     /// 最大缩放倍数（限制为合理范围）
     var maxZoomFactor: CGFloat {
         guard let device = currentVideoDevice else { return 1.0 }
-        // 限制最大10x，避免画质过差
-        return min(device.maxAvailableVideoZoomFactor, 10.0)
+        // 限制最大5x，确保画质清晰
+        return min(device.maxAvailableVideoZoomFactor, 5.0)
     }
     
     /// 设置缩放倍数（录制中可调用）

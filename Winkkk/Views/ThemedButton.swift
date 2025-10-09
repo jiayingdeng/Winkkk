@@ -151,9 +151,19 @@ class CapsuleButton: UIButton {
         gradientLayer.endPoint = CGPoint(x: 1, y: 0)
         layer.insertSublayer(gradientLayer, at: 0)
         
-        // 文字颜色
-        setTitleColor(ThemeManager.primaryText, for: .normal)
-        setTitleColor(ThemeManager.primaryText.withAlphaComponent(0.6), for: .highlighted)
+        // 文字颜色 - 根据主题选择合适的文字颜色
+        let textColor: UIColor
+        switch ThemeManager.shared.currentTheme {
+        case .lightMinimal:
+            // 黑白主题下，primary按钮有深色渐变背景，需要白色文字
+            textColor = .white
+        case .dreamyGirl:
+            // 梦幻粉主题下，使用主题的primaryText
+            textColor = ThemeManager.primaryText
+        }
+        
+        setTitleColor(textColor, for: .normal)
+        setTitleColor(textColor.withAlphaComponent(0.6), for: .highlighted)
         
         // 阴影
         addButtonShadow()
@@ -176,8 +186,9 @@ class CapsuleButton: UIButton {
     }
     
     private func setupFloatingStyle() {
-        // 毛玻璃效果背景
-        let blurEffect = UIBlurEffect(style: .light)
+        // 毛玻璃效果背景 - 根据主题选择合适的模糊效果
+        let blurStyle: UIBlurEffect.Style = ThemeManager.shared.currentTheme == .lightMinimal ? .systemMaterial : .light
+        let blurEffect = UIBlurEffect(style: blurStyle)
         let blurView = UIVisualEffectView(effect: blurEffect)
         blurView.isUserInteractionEnabled = false
         blurView.layer.cornerRadius = buttonSize.height / 2
@@ -192,6 +203,7 @@ class CapsuleButton: UIButton {
             blurView.bottomAnchor.constraint(equalTo: bottomAnchor)
         ])
         
+        // 文字颜色使用主题的primaryText即可，因为毛玻璃背景会适配
         setTitleColor(ThemeManager.primaryText, for: .normal)
         setTitleColor(ThemeManager.primaryText.withAlphaComponent(0.6), for: .highlighted)
         
