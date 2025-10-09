@@ -137,14 +137,14 @@ class VideoDetailPopupView: UIView {
     // MARK: - Actions
     
     @objc private func closeButtonTapped() {
-        hapticManager.trigger(.light)
+        hapticManager.lightImpact()
         hideWithAnimation()
     }
     
     @objc private func backgroundTapped(_ gesture: UITapGestureRecognizer) {
         let location = gesture.location(in: self)
         if !containerView.frame.contains(location) {
-            hapticManager.trigger(.light)
+            hapticManager.lightImpact()
             hideWithAnimation()
         }
     }

@@ -333,7 +333,7 @@ class SceneSelectionViewController: UIViewController {
         guard let cardView = gesture.view else { return }
         let sceneType = SceneType.allCases[cardView.tag]
         
-        hapticManager.trigger(.medium)
+        hapticManager.mediumImpact()
         
         // 卡片点击动画
         UIView.animate(withDuration: 0.1, animations: {
@@ -351,7 +351,7 @@ class SceneSelectionViewController: UIViewController {
     }
     
     @objc private func cancelButtonTapped() {
-        hapticManager.trigger(.light)
+        hapticManager.lightImpact()
         delegate?.sceneSelectionViewControllerDidCancel(self)
     }
     
@@ -365,12 +365,12 @@ class SceneSelectionViewController: UIViewController {
         )
         
         alert.addAction(UIAlertAction(title: "查看拍摄指导", style: .default) { _ in
-            self.hapticManager.trigger(.light)
+            self.hapticManager.lightImpact()
             self.showShootingGuide(for: sceneType)
         })
         
         alert.addAction(UIAlertAction(title: "直接开始录像", style: .default) { _ in
-            self.hapticManager.trigger(.medium)
+            self.hapticManager.mediumImpact()
             self.delegate?.sceneSelectionViewController(self, didSelectScene: sceneType)
         })
         

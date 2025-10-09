@@ -221,12 +221,12 @@ class PermissionRequestViewController: UIViewController {
     
     // MARK: - Actions
     @objc private func continueButtonTapped() {
-        hapticManager.trigger(.medium)
+        hapticManager.mediumImpact()
         requestAllPermissions()
     }
     
     @objc private func laterButtonTapped() {
-        hapticManager.trigger(.light)
+        hapticManager.lightImpact()
         delegate?.permissionRequestDidCancel()
     }
     
@@ -265,9 +265,9 @@ class PermissionRequestViewController: UIViewController {
         card.requestPermission { [weak self] granted in
             DispatchQueue.main.async {
                 if granted {
-                    self?.hapticManager.trigger(.success)
+                    self?.hapticManager.notificationSuccess()
                 } else {
-                    self?.hapticManager.trigger(.warning)
+                    self?.hapticManager.notificationWarning()
                 }
                 self?.requestNextPermission(from: cards, index: index + 1)
             }
