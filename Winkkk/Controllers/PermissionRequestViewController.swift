@@ -20,6 +20,9 @@ class PermissionRequestViewController: UIViewController {
     // MARK: - Properties
     weak var delegate: PermissionRequestDelegate?
     
+    // MARK: - Dependencies
+    private let hapticManager = HapticFeedbackManager.shared
+    
     // MARK: - UI Components
     private let gradientBackgroundView = GradientBackgroundView()
     private let scrollView = UIScrollView()
@@ -218,10 +221,12 @@ class PermissionRequestViewController: UIViewController {
     
     // MARK: - Actions
     @objc private func continueButtonTapped() {
+        hapticManager.trigger(.medium)
         requestAllPermissions()
     }
     
     @objc private func laterButtonTapped() {
+        hapticManager.trigger(.light)
         delegate?.permissionRequestDidCancel()
     }
     
@@ -259,6 +264,11 @@ class PermissionRequestViewController: UIViewController {
         let card = cards[index]
         card.requestPermission { [weak self] granted in
             DispatchQueue.main.async {
+                if granted {
+                    self?.hapticManager.trigger(.success)
+                } else {
+                    self?.hapticManager.trigger(.warning)
+                }
                 self?.requestNextPermission(from: cards, index: index + 1)
             }
         }
@@ -500,6 +510,7 @@ class PermissionCard: UIView {
     // MARK: - Actions
     @objc private func cardTapped() {
         if !isPermissionGranted {
+            HapticFeedbackManager.shared.trigger(.light)
             delegate?.permissionCardDidRequestPermission(self)
         }
     }

@@ -1043,6 +1043,7 @@ class VideoGalleryViewController: UIViewController {
     
     // MARK: - Actions
     @objc private func closeButtonTapped() {
+        hapticManager.trigger(.light)
         if let delegate = delegate {
             delegate.videoGalleryViewControllerDidCancel(self)
         } else {
@@ -1051,14 +1052,17 @@ class VideoGalleryViewController: UIViewController {
     }
     
     @objc private func importButtonTapped() {
+        hapticManager.trigger(.light)
         presentVideoImportOptions()
     }
     
     @objc private func selectButtonTapped() {
+        hapticManager.trigger(.light)
         enterSelectionMode()
     }
     
     @objc private func selectAllButtonTapped() {
+        hapticManager.trigger(.light)
         if selectedVideoItems.count == videos.count {
             // 已全选，执行反选
             selectedVideoItems.removeAll()
@@ -1073,6 +1077,7 @@ class VideoGalleryViewController: UIViewController {
     
     @objc private func exportButtonTapped() {
         guard !selectedVideoItems.isEmpty else { return }
+        hapticManager.trigger(.light)
         
         let exportAction = UIAlertAction(title: "导出", style: .default) { [weak self] _ in
             self?.performBatchExport()
@@ -1092,6 +1097,7 @@ class VideoGalleryViewController: UIViewController {
             showAlert(title: "请稍等", message: "正在执行删除操作，请稍后再试")
             return
         }
+        hapticManager.trigger(.warning)
         
         showDeleteConfirmation(
             title: "删除视频",
@@ -1102,6 +1108,7 @@ class VideoGalleryViewController: UIViewController {
     }
     
     @objc private func cancelSelectionTapped() {
+        hapticManager.trigger(.light)
         exitSelectionMode()
     }
     
@@ -1388,6 +1395,12 @@ class VideoGalleryViewController: UIViewController {
     }
     
     private func showBatchExportResult(completed: Int, failed: Int) {
+        if failed > 0 {
+            hapticManager.trigger(.warning)
+        } else {
+            hapticManager.trigger(.success)
+        }
+        
         let title = "导出完成"
         var message = "成功导出 \(completed) 个视频"
         if failed > 0 {
@@ -1493,8 +1506,10 @@ class VideoGalleryViewController: UIViewController {
         let totalCount = completed
         
         if failed == 0 {
+            hapticManager.trigger(.success)
             showAlert(title: "删除完成", message: "成功删除 \(totalCount) 个视频")
         } else {
+            hapticManager.trigger(.warning)
             var message = "删除完成：成功 \(completed - failed) 个，失败 \(failed) 个"
             if !failedVideos.isEmpty {
                 message += "\n\n失败的视频：\n" + failedVideos.joined(separator: "\n")

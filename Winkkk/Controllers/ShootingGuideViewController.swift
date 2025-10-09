@@ -22,6 +22,9 @@ class ShootingGuideViewController: UIViewController {
     private let sceneType: SceneType
     private let shootingGuide: ShootingGuide
     
+    // MARK: - Dependencies
+    private let hapticManager = HapticFeedbackManager.shared
+    
     // MARK: - UI组件
     private let scrollView = UIScrollView()
     private let contentView = UIView()
@@ -345,6 +348,7 @@ class ShootingGuideViewController: UIViewController {
     }
     
     @objc private func startButtonTapped() {
+        hapticManager.trigger(.medium)
         // 按钮动画
         UIView.animate(withDuration: 0.1, animations: {
             self.startButton.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
@@ -361,11 +365,13 @@ class ShootingGuideViewController: UIViewController {
     }
     
     @objc private func cancelButtonTapped() {
+        hapticManager.trigger(.light)
         delegate?.shootingGuideViewControllerDidCancel(self)
     }
     
     @objc private func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
         if gesture.state == .began {
+            hapticManager.trigger(.light)
             showAdvancedSettings()
         }
     }
@@ -380,6 +386,7 @@ class ShootingGuideViewController: UIViewController {
         )
         
         alert.addAction(UIAlertAction(title: "开始录像", style: .default) { _ in
+            self.hapticManager.trigger(.success)
             // 设置场景模式
             TimeSequenceModeManager.shared.switchToTimeSequenceMode(with: self.sceneType)
             self.delegate?.shootingGuideViewControllerDidStartRecording(self)

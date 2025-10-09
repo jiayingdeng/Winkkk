@@ -12,6 +12,9 @@ import Photos
 
 class OnboardingViewController: UIViewController {
     
+    // MARK: - Dependencies
+    private let hapticManager = HapticFeedbackManager.shared
+    
     // MARK: - UI Components
     private let gradientBackgroundView = GradientBackgroundView()
     private let scrollView = UIScrollView()
@@ -239,6 +242,7 @@ class OnboardingViewController: UIViewController {
     
     // MARK: - Actions
     @objc private func continueButtonTapped() {
+        hapticManager.trigger(.medium)
         if currentPageIndex < onboardingData.count - 1 {
             // 下一页
             currentPageIndex += 1
@@ -250,17 +254,20 @@ class OnboardingViewController: UIViewController {
     }
     
     @objc private func skipButtonTapped() {
+        hapticManager.trigger(.light)
         // 直接请求权限
         requestPermissions()
     }
     
     @objc private func pageControlChanged(_ sender: UIPageControl) {
+        hapticManager.trigger(.light)
         currentPageIndex = sender.currentPage
         scrollToCurrentPage()
     }
     
     @objc private func swipeLeft(_ gesture: UISwipeGestureRecognizer) {
         if currentPageIndex < onboardingData.count - 1 {
+            hapticManager.trigger(.light)
             currentPageIndex += 1
             scrollToCurrentPage()
         }
@@ -268,6 +275,7 @@ class OnboardingViewController: UIViewController {
     
     @objc private func swipeRight(_ gesture: UISwipeGestureRecognizer) {
         if currentPageIndex > 0 {
+            hapticManager.trigger(.light)
             currentPageIndex -= 1
             scrollToCurrentPage()
         }

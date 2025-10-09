@@ -10,6 +10,9 @@ import UIKit
 
 class VideoDetailPopupView: UIView {
     
+    // MARK: - Dependencies
+    private let hapticManager = HapticFeedbackManager.shared
+    
     // MARK: - UI Components
     private let containerView: UIView = {
         let view = UIView()
@@ -134,12 +137,14 @@ class VideoDetailPopupView: UIView {
     // MARK: - Actions
     
     @objc private func closeButtonTapped() {
+        hapticManager.trigger(.light)
         hideWithAnimation()
     }
     
     @objc private func backgroundTapped(_ gesture: UITapGestureRecognizer) {
         let location = gesture.location(in: self)
         if !containerView.frame.contains(location) {
+            hapticManager.trigger(.light)
             hideWithAnimation()
         }
     }

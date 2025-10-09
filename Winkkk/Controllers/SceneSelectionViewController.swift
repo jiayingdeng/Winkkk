@@ -19,6 +19,9 @@ class SceneSelectionViewController: UIViewController {
     // MARK: - 代理
     weak var delegate: SceneSelectionViewControllerDelegate?
     
+    // MARK: - Dependencies
+    private let hapticManager = HapticFeedbackManager.shared
+    
     // MARK: - UI组件
     private let scrollView = UIScrollView()
     private let contentView = UIView()
@@ -330,6 +333,8 @@ class SceneSelectionViewController: UIViewController {
         guard let cardView = gesture.view else { return }
         let sceneType = SceneType.allCases[cardView.tag]
         
+        hapticManager.trigger(.medium)
+        
         // 卡片点击动画
         UIView.animate(withDuration: 0.1, animations: {
             cardView.transform = CGAffineTransform(scaleX: 0.95, y: 0.95)
@@ -346,6 +351,7 @@ class SceneSelectionViewController: UIViewController {
     }
     
     @objc private func cancelButtonTapped() {
+        hapticManager.trigger(.light)
         delegate?.sceneSelectionViewControllerDidCancel(self)
     }
     
@@ -359,10 +365,12 @@ class SceneSelectionViewController: UIViewController {
         )
         
         alert.addAction(UIAlertAction(title: "查看拍摄指导", style: .default) { _ in
+            self.hapticManager.trigger(.light)
             self.showShootingGuide(for: sceneType)
         })
         
         alert.addAction(UIAlertAction(title: "直接开始录像", style: .default) { _ in
+            self.hapticManager.trigger(.medium)
             self.delegate?.sceneSelectionViewController(self, didSelectScene: sceneType)
         })
         

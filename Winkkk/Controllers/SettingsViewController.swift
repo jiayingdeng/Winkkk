@@ -21,6 +21,7 @@ class SettingsViewController: UIViewController {
     
     // MARK: - Dependencies
     private let videoManager = VideoManager.shared
+    private let hapticManager = HapticFeedbackManager.shared
     
     // MARK: - Lifecycle
     override func viewDidLoad() {
@@ -250,6 +251,7 @@ class SettingsViewController: UIViewController {
     
     // MARK: - Actions
     @objc private func closeButtonTapped() {
+        hapticManager.trigger(.light)
         dismiss(animated: true)
     }
     
@@ -262,6 +264,7 @@ class SettingsViewController: UIViewController {
         
         for (index, quality) in qualities.enumerated() {
             alert.addAction(UIAlertAction(title: quality, style: .default) { [weak self] _ in
+                self?.hapticManager.trigger(.light)
                 UserDefaults.standard.set(presets[index].rawValue, forKey: "VideoQualityPreset")
                 self?.updateVideoQualitySubtitle(quality)
                 
@@ -348,6 +351,7 @@ class SettingsViewController: UIViewController {
     }
     
     private func showCleanCacheAlert() {
+        hapticManager.trigger(.warning)
         let alert = UIAlertController(
             title: "清理缓存",
             message: "这将删除所有缩略图和临时文件，但不会影响您的视频和截图。确定继续吗？",
@@ -372,10 +376,12 @@ class SettingsViewController: UIViewController {
                 
                 switch result {
                 case .success(let cleanupResult):
+                    self?.hapticManager.trigger(.success)
                     self?.showCleanupSuccess(cleanupResult)
                     self?.refreshCacheInfo()
                     
                 case .failure(let error):
+                    self?.hapticManager.trigger(.error)
                     self?.showError(error)
                 }
             }
@@ -551,6 +557,7 @@ extension SettingsViewController: UITableViewDataSource, UITableViewDelegate {
     
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
+        hapticManager.trigger(.light)
         
         let item = sections[indexPath.section].items[indexPath.row]
         item.action?()
@@ -838,6 +845,7 @@ class SettingsSwitchCell: UITableViewCell {
     }
     
     @objc private func switchValueChanged() {
+        HapticFeedbackManager.shared.trigger(.light)
         switchAction?(switchControl.isOn)
     }
 }

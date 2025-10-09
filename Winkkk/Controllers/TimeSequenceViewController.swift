@@ -212,7 +212,7 @@ class TimeSequenceViewController: UIViewController {
         updateTitleForCurrentMode()
         
         titleLabel.font = ThemeManager.titleFont
-        titleLabel.textColor = .white
+        titleLabel.textColor = ThemeManager.primaryText  // 🎨 修复：使用主题主文本色
         titleLabel.textAlignment = .center
         
         subtitleLabel.font = ThemeManager.bodyFont
@@ -230,7 +230,7 @@ class TimeSequenceViewController: UIViewController {
         
         // 选择视频按钮
         selectVideoButton.setTitle("📱 选择要处理的视频", for: .normal)
-        selectVideoButton.setTitleColor(.white, for: .normal)
+        selectVideoButton.setTitleColor(ThemeManager.primaryText, for: .normal)  // 🎨 修复：使用主题主文本色
         selectVideoButton.backgroundColor = ThemeManager.buttonPrimary
         selectVideoButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         selectVideoButton.titleLabel?.font = ThemeManager.buttonFont
@@ -255,7 +255,7 @@ class TimeSequenceViewController: UIViewController {
         // 预览标题
         previewTitleLabel.text = "📸 提取的关键帧"
         previewTitleLabel.font = ThemeManager.headlineFont
-        previewTitleLabel.textColor = .white
+        previewTitleLabel.textColor = ThemeManager.primaryText  // 🎨 修复：使用主题主文本色
         
         // 帧堆栈视图
         framesStackView.axis = .horizontal
@@ -275,7 +275,7 @@ class TimeSequenceViewController: UIViewController {
         // 帧数量标签
         frameCountLabel.text = "关键帧数量: 5"
         frameCountLabel.font = ThemeManager.bodyFont
-        frameCountLabel.textColor = .white
+        frameCountLabel.textColor = ThemeManager.primaryText  // 🎨 修复：使用主题主文本色
         
         // 帧数量滑块
         frameCountSlider.minimumValue = 3
@@ -286,15 +286,15 @@ class TimeSequenceViewController: UIViewController {
         
         // 处理按钮
         processButton.setTitle("🎨 生成时间序列图片", for: .normal)
-        processButton.setTitleColor(.white, for: .normal)
-        processButton.backgroundColor = ThemeManager.success
+        processButton.setTitleColor(ThemeManager.primaryText, for: .normal)  // 🎨 修复：使用主题主文本色
+        processButton.backgroundColor = ThemeManager.buttonPrimary  // 🎨 修复：使用主题主按钮色而非success绿色
         processButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         processButton.titleLabel?.font = ThemeManager.buttonFont
         processButton.addTarget(self, action: #selector(processButtonTapped), for: .touchUpInside)
         
         // 进度视图
         progressView.progressTintColor = ThemeManager.buttonPrimary
-        progressView.trackTintColor = UIColor.white.withAlphaComponent(0.3)
+        progressView.trackTintColor = ThemeManager.secondaryText.withAlphaComponent(0.3)  // 🎨 修复：使用主题色
         progressView.isHidden = true
         
         // 状态标签
@@ -323,15 +323,15 @@ class TimeSequenceViewController: UIViewController {
         
         // 保存按钮
         saveButton.setTitle("💾 保存到相册", for: .normal)
-        saveButton.setTitleColor(.white, for: .normal)
+        saveButton.setTitleColor(ThemeManager.primaryText, for: .normal)  // 🎨 修复：使用主题主文本色
         saveButton.backgroundColor = ThemeManager.buttonPrimary
         saveButton.layer.cornerRadius = ThemeManager.smallCornerRadius
         saveButton.addTarget(self, action: #selector(saveButtonTapped), for: .touchUpInside)
         
         // 分享按钮
         shareButton.setTitle("📤 分享", for: .normal)
-        shareButton.setTitleColor(.white, for: .normal)
-        shareButton.backgroundColor = ThemeManager.success
+        shareButton.setTitleColor(.white, for: .normal)  // 白色文字在绿色背景上
+        shareButton.backgroundColor = ThemeManager.success  // 保持success绿色，这里合理
         shareButton.layer.cornerRadius = ThemeManager.smallCornerRadius
         shareButton.addTarget(self, action: #selector(shareButtonTapped), for: .touchUpInside)
         
@@ -347,8 +347,8 @@ class TimeSequenceViewController: UIViewController {
         
         // 返回录像按钮
         returnToRecordingButton.setTitle("🎥 返回时光序列录像", for: .normal)
-        returnToRecordingButton.setTitleColor(.white, for: .normal)
-        returnToRecordingButton.backgroundColor = UIColor.systemBlue
+        returnToRecordingButton.setTitleColor(ThemeManager.primaryText, for: .normal)  // 🎨 修复：使用主题主文本色
+        returnToRecordingButton.backgroundColor = ThemeManager.buttonSecondary  // 🎨 修复：使用主题次要按钮色
         returnToRecordingButton.layer.cornerRadius = ThemeManager.standardCornerRadius
         returnToRecordingButton.titleLabel?.font = ThemeManager.buttonFont
         returnToRecordingButton.addTarget(self, action: #selector(returnToRecordingButtonTapped), for: .touchUpInside)
@@ -563,24 +563,44 @@ class TimeSequenceViewController: UIViewController {
         print("🎨 TimeSequenceViewController: 主题已切换，更新UI颜色")
         
         UIView.animate(withDuration: 0.3) {
-            // 更新标题颜色
-            self.titleLabel.textColor = .white
+            // 🎨 更新标题颜色
+            self.titleLabel.textColor = ThemeManager.primaryText
             self.subtitleLabel.textColor = ThemeManager.secondaryText
             
-            // 更新按钮颜色
-            self.selectVideoButton.backgroundColor = ThemeManager.buttonPrimary
-            self.processButton.backgroundColor = ThemeManager.buttonPrimary
-            self.saveButton.backgroundColor = ThemeManager.success
-            self.shareButton.backgroundColor = ThemeManager.buttonPrimary
-            self.returnToRecordingButton.backgroundColor = ThemeManager.buttonDeepPurple
+            // 🎨 更新卡片背景
+            self.videoSelectionView.backgroundColor = ThemeManager.cardBackground
+            self.previewContainerView.backgroundColor = ThemeManager.cardBackground
+            self.controlPanelView.backgroundColor = ThemeManager.cardBackground
+            self.resultContainerView.backgroundColor = ThemeManager.cardBackground
+            self.bottomActionView.backgroundColor = ThemeManager.cardBackground
             
-            // 更新标签颜色
+            // 🎨 更新按钮颜色
+            self.selectVideoButton.backgroundColor = ThemeManager.buttonPrimary
+            self.selectVideoButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+            
+            self.processButton.backgroundColor = ThemeManager.buttonPrimary
+            self.processButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+            
+            self.saveButton.backgroundColor = ThemeManager.buttonPrimary
+            self.saveButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+            
+            self.shareButton.backgroundColor = ThemeManager.success
+            self.shareButton.setTitleColor(.white, for: .normal)  // 白色文字在绿色背景上
+            
+            self.returnToRecordingButton.backgroundColor = ThemeManager.buttonSecondary
+            self.returnToRecordingButton.setTitleColor(ThemeManager.primaryText, for: .normal)
+            
+            // 🎨 更新标签颜色
             self.previewTitleLabel.textColor = ThemeManager.primaryText
             self.frameCountLabel.textColor = ThemeManager.primaryText
             self.statusLabel.textColor = ThemeManager.secondaryText
             
-            // 更新滑块颜色
+            // 🎨 更新滑块颜色
             self.frameCountSlider.tintColor = ThemeManager.buttonPrimary
+            
+            // 🎨 更新进度条颜色
+            self.progressView.progressTintColor = ThemeManager.buttonPrimary
+            self.progressView.trackTintColor = ThemeManager.secondaryText.withAlphaComponent(0.3)
         }
     }
     
