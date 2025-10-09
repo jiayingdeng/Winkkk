@@ -22,6 +22,9 @@ class VideoGalleryViewController: UIViewController {
     // MARK: - Delegate
     weak var delegate: VideoGalleryViewControllerDelegate?
     
+    // MARK: - Managers
+    private let hapticManager = HapticFeedbackManager.shared
+    
     // MARK: - UI Components
     private lazy var collectionView: UICollectionView = {
         let layout = createCollectionViewLayout()
