@@ -231,10 +231,6 @@ class CollageViewController: UIViewController {
     
     /// 处理主题切换
     @objc private func handleThemeChange() {
-        // 🎨 更新导航栏颜色
-        navigationController?.navigationBar.tintColor = ThemeManager.buttonPrimary
-        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: ThemeManager.primaryText]
-        
         // 更新头部区域颜色
         countLabel.textColor = ThemeManager.primaryText
         statusLabel.textColor = ThemeManager.secondaryText
@@ -864,9 +860,8 @@ class CollageViewController: UIViewController {
     
     private func configureNavigationBar() {
         title = "创建拼图"
-        // 🎨 使用主题色，确保按钮在各种背景下都可见
-        navigationController?.navigationBar.tintColor = ThemeManager.buttonPrimary
-        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: ThemeManager.primaryText]
+        navigationController?.navigationBar.tintColor = .white
+        navigationController?.navigationBar.titleTextAttributes = [.foregroundColor: UIColor.white]
         
         navigationItem.leftBarButtonItem = UIBarButtonItem(
             title: "取消",
@@ -1069,6 +1064,16 @@ class CollageViewController: UIViewController {
         HapticFeedbackManager.shared.buttonTap()
         
         let activityVC = UIActivityViewController(activityItems: [image], applicationActivities: nil)
+        
+        // 分享完成回调
+        activityVC.completionWithItemsHandler = { [weak self] activityType, completed, returnedItems, error in
+            if completed {
+                DispatchQueue.main.async {
+                    self?.showToast(icon: "square.and.arrow.up.circle.fill", title: "分享成功", message: "拼图已成功分享")
+                    HapticFeedbackManager.shared.notificationSuccess()
+                }
+            }
+        }
         
         // iPad适配
         if let popover = activityVC.popoverPresentationController {
@@ -1542,6 +1547,87 @@ class CollageViewController: UIViewController {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "确定", style: .default))
         present(alert, animated: true)
+    }
+    
+    /// 显示Toast提示
+    private func showToast(icon: String, title: String, message: String) {
+        let toastView = UIView()
+        toastView.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.95)
+        toastView.layer.cornerRadius = 16
+        toastView.layer.shadowColor = UIColor.black.cgColor
+        toastView.layer.shadowOpacity = 0.15
+        toastView.layer.shadowOffset = CGSize(width: 0, height: 4)
+        toastView.layer.shadowRadius = 12
+        toastView.translatesAutoresizingMaskIntoConstraints = false
+        
+        let iconLabel = UILabel()
+        iconLabel.text = icon.contains(".") ? "" : icon
+        if icon.contains(".") {
+            let imageAttachment = NSTextAttachment()
+            let config = UIImage.SymbolConfiguration(pointSize: 44, weight: .medium)
+            if let image = UIImage(systemName: icon, withConfiguration: config)?.withTintColor(ThemeManager.success, renderingMode: .alwaysOriginal) {
+                imageAttachment.image = image
+                let attributedString = NSAttributedString(attachment: imageAttachment)
+                iconLabel.attributedText = attributedString
+            }
+        }
+        iconLabel.font = UIFont.systemFont(ofSize: 44)
+        iconLabel.textAlignment = .center
+        iconLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        let titleLabel = UILabel()
+        titleLabel.text = title
+        titleLabel.font = UIFont.systemFont(ofSize: 18, weight: .semibold)
+        titleLabel.textColor = ThemeManager.primaryText
+        titleLabel.textAlignment = .center
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        let messageLabel = UILabel()
+        messageLabel.text = message
+        messageLabel.font = UIFont.systemFont(ofSize: 14, weight: .regular)
+        messageLabel.textColor = ThemeManager.secondaryText
+        messageLabel.textAlignment = .center
+        messageLabel.numberOfLines = 0
+        messageLabel.translatesAutoresizingMaskIntoConstraints = false
+        
+        toastView.addSubview(iconLabel)
+        toastView.addSubview(titleLabel)
+        toastView.addSubview(messageLabel)
+        view.addSubview(toastView)
+        
+        NSLayoutConstraint.activate([
+            toastView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            toastView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            toastView.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 40),
+            toastView.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -40),
+            
+            iconLabel.topAnchor.constraint(equalTo: toastView.topAnchor, constant: 20),
+            iconLabel.centerXAnchor.constraint(equalTo: toastView.centerXAnchor),
+            
+            titleLabel.topAnchor.constraint(equalTo: iconLabel.bottomAnchor, constant: 12),
+            titleLabel.leadingAnchor.constraint(equalTo: toastView.leadingAnchor, constant: 20),
+            titleLabel.trailingAnchor.constraint(equalTo: toastView.trailingAnchor, constant: -20),
+            
+            messageLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            messageLabel.leadingAnchor.constraint(equalTo: toastView.leadingAnchor, constant: 20),
+            messageLabel.trailingAnchor.constraint(equalTo: toastView.trailingAnchor, constant: -20),
+            messageLabel.bottomAnchor.constraint(equalTo: toastView.bottomAnchor, constant: -20)
+        ])
+        
+        toastView.alpha = 0
+        toastView.transform = CGAffineTransform(scaleX: 0.8, y: 0.8)
+        
+        UIView.animate(withDuration: 0.3, delay: 0, usingSpringWithDamping: 0.7, initialSpringVelocity: 0.5, options: .curveEaseOut, animations: {
+            toastView.alpha = 1
+            toastView.transform = .identity
+        }) { _ in
+            UIView.animate(withDuration: 0.25, delay: 2.0, options: .curveEaseIn, animations: {
+                toastView.alpha = 0
+                toastView.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
+            }) { _ in
+                toastView.removeFromSuperview()
+            }
+        }
     }
 }
 
